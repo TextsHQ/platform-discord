@@ -1,12 +1,10 @@
 import { CookieJar } from 'tough-cookie'
-import { PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Thread, Message, CurrentUser, InboxName, MessageContent, PaginationArg, texts } from '@textshq/platform-sdk'
+import { PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Thread, Message, CurrentUser, InboxName, MessageContent, PaginationArg } from '@textshq/platform-sdk'
 import DiscordAPI from './network-api'
-
-const seenEvents = new Set()
 
 const sleep = (s: number) => new Promise(resolve => setTimeout(resolve, s))
 
-export default class LocalAPI implements PlatformAPI {
+export default class Discord implements PlatformAPI {
   private eventLoopRunning = true
 
   private eventCallback: OnServerEventCallback
@@ -19,13 +17,13 @@ export default class LocalAPI implements PlatformAPI {
 
   login = async (creds): Promise<LoginResult> => {
     if (!creds.cookieJarJSON) return { type: 'error' }
-    const cookies = CookieJar.fromJSON(creds.cookieJarJSON).getCookiesSync('https://discord.com')
-    const token = cookies.find(c => c.key === 'token').value
-    if (!token) {
+    const cookie = creds.cookieJarJSON.cookies.find(c => c.key === 'token')
+
+    if (!cookie.value) {
       return { type: 'error' }
     }
 
-    this.discordAPI.setToken(token)
+    this.discordAPI.setToken(cookie.value)
     return { type: 'success' }
   }
 

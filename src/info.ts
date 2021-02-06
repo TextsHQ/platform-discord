@@ -9,11 +9,21 @@ const info: PlatformInfo = {
   icon: FaDiscord,
   loginMode: 'browser',
   browserLogin: {
-    loginURL: 'https://discord.com/api/oauth2/authorize?client_id=807610792647852032&redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Fdiscord%2Foauth2&response_type=code&scope=email%20identify%20messages.read%20webhook.incoming%20guilds%20rpc%20rpc.notifications.read%20relationships.read',
+    loginURL: 'https://discord.com/login',
     authCookieName: 'token',
     windowWidth: 950,
     windowHeight: 650,
-    runJSOnNavigate: 'console.log(document.location.href)',
+    runJSOnLaunch: `
+      const iframe = document.createElement('iframe');
+      document.head.append(iframe);
+
+      const i = setInterval(function() {
+        if (iframe.contentWindow.localStorage.token) {
+          clearInterval(i);
+          document.cookie = "token=" + iframe.contentWindow.localStorage.token.slice(1, -1);
+        }
+      }, 100)
+    `,
   },
   deletionMode: MessageDeletionMode.DELETE_FOR_EVERYONE,
   attributes: new Set([

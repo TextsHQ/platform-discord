@@ -1,10 +1,9 @@
-import { CurrentUser, texts } from '@textshq/platform-sdk'
+import { CurrentUser } from '@textshq/platform-sdk'
 
-const { Sentry } = texts
 const got = require('got')
 
 function handleErrors(json: JSON) {
-  console.log(json)
+  console.error(json)
 }
 
 export default class TwitterAPI {
@@ -19,16 +18,15 @@ export default class TwitterAPI {
     const userJson = await this.fetch({ method: 'GET', url: 'https://discord.com/api/v8/users/@me' })
     if (!userJson) throw new Error('No response')
 
-    console.log(userJson)
-
     return {
       displayText: `${userJson.username}#${userJson.discriminator}`,
       id: userJson.id,
+      fullName: userJson.username,
       username: `${userJson.username}#${userJson.discriminator}`,
       phoneNumber: userJson.phone,
       email: userJson.email,
       nickname: userJson.username,
-      imgURL: undefined,
+      imgURL: `https://cdn.discordapp.com/avatars/${userJson.id}/${userJson.avatar}.png?size=256`,
       isVerified: userJson.verified,
       cannotMessage: true,
       isSelf: true,
@@ -38,7 +36,6 @@ export default class TwitterAPI {
   // - MARK: Private functions
   private fetch = async ({ headers = {}, ...rest }) => {
     if (!this.token) throw new Error('Discord token hasn\'t been found.')
-    console.log(this.token)
 
     try {
       const res = await got({
