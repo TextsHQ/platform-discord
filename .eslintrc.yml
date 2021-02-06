@@ -1,0 +1,6 @@
+extends: '@textshq'
+rules:
+  global-require: off
+  arrow-body-style: off
+parserOptions:
+  project: ./tsconfig.json
