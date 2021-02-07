@@ -24,6 +24,7 @@ const info: PlatformInfo = {
         if (iframe.contentWindow.localStorage.token) {
           clearInterval(i);
           document.cookie = "token=" + iframe.contentWindow.localStorage.token.slice(1, -1);
+          return true;
         }
       }, 100)
     `,
@@ -32,6 +33,7 @@ const info: PlatformInfo = {
   attributes: new Set([
     Attribute.NO_CACHE,
   ]),
+  // auth: '<bold>WARNING:</bold> Discord prohibits using third-party clients. <bold>Use at your own risk.</bold>',
 }
 
 export default info

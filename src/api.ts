@@ -7,17 +7,17 @@ export default class Discord implements PlatformAPI {
 
   eventCallback: OnServerEventCallback
 
-  init = async (cookieJarJSON?: CookieJar.Serialized) => {
-    if (!cookieJarJSON) return
-    const cookie = cookieJarJSON.cookies.find(c => c.key === 'token')
+  init = async (session: any) => {
+    console.log(session)
+
+    if (!session) return
+    const cookie = session.cookies.find(c => c.key === 'token')
 
     if (!cookie.value) {
       return
     }
 
-    if (!this.api) {
-      this.api = new DiscordAPI(cookie.value)
-    }
+    this.api = new DiscordAPI(cookie.value)
   }
 
   login = async (creds): Promise<LoginResult> => {
@@ -28,9 +28,7 @@ export default class Discord implements PlatformAPI {
       return { type: 'error' }
     }
 
-    if (!this.api) {
-      this.api = new DiscordAPI(cookie.value)
-    }
+    this.api = new DiscordAPI(cookie.value)
     return { type: 'success' }
   }
 
@@ -52,18 +50,45 @@ export default class Discord implements PlatformAPI {
 
   searchUsers = async (typed: string) => []
 
-  createThread = (userIDs: string[]) => null as any
+  createThread = (userIDs: string[]) => {
+    /* const thread: Thread = {
+      id: string;
+      title?: string;
+      isUnread: boolean;
+      isReadOnly: boolean;
+      isArchived?: boolean;
+      isPinned?: boolean;
+      mutedUntil?: Date | 'forever';
+      type: ThreadType;
+      timestamp: Date;
+      imgURL?: string;
+      createdAt?: Date;
+      description?: string;
+      lastMessageSnippet?: string;
+      messageExpirySeconds?: number;
+      messages: Paginated<Message>;
+      participants: Paginated<Participant>;
+    } */
+
+    return false
+  }
 
   getThreads = async (inboxName: InboxName, pagination?: PaginationArg): Promise<Paginated<Thread>> => {
     if (!this.api) {
       throw new Error('No DiscordAPI initialized.')
     }
 
-    return { items: await this.api.getThreads(), hasMore: false }
+    return { items: await this.api.getThreads(inboxName, pagination), hasMore: false }
   }
 
   getMessages = async (threadID: string, pagination?: PaginationArg): Promise<Paginated<Message>> => {
-    return { items: [], hasMore: false }
+    console.log(pagination)
+
+    if (!this.api) {
+      throw new Error('No DiscordAPI initialized.')
+    }
+
+    return { items: await this.api.getMessages(threadID, pagination), hasMore: false }
   }
 
   sendMessage = async (threadID: string, content: MessageContent) => {
