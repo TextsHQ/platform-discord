@@ -31,7 +31,8 @@ const info: PlatformInfo = {
   },
   deletionMode: MessageDeletionMode.DELETE_FOR_EVERYONE,
   attributes: new Set([
-    Attribute.NO_CACHE,
+    Attribute.SUPPORTS_PRESENCE,
+    Attribute.SUPPORTS_QUOTED_MESSAGES,
   ]),
   // auth: '<bold>WARNING:</bold> Discord prohibits using third-party clients. <bold>Use at your own risk.</bold>',
 }
