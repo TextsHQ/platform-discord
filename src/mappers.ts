@@ -38,23 +38,23 @@ export function mapThread(thread: any, currentUser?: User, lastMessage?: any): T
   if (currentUser && type !== 'single') participants.push(currentUser)
   participants.sort((a, b) => (a.username ?? '') < (b.username ?? '') ? 1 : -1 )
 
-  const firstParticipant: User = participants[0]
-  const title: string = thread.name || participants.map(p => p.username).join(', ') || '<unnamed>'
+  const firstParticipant = participants[0]
 
   return {
+    _original: JSON.stringify(thread),
     id: thread.id,
-    title,
+    title: thread.name,
     isUnread: false,
     isReadOnly: false,
     isArchived: undefined,
     isPinned: false,
     // mutedUntil?: Date | 'forever',
     type,
-    timestamp: new Date(thread.timestamp || lastMessage.timestamp || 0),
-    imgURL: thread.icon ?? thread === 'single' ? firstParticipant.imgURL : undefined,
+    timestamp: new Date(thread.timestamp || lastMessage?.timestamp || 0),
+    imgURL: thread.icon,
     // createdAt?: Date,
     // description: undefined,
-    lastMessageSnippet: lastMessage.content,
+    lastMessageSnippet: lastMessage?.content,
     messages: {
       hasMore: true,
       items: [],
