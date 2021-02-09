@@ -61,24 +61,25 @@ export default class DiscordAPI {
   }
 
   public getThreads = async (inboxName: InboxName, pagination?: PaginationArg): Promise<Thread[]> => {
-    const json = await this.fetch({ method: 'GET', url: `${API_ENDPOINT}/users/@me/channels` })
-    if (!json) throw new Error('No response')
+    const threads = await this.fetch({ method: 'GET', url: `${API_ENDPOINT}/users/@me/channels` })
+    if (!threads) throw new Error('No response')
 
-    return Promise.all(json.map(async thread => {
-      const lastMessage = await this.fetch({ method: 'GET', url: `https://discord.com/api/v8/channels/${thread.id}/messages?limit=1` })
-      return mapThread(thread, this.currentUser, (lastMessage.length > 0 ? lastMessage[0] : undefined))
+    return Promise.all(threads.map(async (thread, index) => {
+      const messages = index <= LIMIT_COUNT ? await this.fetch({ method: 'GET', url: `${API_ENDPOINT}/channels/${thread.id}/messages?limit=1` }) : []
+      return mapThread(thread, this.currentUser, (messages.length > 0 ? messages[0] : undefined))
     }))
   }
 
   public getMessages = async (threadID: string, pagination?: PaginationArg): Promise<TextsMessage[]> => {
     if (!this.currentUser) throw new Error('No current user')
 
-    while (!this.ready && WAIT_TILL_READY) await sleep(1000)
+    const options = {
+      before: (pagination?.direction === 'before') ? pagination?.cursor : undefined,
+      after: (pagination?.direction === 'after') ? pagination?.cursor : undefined
+    }
+    const paginationQuery = options.before ? `before=${options.before}` : options.after ? `after=${options.after}` : ''
+    const messages = await this.fetch({ method: 'GET', url: `${API_ENDPOINT}/channels/${threadID}/messages?limit=50&${paginationQuery}` })
 
-    const channel: DMChannel = await this.client.channels.fetch(threadID) as DMChannel
-    if (!channel) throw new Error('Channel not found!')
-
-    const messages = await channel.messages.fetch()
     return messages
       .map(m => mapMessage(m, this.currentUser.id))
       .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
@@ -106,7 +107,7 @@ export default class DiscordAPI {
     if (message.guild) return
 
     // Ignore empty messages
-    if (!message.content && !message.embeds) return
+    if (!message.content && !message.embeds && !message.attachments && !message.reactions) return
 
     if (this.eventCallback) this.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: message.channel.id }])
   }
@@ -139,11 +140,12 @@ export default class DiscordAPI {
     this.client.on('message', this.messageHandler)
     this.client.on('messageDelete', msg => {
       if (msg.guild) return
-      texts.log('messageDelete')
+      if (this.eventCallback) this.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: msg.channel.id }])
     })
     this.client.on('messageDeleteBulk', msgs => {
-      const messages = msgs.filter(m => !m.guild)
-      texts.log('messageDeleteBulk')
+      msgs.filter(m => !m.guild).forEach(m => {
+        if (this.eventCallback) this.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: m.channel.id }])
+      })
     })
     this.client.on('messageReactionAdd', reaction => {
       if (reaction.message.guild) return
@@ -153,32 +155,32 @@ export default class DiscordAPI {
       if (reaction.message.guild) return
       if (this.eventCallback) this.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: reaction.message.id }])
     })
-    this.client.on('messageReactionRemoveAll', reactions => {
-      if (reactions.guild) return
-      texts.log('messageReactionRemoveAll ' + reactions)
+    this.client.on('messageReactionRemoveAll', message => {
+      if (message.guild) return
+      if (this.eventCallback) this.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: message.channel.id }])
     })
     this.client.on('messageReactionRemoveEmoji', reactionEmoji => {
       if (reactionEmoji.message.guild) return
       if (this.eventCallback) this.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: reactionEmoji.message.id }])
     })
-    this.client.on('messageUpdate', (msg1, msg2) => {
-      if (msg1.guild || msg2.guild) return
-      if (this.eventCallback) this.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: msg1.channel.id }])
+    this.client.on('messageUpdate', msg => {
+      if (msg.guild) return
+      if (this.eventCallback) this.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: msg.channel.id }])
     })
-    this.client.on('presenceUpdate', (presence1, presence2) => {
-      if (presence1?.guild || presence2.guild) return
+    this.client.on('presenceUpdate', (_, presence) => {
+      if (presence.guild) return
 
-      texts.log('presenceUpdate', presence1, presence2)
+      if (this.eventCallback) this.eventCallback([{ type: ServerEventType.USER_PRESENCE_UPDATED, presence: { userID: presence.userID, isActive: presence.status !== 'invisible' && presence.status !== 'offline', lastActive: new Date() } }])
     })
     this.client.on('rateLimit', limit => {
-      texts.log('We\'re being ratelimited: ' + limit)
+      texts.log('We\'re being ratelimited: ' + limit.limit, limit.timeout)
     })
     this.client.on('typingStart', (channel, user) => {
       if (channel.type !== 'dm' && channel.type !== 'group') return
       if (this.eventCallback) this.eventCallback([{ type: ServerEventType.PARTICIPANT_TYPING, typing: user.typingIn(channel.id), participantID: user.id, threadID: channel.id }])
     })
-    this.client.on('userUpdate', (user1, user2) => {
-      texts.log('userUpdate')
+    this.client.on('userUpdate', (_, user) => {
+      if (this.eventCallback) this.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: user.id }])
     })
   }
 

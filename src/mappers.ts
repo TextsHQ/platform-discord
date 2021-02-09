@@ -1,5 +1,4 @@
-import { CurrentUser, Message as TextsMessage, MessageAttachment as TextsMessageAttachment, MessageAttachmentType, MessageLink, MessageReaction as TextsMessageReaction, Thread, ThreadType, User } from '@textshq/platform-sdk'
-import { Message as DiscordMessage, MessageReaction as DiscordMessageReaction } from 'better-discord.js'
+import { CurrentUser, Message as TextsMessage, MessageAttachment as TextsMessageAttachment, MessageAttachmentType, MessageLink, MessageReaction, MessageReaction as TextsMessageReaction, Thread, ThreadType, User } from '@textshq/platform-sdk'
 
 export function mapUser(user: any): User {
   return {
@@ -38,22 +37,16 @@ export function mapThread(thread: any, currentUser?: User, lastMessage?: any): T
   if (currentUser && type !== 'single') participants.push(currentUser)
   participants.sort((a, b) => (a.username ?? '') < (b.username ?? '') ? 1 : -1 )
 
-  const firstParticipant = participants[0]
-
   return {
     _original: JSON.stringify(thread),
     id: thread.id,
     title: thread.name,
     isUnread: false,
     isReadOnly: false,
-    isArchived: undefined,
-    isPinned: false,
-    // mutedUntil?: Date | 'forever',
     type,
     timestamp: new Date(thread.timestamp || lastMessage?.timestamp || 0),
-    imgURL: thread.icon,
-    // createdAt?: Date,
-    // description: undefined,
+    imgURL: (type === 'group' && thread.icon) ? `https://cdn.discordapp.com/channel-icons/${thread.id}/${thread.icon}.png` : thread.icon,
+    description: thread.topic,
     lastMessageSnippet: lastMessage?.content,
     messages: {
       hasMore: true,
@@ -66,7 +59,7 @@ export function mapThread(thread: any, currentUser?: User, lastMessage?: any): T
   }
 }
 
-export function mapMessage(message: DiscordMessage, currentUserID: string): TextsMessage {
+export function mapMessage(message: any, currentUserID: string): TextsMessage {
   const attachments: TextsMessageAttachment[] = message.attachments.map(a => {
     // TODO: Improve it
     const lowercased = (a.name || a.url).toLowerCase()
@@ -100,35 +93,42 @@ export function mapMessage(message: DiscordMessage, currentUserID: string): Text
   })
 
   const links: MessageLink[] = message.embeds
-    .filter(e => e.type === 'article' || e.type === 'link')
+    .filter(e => e.type === 'article' || e.type === 'link' || e.type === 'video' || e.type === 'rich')
     .filter(e => e.url)
     .map(e => {
       return {
         url: e.url!,
-        img: e.thumbnail?.url || undefined,
-        imgSize: (e.thumbnail?.width && e.thumbnail.height) ? { width: e.thumbnail.width, height: e.thumbnail.height } : undefined,
-        title: e.title || e.url!,
+        img: e.thumbnail?.url || e.image?.url,
+        imgSize: { width: e.thumbnail?.width || e.image?.width, height: e.thumbnail?.height || e.image?.height },
+        title: e.title || e.author?.name || e.url!,
         summary: e.description || undefined,
       }
     })
 
+  // TODO: Improve this - as of right now, it only displays reactions that current user has added.
+  const reactions: MessageReaction[] = (message.reactions || []).filter(r => r.me).map(r => {
+    return {
+      id: r.emoji.id || r.emoji.name,
+      reactionKey: r.emoji.name,
+      participantID: currentUserID,
+      emoji: r.emoji != undefined
+    }
+  })
+
   return {
+    _original: message,
     id: message.id,
-    timestamp: message.createdAt,
-    editedTimestamp: message.editedAt || undefined,
+    timestamp: new Date(Date.parse(message.timestamp)),
+    editedTimestamp: message.edited_timestamp ? new Date(Date.parse(message.edited_timestamp)) : undefined,
     senderID: message.author.id,
     text: message.content,
     attachments,
     links,
-    reactions: [], // TODO MessageReaction[],
+    reactions,
     isSender: currentUserID === message.author.id,
-    silent: false, // TODO: boolean,
-    linkedMessageID: message.reference?.messageID || undefined,
+    linkedMessageID: message.referenced_message?.id,
     isDeleted: message.deleted,
-    // action?: MessageAction,
-    // cursor?: string,
-    // buttons?: MessageButton[],
-    // extra?: any,
-    threadID: message.channel.id,
+    cursor: message.id,
+    threadID: message.channel_id,
   }
 }

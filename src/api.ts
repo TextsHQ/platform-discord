@@ -63,7 +63,8 @@ export default class Discord implements PlatformAPI {
   }
 
   getMessages = async (threadID: string, pagination?: PaginationArg): Promise<Paginated<Message>> => {
-    return { items: await this.api.getMessages(threadID, pagination), hasMore: false }
+    // TODO: Improve this - check if there's more messages
+    return { items: await this.api.getMessages(threadID, pagination), hasMore: true }
   }
 
   sendMessage = async (threadID: string, content: MessageContent) => this.api.sendMessage(threadID, content)
