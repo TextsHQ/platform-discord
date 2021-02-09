@@ -189,6 +189,21 @@ export default class DiscordAPI {
     this.client.on('userUpdate', (_, user) => {
       if (this.eventCallback) this.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: user.id }])
     })
+    this.client.on('channelCreate', channel => {
+      if (channel.type !== 'dm' && channel.type !== 'group') return
+      if (this.eventCallback) this.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: channel.id }])
+    })
+    this.client.on('channelDelete', channel => {
+      if (channel.type !== 'dm' && channel.type !== 'group') return
+      if (this.eventCallback) this.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: channel.id }])
+    })
+    this.client.on('channelUpdate', (_, channel) => {
+      if (channel.type !== 'dm' && channel.type !== 'group') return
+      if (this.eventCallback) this.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: channel.id }])
+    })
+    this.client.on('relationshipAdd', (_, relation) => {
+      console.log('relationshipAdd')
+    })
   }
 
   private fetch = async ({ headers = {}, ...rest }) => {
