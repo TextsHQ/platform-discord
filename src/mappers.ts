@@ -1,10 +1,10 @@
-import { CurrentUser, Message as TextsMessage, MessageAttachment as TextsMessageAttachment, MessageAttachmentType, MessageLink, MessageReaction, MessageReaction as TextsMessageReaction, Thread, ThreadType, User } from '@textshq/platform-sdk'
+import { CurrentUser, Message as TextsMessage, MessageAttachment as TextsMessageAttachment, MessageAttachmentType, MessageLink, MessageReaction, Thread, ThreadType, User } from '@textshq/platform-sdk'
 
 export function mapUser(user: any): User {
   return {
     id: user.id,
-    fullName: `${user.username}#${user.discriminator}`,
-    username: user.username,
+    fullName: user.username,
+    username: `${user.username}#${user.discriminator}`,
     nickname: user.username,
     imgURL: user.avatar ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=256` : undefined,
     isVerified: false,
@@ -34,8 +34,8 @@ export function mapThread(thread: any, currentUser?: User, lastMessage?: any): T
   const type: ThreadType = MAP_THREAD_TYPE[thread.type]
 
   const participants: User[] = thread.recipients.map(mapUser)
-  if (currentUser && type !== 'single') participants.push(currentUser)
   participants.sort((a, b) => (a.username ?? '') < (b.username ?? '') ? 1 : -1 )
+  if (currentUser) participants.push(currentUser)
 
   return {
     _original: JSON.stringify(thread),

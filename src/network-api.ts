@@ -9,6 +9,7 @@ const got = require('got')
 const API_ENDPOINT = 'https://discord.com/api/v8'
 const LIMIT_COUNT = 25
 const WAIT_TILL_READY = true
+const RESTART_ON_FAIL = true
 
 function handleErrors(json: any): boolean {
   if (json.code && DISCORD_ERROR[json.code]) {
@@ -73,6 +74,8 @@ export default class DiscordAPI {
   public getMessages = async (threadID: string, pagination?: PaginationArg): Promise<TextsMessage[]> => {
     if (!this.currentUser) throw new Error('No current user')
 
+    while (!this.ready && WAIT_TILL_READY) await sleep(1000)
+
     const options = {
       before: (pagination?.direction === 'before') ? pagination?.cursor : undefined,
       after: (pagination?.direction === 'after') ? pagination?.cursor : undefined
@@ -123,14 +126,20 @@ export default class DiscordAPI {
     this.client.on('disconnect', () => {
       texts.log('Disconnected from gateway.')
       this.ready = false
+
+      if (RESTART_ON_FAIL) this.client.login(this.token, false)
     })
     this.client.on('invalidated', () => {
       texts.log('Gateway connection invalidated')
       this.ready = false
+
+      if (RESTART_ON_FAIL) this.client.login(this.token, false)
     })
     this.client.on('error', error => {
       texts.error('Gateway error:' + error)
       this.ready = false
+
+      if (RESTART_ON_FAIL) this.client.login(this.token, false)
       throw error
     })
     this.client.on('warn', warning => {
@@ -143,9 +152,7 @@ export default class DiscordAPI {
       if (this.eventCallback) this.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: msg.channel.id }])
     })
     this.client.on('messageDeleteBulk', msgs => {
-      msgs.filter(m => !m.guild).forEach(m => {
-        if (this.eventCallback) this.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: m.channel.id }])
-      })
+      if (this.eventCallback) this.eventCallback(msgs.filter(m => !m.guild).map(m => ({ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: m.channel.id })))
     })
     this.client.on('messageReactionAdd', reaction => {
       if (reaction.message.guild) return
@@ -170,7 +177,7 @@ export default class DiscordAPI {
     this.client.on('presenceUpdate', (_, presence) => {
       if (presence.guild) return
 
-      if (this.eventCallback) this.eventCallback([{ type: ServerEventType.USER_PRESENCE_UPDATED, presence: { userID: presence.userID, isActive: presence.status !== 'invisible' && presence.status !== 'offline', lastActive: new Date() } }])
+      if (this.eventCallback) this.eventCallback([{ type: ServerEventType.USER_PRESENCE_UPDATED, presence: { userID: presence.userID, isActive: presence.status === 'online' || presence.status === 'idle', lastActive: new Date() } }])
     })
     this.client.on('rateLimit', limit => {
       texts.log('We\'re being ratelimited: ' + limit.limit, limit.timeout)
