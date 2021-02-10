@@ -157,6 +157,10 @@ export default class DiscordAPI {
     // Ignore messages from guilds - they're not DMs, so we don't care 🤷‍♂️
     if (message.guild) return
 
+    if (message.type === 'RECIPIENT_ADD' || message.type === 'RECIPIENT_REMOVE' || message.type === 'CALL') {
+      // Custom status
+    }
+
     // Ignore empty messages
     if (!message.content && !message.embeds && !message.attachments && !message.reactions) return
 

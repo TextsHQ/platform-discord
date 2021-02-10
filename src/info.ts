@@ -30,11 +30,18 @@ const info: PlatformInfo = {
     `,
   },
   deletionMode: MessageDeletionMode.DELETE_FOR_EVERYONE,
+  /* reactions: {
+    supported: [],
+    supportsDynamicReactions: true,
+    canReactWithAllEmojis: true,
+    allowsMultipleReactionsToSingleMessage: true
+  }, */
   attributes: new Set([
     Attribute.SUPPORTS_PRESENCE,
     Attribute.SUPPORTS_STOP_TYPING_INDICATOR,
     Attribute.SUBSCRIBE_TO_CONN_STATE_CHANGE,
-    Attribute.SUPPORTS_QUOTED_MESSAGES
+    Attribute.SUPPORTS_QUOTED_MESSAGES,
+    Attribute.SUPPORTS_GROUP_IMAGE_CHANGE
   ]),
   // auth: '<bold>WARNING:</bold> Discord prohibits using third-party clients. <bold>Use at your own risk.</bold>',
 }
