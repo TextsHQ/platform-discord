@@ -3,7 +3,7 @@ import { PlatformInfo, MessageDeletionMode, Attribute } from '@textshq/platform-
 const info: PlatformInfo = {
   name: 'discord',
   version: '0.1.0',
-  tags: ['Alpha'],
+  tags: ['Alpha', 'Dangerous'],
   displayName: 'Discord',
   icon: `
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -32,7 +32,9 @@ const info: PlatformInfo = {
   deletionMode: MessageDeletionMode.DELETE_FOR_EVERYONE,
   attributes: new Set([
     Attribute.SUPPORTS_PRESENCE,
-    Attribute.SUPPORTS_QUOTED_MESSAGES,
+    Attribute.SUPPORTS_STOP_TYPING_INDICATOR,
+    Attribute.SUBSCRIBE_TO_CONN_STATE_CHANGE,
+    Attribute.SUPPORTS_QUOTED_MESSAGES
   ]),
   // auth: '<bold>WARNING:</bold> Discord prohibits using third-party clients. <bold>Use at your own risk.</bold>',
 }

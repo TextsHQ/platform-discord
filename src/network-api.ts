@@ -1,5 +1,5 @@
 import { CookieJar } from 'tough-cookie'
-import { texts, CurrentUser, MessageContent, PaginationArg, Thread, Message as TextsMessage, InboxName, PlatformAPI, ServerEventType, OnServerEventCallback, User } from '@textshq/platform-sdk'
+import { texts, CurrentUser, MessageContent, PaginationArg, Thread, Message as TextsMessage, InboxName, PlatformAPI, ServerEventType, OnServerEventCallback, User, ActivityType, OnConnStateChangeCallback } from '@textshq/platform-sdk'
 import { Client as DiscordClient, DMChannel, Message as DiscordMessage } from 'better-discord.js'
 import { mapCurrentUser, mapMessage, mapThread } from './mappers'
 import { DISCORD_ERROR } from './errors'
@@ -22,21 +22,31 @@ async function sleep(time: number) {
 }
 
 export default class DiscordAPI {
+  // Authorization token
   private token?: string
 
+  // Client used to interact with Discord
   private readonly client: DiscordClient = new DiscordClient()
 
+  // Cookie jar, used for authorization
   public cookieJar?: CookieJar
 
-  public currentUser: User
+  // Currently logged in user
+  public currentUser?: CurrentUser
 
+  // Events callback
   public eventCallback?: OnServerEventCallback
 
+  // Connection state change callback
+  public connectionStateChangeCallback?: OnConnStateChangeCallback
+
+  // Client is ready
   public ready: boolean = false
 
   // MARK: - Public functions
 
-  public setLoginState = async (cookieJar: CookieJar) => {
+  // Logs in and setups the gateway listeners
+  public login = async (cookieJar: CookieJar) => {
     if (!cookieJar) throw TypeError()
     this.cookieJar = cookieJar
 
@@ -49,6 +59,13 @@ export default class DiscordAPI {
     this.setupGatewayListeners()
   }
 
+  // Logs out, destroying client
+  public logout = async () => {
+    this.ready = false
+    this.client.destroy()
+  }
+
+  // Fetches the currently logged in user
   public getCurrentUser = async (): Promise<CurrentUser> => {
     const res = await this.fetch({ method: 'GET', url: `${API_ENDPOINT}/users/@me` })
     if (!res.body) throw new Error('No response')
@@ -59,6 +76,7 @@ export default class DiscordAPI {
     return currentUser
   }
 
+  // Fetches all threads
   public getThreads = async (inboxName: InboxName, pagination?: PaginationArg): Promise<Thread[]> => {
     const res = await this.fetch({ method: 'GET', url: `${API_ENDPOINT}/users/@me/channels` })
     if (!res.body) throw new Error('No response')
@@ -73,8 +91,11 @@ export default class DiscordAPI {
     }))
   }
 
+  // Fetches messages from provided threadID
   public getMessages = async (threadID: string, pagination?: PaginationArg): Promise<TextsMessage[]> => {
     if (!this.currentUser) throw new Error('No current user')
+    const currentUser = this.currentUser
+
     while (!this.ready && WAIT_TILL_READY) await sleep(1000)
 
     const options = {
@@ -86,10 +107,11 @@ export default class DiscordAPI {
     if (!res.body) throw new Error('No response')
 
     return JSON.parse(res.body)
-      .map(m => mapMessage(m, this.currentUser.id))
+      .map(m => mapMessage(m, currentUser.id))
       .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
   }
 
+  // Sends a message to provided threadID
   public sendMessage = async (threadID: string, content: MessageContent): Promise<boolean> => {
     const channel: DMChannel = await this.client.channels.fetch(threadID) as DMChannel
     if (!channel) throw new Error('Thread with ID ' + threadID + ' not found!')
@@ -105,15 +127,32 @@ export default class DiscordAPI {
     return true
   }
 
+  // Deletes provided messageID (only if `forEveryone` is true)
   public deleteMessage = async (threadID: string, messageID: string, forEveryone?: boolean): Promise<boolean> => {
     if (forEveryone === false) return true
 
     const res = await this.fetch({ method: 'DELETE', url: `${API_ENDPOINT}/channels/${threadID}/messages/${messageID}` })
-    return res.statusCode == 204
+    return res.statusCode === 204
+  }
+
+  // Sends the TYPING || NOT_TYPING event to channel with provided threadID
+  public setTyping = async (type: ActivityType, threadID: string): Promise<void> => {
+    if (type !== ActivityType.NONE && type !== ActivityType.TYPING) return
+
+    const channel: DMChannel = await this.client.channels.fetch(threadID) as DMChannel
+    if (!channel) throw new Error('Thread with ID ' + threadID + ' not found!')
+    while (!this.ready && WAIT_TILL_READY) await sleep(1000)
+
+    if (type === ActivityType.TYPING) {
+      channel.startTyping()
+    } else if (type === ActivityType.NONE) {
+      channel.stopTyping()
+    }
   }
 
   // - MARK: Private functions
 
+  // Handles received messages
   private messageHandler = (message: DiscordMessage) => {
     // Ignore messages from guilds - they're not DMs, so we don't care 🤷‍♂️
     if (message.guild) return
@@ -124,6 +163,7 @@ export default class DiscordAPI {
     if (this.eventCallback) this.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: message.channel.id }])
   }
 
+  // Setups the gateway listeners
   private setupGatewayListeners = () => {
     texts.log('Connecting to gateway...')
 
@@ -215,6 +255,7 @@ export default class DiscordAPI {
     })
   }
 
+  // Fetch with the authorization token
   private fetch = async ({ headers = {}, ...rest }) => {
     try {
       const res = await got({

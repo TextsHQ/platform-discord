@@ -1,37 +1,40 @@
 import { CookieJar } from 'tough-cookie'
-import { PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Thread, Message, CurrentUser, InboxName, MessageContent, PaginationArg } from '@textshq/platform-sdk'
+import { PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Thread, Message, CurrentUser, InboxName, MessageContent, PaginationArg, OnConnStateChangeCallback, ActivityType } from '@textshq/platform-sdk'
 import DiscordAPI from './network-api'
 
 export default class Discord implements PlatformAPI {
   private api: DiscordAPI = new DiscordAPI()
 
-  eventCallback: OnServerEventCallback
-
   init = async (cookieJarJSON: any) => {
     if (!cookieJarJSON) return
     const cookieJar = CookieJar.fromJSON(cookieJarJSON)
-    await this.api.setLoginState(cookieJar)
+    await this.api.login(cookieJar)
   }
+
+  dispose = async () => this.api.logout()
 
   login = async (creds): Promise<LoginResult> => {
     if (!creds.cookieJarJSON) return { type: 'error' }
-    await this.api.setLoginState(CookieJar.fromJSON(creds.cookieJarJSON as any))
+    await this.api.login(CookieJar.fromJSON(creds.cookieJarJSON as any))
     return { type: 'success' }
   }
 
+  logout = async () => this.api.logout()
+
   serializeSession = () => this.api.cookieJar.toJSON()
 
-  getCurrentUser = async (): Promise<CurrentUser> => this.api.getCurrentUser()
+  getCurrentUser = async () => this.api.getCurrentUser()
 
   subscribeToEvents = (onEvent: OnServerEventCallback) => {
-    this.eventCallback = onEvent
     this.api.eventCallback = onEvent
     this.poll()
   }
 
-  poll = async () => { }
+  onConnectionStateChange = async (onEvent: OnConnStateChangeCallback): Promise<void> => {
+    this.api.connectionStateChangeCallback = onEvent
+  }
 
-  dispose = () => { }
+  poll = async () => { }
 
   searchUsers = async (typed: string) => []
 
@@ -63,15 +66,15 @@ export default class Discord implements PlatformAPI {
   }
 
   getMessages = async (threadID: string, pagination?: PaginationArg): Promise<Paginated<Message>> => {
-    // TODO: Improve this - check if there's more messages
+    // TODO: Check if there's more messages
     return { items: await this.api.getMessages(threadID, pagination), hasMore: true }
   }
 
   sendMessage = async (threadID: string, content: MessageContent) => this.api.sendMessage(threadID, content)
 
-  sendActivityIndicator = (threadID: string) => { }
+  sendActivityIndicator = async (type: ActivityType, threadID: string) => this.api.setTyping(type, threadID)
 
   sendReadReceipt = async (threadID: string, messageID: string) => { }
 
-  deleteMessage = async (threadID: string, messageID: string, forEveryone?: boolean): Promise<boolean> => this.api.deleteMessage(threadID, messageID, forEveryone)
+  deleteMessage = async (threadID: string, messageID: string, forEveryone?: boolean) => this.api.deleteMessage(threadID, messageID, forEveryone)
 }
