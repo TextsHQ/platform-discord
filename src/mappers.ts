@@ -1,4 +1,4 @@
-import { CurrentUser, Message as TextsMessage, MessageAttachment as TextsMessageAttachment, MessageAttachmentType, MessageLink, MessageReaction, Thread, ThreadType, User } from '@textshq/platform-sdk'
+import { CurrentUser, Message as TextsMessage, MessageAttachment as TextsMessageAttachment, MessageAttachmentType, MessageLink, MessageReaction, TextAttributes, Thread, ThreadType, User } from '@textshq/platform-sdk'
 
 const USER_REGEX = /<@!(\d*)>/g
 const EMOTE_REGEX = /<(a?):([A-Za-z0-9_]+):(\d+)>/g
@@ -50,7 +50,7 @@ export function mapThread(thread: any, currentUser?: User, lastMessage?: any): T
     timestamp: new Date(thread.timestamp || lastMessage?.timestamp || 0),
     imgURL: (type === 'group' && thread.icon) ? `https://cdn.discordapp.com/channel-icons/${thread.id}/${thread.icon}.png` : thread.icon,
     description: thread.topic,
-    lastMessageSnippet: transformMessageContent(lastMessage?.content),
+    lastMessageSnippet: lastMessage?.content,
     messages: {
       hasMore: true,
       items: [],
@@ -118,13 +118,13 @@ export function mapMessage(message: any, currentUserID: string): TextsMessage {
     }
   })
 
-  return {
+  let mapped: TextsMessage = {
     _original: message,
     id: message.id,
     timestamp: new Date(Date.parse(message.timestamp)),
     editedTimestamp: message.edited_timestamp ? new Date(Date.parse(message.edited_timestamp)) : undefined,
     senderID: message.author.id,
-    text: transformMessageContent(message.content) || message.content,
+    text: message.content,
     attachments,
     links,
     reactions,
@@ -134,16 +134,46 @@ export function mapMessage(message: any, currentUserID: string): TextsMessage {
     cursor: message.id,
     threadID: message.channel_id,
   }
+
+  if (mapped.text) {
+    const { text, textAttributes } = transformMessageContent(mapped.text)
+    if (text && textAttributes) {
+      mapped.text = text
+      mapped.textAttributes = textAttributes
+    }
+  }
+
+  return mapped
 }
 
-export function transformMessageContent(message?: string): string | undefined {
+export function transformMessageContent(message?: string): { text?: string, textAttributes?: TextAttributes } {
   if (!message) return
 
-  return message
-    .replaceAll(EMOTE_REGEX, (_, animated, emote_name, emote_id) => {
-      return `<img src="https://cdn.discordapp.com/emojis/${emote_id}.${animated ? "gif" : "png"}" alt="${emote_name}">`
+  let textAttributes = { entities: [] }
+  const text = message
+    .replaceAll(EMOTE_REGEX, (matched, animated, _, emote_id, offset) => {
+      const entity = {
+        from: offset,
+        to: offset + matched.length,
+        replaceWithMedia: {
+          mediaType: 'img',
+          srcURL: `https://cdn.discordapp.com/emojis/${emote_id}.${animated ? "gif" : "png"}?size=${message.length === matched.length ? "64": "16"}`
+        }
+      }
+      textAttributes.entities.push(entity)
+      return matched
     })
-    .replaceAll(USER_REGEX, (_, user_id) => {
-      return `<USER_TAG:${user_id}>`
+    .replaceAll(USER_REGEX, (matched, user_id, offset) => {
+      const entity = {
+        from: offset,
+        to: offset + matched.length,
+        mentionedUser: {
+          id: user_id
+        }
+      }
+      textAttributes.entities.push(entity)
+      return matched
     })
+
+  return { text, textAttributes }
 }
