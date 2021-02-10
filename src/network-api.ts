@@ -11,12 +11,10 @@ const LIMIT_COUNT = 25
 const WAIT_TILL_READY = true
 const RESTART_ON_FAIL = true
 
-function handleErrors(json: any): boolean {
+function handleErrors(json: any) {
   if (json.code && DISCORD_ERROR[json.code]) {
     throw DISCORD_ERROR[json.code]
   }
-
-  return true
 }
 
 async function sleep(time: number) {
@@ -52,28 +50,31 @@ export default class DiscordAPI {
   }
 
   public getCurrentUser = async (): Promise<CurrentUser> => {
-    const json = await this.fetch({ method: 'GET', url: `${API_ENDPOINT}/users/@me` })
-    if (!json) throw new Error('No response')
+    const res = await this.fetch({ method: 'GET', url: `${API_ENDPOINT}/users/@me` })
+    if (!res.body) throw new Error('No response')
 
-    const currentUser: CurrentUser = mapCurrentUser(json)
+    const currentUser: CurrentUser = mapCurrentUser(JSON.parse(res.body))
     this.currentUser = currentUser
 
     return currentUser
   }
 
   public getThreads = async (inboxName: InboxName, pagination?: PaginationArg): Promise<Thread[]> => {
-    const threads = await this.fetch({ method: 'GET', url: `${API_ENDPOINT}/users/@me/channels` })
-    if (!threads) throw new Error('No response')
+    const res = await this.fetch({ method: 'GET', url: `${API_ENDPOINT}/users/@me/channels` })
+    if (!res.body) throw new Error('No response')
 
-    return Promise.all(threads.map(async (thread, index) => {
-      const messages = index <= LIMIT_COUNT ? await this.fetch({ method: 'GET', url: `${API_ENDPOINT}/channels/${thread.id}/messages?limit=1` }) : []
-      return mapThread(thread, this.currentUser, (messages.length > 0 ? messages[0] : undefined))
+    return Promise.all(JSON.parse(res.body).map(async (thread, index) => {
+      let messages
+      if (index <= LIMIT_COUNT) {
+        const res = await this.fetch({ method: 'GET', url: `${API_ENDPOINT}/channels/${thread.id}/messages?limit=1` })
+        messages = JSON.parse(res.body)
+      }
+      return mapThread(thread, this.currentUser, ((messages && messages.length > 0) ? messages[0] : undefined))
     }))
   }
 
   public getMessages = async (threadID: string, pagination?: PaginationArg): Promise<TextsMessage[]> => {
     if (!this.currentUser) throw new Error('No current user')
-
     while (!this.ready && WAIT_TILL_READY) await sleep(1000)
 
     const options = {
@@ -81,9 +82,10 @@ export default class DiscordAPI {
       after: (pagination?.direction === 'after') ? pagination?.cursor : undefined
     }
     const paginationQuery = options.before ? `before=${options.before}` : options.after ? `after=${options.after}` : ''
-    const messages = await this.fetch({ method: 'GET', url: `${API_ENDPOINT}/channels/${threadID}/messages?limit=50&${paginationQuery}` })
+    const res = await this.fetch({ method: 'GET', url: `${API_ENDPOINT}/channels/${threadID}/messages?limit=50&${paginationQuery}` })
+    if (!res.body) throw new Error('No response')
 
-    return messages
+    return JSON.parse(res.body)
       .map(m => mapMessage(m, this.currentUser.id))
       .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
   }
@@ -101,6 +103,13 @@ export default class DiscordAPI {
     })
 
     return true
+  }
+
+  public deleteMessage = async (threadID: string, messageID: string, forEveryone?: boolean): Promise<boolean> => {
+    if (forEveryone === false) return true
+
+    const res = await this.fetch({ method: 'DELETE', url: `${API_ENDPOINT}/channels/${threadID}/messages/${messageID}` })
+    return res.statusCode == 204
   }
 
   // - MARK: Private functions
@@ -147,6 +156,10 @@ export default class DiscordAPI {
     })
 
     this.client.on('message', this.messageHandler)
+    this.client.on('messageUpdate', msg => {
+      if (msg.guild) return
+      if (this.eventCallback) this.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: msg.channel.id }])
+    })
     this.client.on('messageDelete', msg => {
       if (msg.guild) return
       if (this.eventCallback) this.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: msg.channel.id }])
@@ -170,17 +183,10 @@ export default class DiscordAPI {
       if (reactionEmoji.message.guild) return
       if (this.eventCallback) this.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: reactionEmoji.message.id }])
     })
-    this.client.on('messageUpdate', msg => {
-      if (msg.guild) return
-      if (this.eventCallback) this.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: msg.channel.id }])
-    })
     this.client.on('presenceUpdate', (_, presence) => {
       if (presence.guild) return
 
       if (this.eventCallback) this.eventCallback([{ type: ServerEventType.USER_PRESENCE_UPDATED, presence: { userID: presence.userID, isActive: presence.status === 'online' || presence.status === 'idle', lastActive: new Date() } }])
-    })
-    this.client.on('rateLimit', limit => {
-      texts.log('We\'re being ratelimited: ' + limit.limit, limit.timeout)
     })
     this.client.on('typingStart', (channel, user) => {
       if (channel.type !== 'dm' && channel.type !== 'group') return
@@ -204,6 +210,9 @@ export default class DiscordAPI {
     this.client.on('relationshipAdd', (_, relation) => {
       console.log('relationshipAdd')
     })
+    this.client.on('rateLimit', limit => {
+      texts.log('We\'re being ratelimited: ' + limit.limit, limit.timeout)
+    })
   }
 
   private fetch = async ({ headers = {}, ...rest }) => {
@@ -217,13 +226,8 @@ export default class DiscordAPI {
         ...rest,
       })
 
-      if (!res.body) return
-
-      const json = JSON.parse(res.body)
-      if (!handleErrors(json)) {
-        return
-      }
-      return json
+      if (res.body && JSON.parse(res.body)) handleErrors(JSON.parse(res.body))
+      return res
     } catch (err) {
       if (err.code === 'ECONNREFUSED' && (err.message.endsWith('0.0.0.0:443') || err.message.endsWith('127.0.0.1:443'))) {
         texts.error('Discord is blocked')

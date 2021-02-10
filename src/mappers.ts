@@ -1,5 +1,8 @@
 import { CurrentUser, Message as TextsMessage, MessageAttachment as TextsMessageAttachment, MessageAttachmentType, MessageLink, MessageReaction, Thread, ThreadType, User } from '@textshq/platform-sdk'
 
+const USER_REGEX = /<@!(\d*)>/g
+const EMOTE_REGEX = /<(a?):([A-Za-z0-9_]+):(\d+)>/g
+
 export function mapUser(user: any): User {
   return {
     id: user.id,
@@ -47,7 +50,7 @@ export function mapThread(thread: any, currentUser?: User, lastMessage?: any): T
     timestamp: new Date(thread.timestamp || lastMessage?.timestamp || 0),
     imgURL: (type === 'group' && thread.icon) ? `https://cdn.discordapp.com/channel-icons/${thread.id}/${thread.icon}.png` : thread.icon,
     description: thread.topic,
-    lastMessageSnippet: lastMessage?.content,
+    lastMessageSnippet: transformMessageContent(lastMessage?.content),
     messages: {
       hasMore: true,
       items: [],
@@ -121,7 +124,7 @@ export function mapMessage(message: any, currentUserID: string): TextsMessage {
     timestamp: new Date(Date.parse(message.timestamp)),
     editedTimestamp: message.edited_timestamp ? new Date(Date.parse(message.edited_timestamp)) : undefined,
     senderID: message.author.id,
-    text: message.content,
+    text: transformMessageContent(message.content) || message.content,
     attachments,
     links,
     reactions,
@@ -131,4 +134,16 @@ export function mapMessage(message: any, currentUserID: string): TextsMessage {
     cursor: message.id,
     threadID: message.channel_id,
   }
+}
+
+export function transformMessageContent(message?: string): string | undefined {
+  if (!message) return
+
+  return message
+    .replaceAll(EMOTE_REGEX, (_, animated, emote_name, emote_id) => {
+      return `<img src="https://cdn.discordapp.com/emojis/${emote_id}.${animated ? "gif" : "png"}" alt="${emote_name}">`
+    })
+    .replaceAll(USER_REGEX, (_, user_id) => {
+      return `<USER_TAG:${user_id}>`
+    })
 }

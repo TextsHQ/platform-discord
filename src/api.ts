@@ -72,4 +72,6 @@ export default class Discord implements PlatformAPI {
   sendActivityIndicator = (threadID: string) => { }
 
   sendReadReceipt = async (threadID: string, messageID: string) => { }
+
+  deleteMessage = async (threadID: string, messageID: string, forEveryone?: boolean): Promise<boolean> => this.api.deleteMessage(threadID, messageID, forEveryone)
 }
