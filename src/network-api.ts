@@ -29,7 +29,7 @@ export default class DiscordAPI {
   private readonly client: DiscordClient = new DiscordClient()
 
   // ID to username mappings
-  private userMappings: Set<{ id: string, username: string }> = new Set()
+  private userMappings: Map<string, string> = new Map()
 
   // Cookie jar, used for authorization
   public cookieJar?: CookieJar
@@ -78,7 +78,7 @@ export default class DiscordAPI {
 
     const currentUser: CurrentUser = mapCurrentUser(JSON.parse(res.body))
     this.currentUser = currentUser
-    this.userMappings.add({ id: currentUser.id, username: currentUser.displayText })
+    this.userMappings.set(currentUser.id, currentUser.displayText)
 
     this.getUserFriends()
 
@@ -98,7 +98,7 @@ export default class DiscordAPI {
 
         thread.recipients
           .forEach(r => {
-            this.userMappings.add({ id: r.id, username: r.username + '#' + r.discriminator })
+            this.userMappings.set(r.id, (r.username + '#' + r.discriminator))
           })
       }
 
@@ -158,8 +158,8 @@ export default class DiscordAPI {
     let text
     if (content.text) {
       text = content.text.replaceAll(/@([^#@]{3,32}#[0-9]{4})/gi, (_, username) => {
-        const user = Array.from(this.userMappings).find(u => u.username === username)
-        if (user) return `<@!${user.id}>`
+        const user = Array.from(this.userMappings).find(u => u[1] === username)
+        if (user) return `<@!${user[0]}>`
 
         return username
       })

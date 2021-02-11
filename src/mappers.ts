@@ -33,7 +33,7 @@ const MAP_THREAD_TYPE: ThreadType[] = [
   'single', // GUILD_STORE
 ]
 
-export function mapThread(thread: any, currentUser?: User, lastMessage?: any, userMappings?: Set<{ id: string, username: string }>): Thread {
+export function mapThread(thread: any, currentUser?: User, lastMessage?: any, userMappings?: Map<string, string>): Thread {
   const type: ThreadType = MAP_THREAD_TYPE[thread.type]
 
   const participants: User[] = thread.recipients.map(mapUser)
@@ -96,7 +96,7 @@ function mapAttachment(a): MessageAttachment {
   }
 }
 
-export function mapMessage(message: any, currentUserID: string, reactionsDetails?: any[], userMappings?: Set<{ id: string, username: string }>): Message {
+export function mapMessage(message: any, currentUserID: string, reactionsDetails?: any[], userMappings?: Map<string, string>): Message {
   const attachments = message.attachments.map(mapAttachment)
 
   const links: MessageLink[] = message.embeds
@@ -148,7 +148,7 @@ export function mapMessage(message: any, currentUserID: string, reactionsDetails
   return mapped
 }
 
-function transformEmojisAndTags(message?: string, userMappings?: Set<{ id: string, username: string }>): { text?: string, textAttributes?: TextAttributes } {
+function transformEmojisAndTags(message?: string, userMappings?: Map<string, string>): { text?: string, textAttributes?: TextAttributes } {
   if (!message) return
 
   let emojiOffsetRemoved = 0
@@ -175,22 +175,22 @@ function transformEmojisAndTags(message?: string, userMappings?: Set<{ id: strin
       return `:${emote_name}:`
     })
     .replaceAll(USER_REGEX, (matched, user_id, offset) => {
-      const user = Array.from(userMappings).find(u => u.id === user_id)
+      const username = userMappings.get(user_id)
 
-      if (!user) return
+      if (!username) return
 
       const entity = {
         from: offset - userOffsetRemoved,
-        to: offset - userOffsetRemoved + (user ? user.username.slice(0, -5).length + 1 : matched.length),
+        to: offset - userOffsetRemoved + (username ? username.slice(0, -5).length + 1 : matched.length),
         mentionedUser: {
           id: user_id,
-          username: user.username,
+          username,
         },
       }
 
-      userOffsetRemoved += user ? matched.length - `@${user.username.slice(0, -5)}`.length : 0
+      userOffsetRemoved += username ? matched.length - `@${username.slice(0, -5)}`.length : 0
       textAttributes.entities.push(entity)
-      return user ? `@${user.username.slice(0, -5)}` : matched
+      return username ? `@${username.slice(0, -5)}` : matched
     })
 
   return { text, textAttributes }
