@@ -25,6 +25,9 @@ export default class DiscordAPI {
   // Authorization token
   private token?: string
 
+  // ID to username mappings
+  private userMappings = []
+
   // Client used to interact with Discord
   private readonly client: DiscordClient = new DiscordClient()
 
@@ -72,6 +75,7 @@ export default class DiscordAPI {
 
     const currentUser: CurrentUser = mapCurrentUser(JSON.parse(res.body))
     this.currentUser = currentUser
+    this.userMappings[currentUser.id] = currentUser.displayText
 
     return currentUser
   }
@@ -86,8 +90,14 @@ export default class DiscordAPI {
       if (index <= LIMIT_COUNT) {
         const res = await this.fetch({ method: 'GET', url: `${API_ENDPOINT}/channels/${thread.id}/messages?limit=1` })
         messages = JSON.parse(res.body)
+
+        thread.recipients
+          .forEach(r => {
+            this.userMappings[r.id] = r.username + "#" + r.discriminator
+          })
       }
-      return mapThread(thread, this.currentUser, ((messages && messages.length > 0) ? messages[0] : undefined))
+
+      return mapThread(thread, this.currentUser, ((messages && messages.length > 0) ? messages[0] : undefined), (this.userMappings as [string: string]))
     }))
   }
 
@@ -107,7 +117,7 @@ export default class DiscordAPI {
     if (!res.body) throw new Error('No response')
 
     return JSON.parse(res.body)
-      .map(m => mapMessage(m, currentUser.id))
+      .map(m => mapMessage(m, currentUser.id, (this.userMappings as [string: string])))
       .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
   }
 

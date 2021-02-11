@@ -33,7 +33,7 @@ const MAP_THREAD_TYPE: ThreadType[] = [
   'single', // GUILD_STORE
 ]
 
-export function mapThread(thread: any, currentUser?: User, lastMessage?: any): Thread {
+export function mapThread(thread: any, currentUser?: User, lastMessage?: any, userMappings?: [string: string]): Thread {
   const type: ThreadType = MAP_THREAD_TYPE[thread.type]
 
   const participants: User[] = thread.recipients.map(mapUser)
@@ -50,7 +50,7 @@ export function mapThread(thread: any, currentUser?: User, lastMessage?: any): T
     timestamp: new Date(thread.timestamp || lastMessage?.timestamp || 0),
     imgURL: (type === 'group' && thread.icon) ? `https://cdn.discordapp.com/channel-icons/${thread.id}/${thread.icon}.png` : thread.icon,
     description: thread.topic,
-    lastMessageSnippet: lastMessage?.content,
+    lastMessageSnippet: lastMessage ? transformEmojisAndTags(lastMessage.content, userMappings).text : lastMessage.content,
     messages: {
       hasMore: true,
       items: [],
@@ -62,7 +62,7 @@ export function mapThread(thread: any, currentUser?: User, lastMessage?: any): T
   }
 }
 
-export function mapMessage(message: any, currentUserID: string): TextsMessage {
+export function mapMessage(message: any, currentUserID: string, userMappings?: [string: string]): TextsMessage {
   const attachments: TextsMessageAttachment[] = message.attachments.map(a => {
     // TODO: Improve it
     const lowercased = (a.name || a.url).toLowerCase()
@@ -136,7 +136,7 @@ export function mapMessage(message: any, currentUserID: string): TextsMessage {
   }
 
   if (mapped.text) {
-    const { text, textAttributes } = transformMessageContent(mapped.text)
+    const { text, textAttributes } = transformEmojisAndTags(mapped.text, userMappings)
     if (text && textAttributes) {
       mapped.text = text
       mapped.textAttributes = textAttributes
@@ -146,33 +146,41 @@ export function mapMessage(message: any, currentUserID: string): TextsMessage {
   return mapped
 }
 
-export function transformMessageContent(message?: string): { text?: string, textAttributes?: TextAttributes } {
+function transformEmojisAndTags(message?: string, userMappings?: [string: string]): { text?: string, textAttributes?: TextAttributes } {
   if (!message) return
 
+  let emojiOffsetRemoved = 0
+  let userOffsetRemoved = 0
   let textAttributes = { entities: [] }
   const text = message
-    .replaceAll(EMOTE_REGEX, (matched, animated, _, emote_id, offset) => {
+    .replaceAll(EMOTE_REGEX, (matched, animated, emote_name, emote_id, offset) => {
       const entity = {
-        from: offset,
-        to: offset + matched.length,
+        from: offset - emojiOffsetRemoved,
+        to: offset - emojiOffsetRemoved + (emote_name.length + 2),
         replaceWithMedia: {
           mediaType: 'img',
           srcURL: `https://cdn.discordapp.com/emojis/${emote_id}.${animated ? "gif" : "png"}?size=${message.length === matched.length ? "64": "16"}`
         }
       }
+
+      emojiOffsetRemoved += matched.length - (emote_name.length + 2)
       textAttributes.entities.push(entity)
-      return matched
+      return `:${emote_name}:`
     })
-    .replaceAll(USER_REGEX, (matched, user_id, offset) => {
+    .replaceAll(USER_REGEX, (matched, user_id, offset, text) => {
+      const username = userMappings[user_id]
       const entity = {
-        from: offset,
-        to: offset + matched.length,
+        from: offset - userOffsetRemoved,
+        to: offset - userOffsetRemoved + (username ? username.slice(0, -5).length + 1 : matched.length),
         mentionedUser: {
-          id: user_id
+          id: user_id,
+          username: username
         }
       }
+
+      userOffsetRemoved += username ? matched.length - `@${username.slice(0, -5)}`.length : 0
       textAttributes.entities.push(entity)
-      return matched
+      return username ? `@${username.slice(0, -5)}` : matched
     })
 
   return { text, textAttributes }
