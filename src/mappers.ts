@@ -1,23 +1,18 @@
-import { CurrentUser, Message as TextsMessage, MessageAttachment as TextsMessageAttachment, MessageAttachmentType, MessageLink, MessageReaction, TextAttributes, Thread, ThreadType, User } from '@textshq/platform-sdk'
+import { CurrentUser, Message, MessageAttachment, MessageAttachmentType, MessageLink, MessageReaction, TextAttributes, Thread, ThreadType, User } from '@textshq/platform-sdk'
 
 const USER_REGEX = /<@!(\d*)>/g
 const EMOTE_REGEX = /<(a?):([A-Za-z0-9_]+):(\d+)>/g
 
 export function mapUser(user: any): User {
-  let imgURL: string | undefined
-  if (user.avatar) {
-    imgURL = `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.${user.avatar.startsWith('a_') ? 'gif' : 'png'}?size=256`
-  }
+  const imgURL = user.avatar
+    ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.${user.avatar.startsWith('a_') ? 'gif' : 'png'}?size=256`
+    : undefined
 
   return {
     id: user.id,
     fullName: user.username,
     username: `${user.username}#${user.discriminator}`,
-    nickname: user.username,
     imgURL,
-    isVerified: false,
-    cannotMessage: false,
-    isSelf: false,
   }
 }
 
@@ -53,7 +48,7 @@ export function mapThread(thread: any, currentUser?: User, lastMessage?: any, us
     isReadOnly: false,
     type,
     timestamp: new Date(thread.timestamp || lastMessage?.timestamp || 0),
-    imgURL: (type === 'group' && thread.icon) ? `https://cdn.discordapp.com/channel-icons/${thread.id}/${thread.icon}.png` : thread.icon,
+    imgURL: thread.icon ? `https://cdn.discordapp.com/channel-icons/${thread.id}/${thread.icon}.png` : undefined,
     description: thread.topic,
     lastMessageSnippet: lastMessage ? transformEmojisAndTags(lastMessage.content, userMappings).text : undefined,
     messages: {
@@ -67,38 +62,42 @@ export function mapThread(thread: any, currentUser?: User, lastMessage?: any, us
   }
 }
 
-export function mapMessage(message: any, currentUserID: string, reactionsDetails?: any, userMappings?: Set<{ id: string, username: string }>): TextsMessage {
-  const attachments: TextsMessageAttachment[] = message.attachments.map(a => {
-    // TODO: Improve it
-    const lowercased = (a.name || a.url).toLowerCase()
-    let type: MessageAttachmentType = MessageAttachmentType.UNKNOWN
-    let isGif: boolean = false
-    let isVoiceNote: boolean = false
-    if (lowercased.endsWith('.png') || lowercased.endsWith('.jpg') || lowercased.endsWith('.jpeg')) {
-      type = MessageAttachmentType.IMG
-    } else if (lowercased.endsWith('.gif') || lowercased.endsWith('.gifv')) {
-      type = MessageAttachmentType.IMG
-      isGif = true
-    } else if (lowercased.endsWith('.mp4') || lowercased.endsWith('.mov') || lowercased.endsWith('.webm')) {
-      type = MessageAttachmentType.VIDEO
-    } else if (lowercased.endsWith('.mp3') || lowercased.endsWith('.flac') || lowercased.endsWith('.wav') || lowercased.endsWith('.ogg')) {
-      type = MessageAttachmentType.AUDIO
-      isVoiceNote = true
-    }
+function mapAttachment(a): MessageAttachment {
+  // TODO: Improve it
+  const lowercased = (a.name || a.url).toLowerCase()
+  let type = MessageAttachmentType.UNKNOWN
 
-    return {
-      id: a.id,
-      type,
-      isGif,
-      // isSticker?: boolean,
-      isVoiceNote,
-      size: a.width && a.height ? { width: a.width, height: a.height } : undefined,
-      srcURL: a.url,
-      posterImg: a.proxyURL,
-      fileName: a.name || undefined,
-      fileSize: a.size || undefined,
-    }
-  })
+  let isGif = false
+  let isVoiceNote = false
+
+  if (lowercased.endsWith('.png') || lowercased.endsWith('.jpg') || lowercased.endsWith('.jpeg')) {
+    type = MessageAttachmentType.IMG
+  } else if (lowercased.endsWith('.gif') || lowercased.endsWith('.gifv')) {
+    type = MessageAttachmentType.IMG
+    isGif = true
+  } else if (lowercased.endsWith('.mp4') || lowercased.endsWith('.mov') || lowercased.endsWith('.webm')) {
+    type = MessageAttachmentType.VIDEO
+  } else if (lowercased.endsWith('.mp3') || lowercased.endsWith('.flac') || lowercased.endsWith('.wav') || lowercased.endsWith('.ogg')) {
+    type = MessageAttachmentType.AUDIO
+    isVoiceNote = true
+  }
+
+  return {
+    id: a.id,
+    type,
+    isGif,
+    // isSticker?: boolean,
+    isVoiceNote,
+    size: a.width && a.height ? { width: a.width, height: a.height } : undefined,
+    srcURL: a.url,
+    posterImg: a.proxyURL,
+    fileName: a.name || undefined,
+    fileSize: a.size || undefined,
+  }
+}
+
+export function mapMessage(message: any, currentUserID: string, reactionsDetails?: any[], userMappings?: Set<{ id: string, username: string }>): Message {
+  const attachments = message.attachments.map(mapAttachment)
 
   const links: MessageLink[] = message.embeds
     .filter(e => e.type === 'article' || e.type === 'link' || e.type === 'video' || e.type === 'rich')
@@ -113,25 +112,18 @@ export function mapMessage(message: any, currentUserID: string, reactionsDetails
       }
     })
 
-  let reactions: MessageReaction[] = []
-  if (reactionsDetails) {
-    reactions = reactionsDetails.flatMap(r => {
-      return r.users.map(u => (
-        {
-          id: r.emoji.id || r.emoji.name,
-          reactionKey: r.emoji.id ? `https://cdn.discordapp.com/emojis/${r.emoji.id}.${r.emoji.animated ? 'gif' : 'png'}` : r.emoji.name,
-          participantID: u.id,
-          emoji: true,
-        }
-      ))
-    })
-  }
+  const reactions = reactionsDetails?.flatMap<MessageReaction>(r =>
+    r.users.map(u => ({
+      id: r.emoji.id || r.emoji.name,
+      reactionKey: r.emoji.id ? `https://cdn.discordapp.com/emojis/${r.emoji.id}.${r.emoji.animated ? 'gif' : 'png'}` : r.emoji.name,
+      participantID: u.id,
+    }))) || []
 
-  const mapped: TextsMessage = {
+  const mapped: Message = {
     _original: message,
     id: message.id,
-    timestamp: new Date(Date.parse(message.timestamp)),
-    editedTimestamp: message.edited_timestamp ? new Date(Date.parse(message.edited_timestamp)) : undefined,
+    timestamp: new Date(message.timestamp),
+    editedTimestamp: message.edited_timestamp ? new Date(message.edited_timestamp) : undefined,
     senderID: message.author.id,
     text: message.content,
     attachments,
@@ -183,6 +175,8 @@ function transformEmojisAndTags(message?: string, userMappings?: Set<{ id: strin
     })
     .replaceAll(USER_REGEX, (matched, user_id, offset) => {
       const user = Array.from(userMappings).find(u => u.id === user_id)
+
+      if (!user) return
 
       const entity = {
         from: offset - userOffsetRemoved,
