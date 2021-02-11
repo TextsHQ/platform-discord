@@ -117,6 +117,7 @@ export function mapMessage(message: any, currentUserID: string, reactionsDetails
       id: r.emoji.id || r.emoji.name,
       reactionKey: r.emoji.id ? `https://cdn.discordapp.com/emojis/${r.emoji.id}.${r.emoji.animated ? 'gif' : 'png'}` : r.emoji.name,
       participantID: u.id,
+      emoji: true,
     }))) || []
 
   const mapped: Message = {

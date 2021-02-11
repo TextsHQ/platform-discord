@@ -1,5 +1,5 @@
 import { CookieJar } from 'tough-cookie'
-import { PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Thread, Message, CurrentUser, InboxName, MessageContent, PaginationArg, OnConnStateChangeCallback, ActivityType } from '@textshq/platform-sdk'
+import { PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Thread, Message, InboxName, MessageContent, PaginationArg, OnConnStateChangeCallback, ActivityType } from '@textshq/platform-sdk'
 import DiscordAPI from './network-api'
 
 export default class Discord implements PlatformAPI {
@@ -23,8 +23,6 @@ export default class Discord implements PlatformAPI {
 
   serializeSession = () => this.api.cookieJar.toJSON()
 
-  getCurrentUser = async () => this.api.getCurrentUser()
-
   subscribeToEvents = (onEvent: OnServerEventCallback) => {
     this.api.eventCallback = onEvent
     this.poll()
@@ -36,34 +34,19 @@ export default class Discord implements PlatformAPI {
 
   poll = async () => { }
 
-  searchUsers = async (typed: string) => []
+  getCurrentUser = async () => this.api.getCurrentUser()
+
+  searchUsers = async (typed: string) => this.api.userFriends.filter(u => u.username.toLowerCase().includes(typed.toLowerCase()))
+
+  getThreads = async (inboxName: InboxName, pagination?: PaginationArg): Promise<Paginated<Thread>> => {
+    return { items: await this.api.getThreads(), hasMore: false }
+  }
 
   createThread = (userIDs: string[]) => {
-    /* const thread: Thread = {
-      id: string;
-      title?: string;
-      isUnread: boolean;
-      isReadOnly: boolean;
-      isArchived?: boolean;
-      isPinned?: boolean;
-      mutedUntil?: Date | 'forever';
-      type: ThreadType;
-      timestamp: Date;
-      imgURL?: string;
-      createdAt?: Date;
-      description?: string;
-      lastMessageSnippet?: string;
-      messageExpirySeconds?: number;
-      messages: Paginated<Message>;
-      participants: Paginated<Participant>;
-    } */
-
     return false
   }
 
-  getThreads = async (inboxName: InboxName, pagination?: PaginationArg): Promise<Paginated<Thread>> => {
-    return { items: await this.api.getThreads(inboxName, pagination), hasMore: false }
-  }
+  archiveThread = (threadID: string) => this.api.archiveThread(threadID)
 
   getMessages = async (threadID: string, pagination?: PaginationArg): Promise<Paginated<Message>> => {
     // TODO: Check if there's more messages
@@ -72,9 +55,9 @@ export default class Discord implements PlatformAPI {
 
   sendMessage = async (threadID: string, content: MessageContent) => this.api.sendMessage(threadID, content)
 
+  deleteMessage = async (threadID: string, messageID: string, forEveryone?: boolean) => this.api.deleteMessage(threadID, messageID, forEveryone)
+
   sendActivityIndicator = async (type: ActivityType, threadID: string) => this.api.setTyping(type, threadID)
 
   sendReadReceipt = async (threadID: string, messageID: string) => { }
-
-  deleteMessage = async (threadID: string, messageID: string, forEveryone?: boolean) => this.api.deleteMessage(threadID, messageID, forEveryone)
 }

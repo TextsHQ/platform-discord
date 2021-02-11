@@ -1,7 +1,7 @@
 import { CookieJar } from 'tough-cookie'
-import { texts, CurrentUser, MessageContent, PaginationArg, Thread, Message as TextsMessage, InboxName, PlatformAPI, ServerEventType, OnServerEventCallback, User, ActivityType, OnConnStateChangeCallback } from '@textshq/platform-sdk'
+import { texts, CurrentUser, MessageContent, PaginationArg, Thread, Message as TextsMessage, ServerEventType, OnServerEventCallback, ActivityType, OnConnStateChangeCallback, User } from '@textshq/platform-sdk'
 import { Client as DiscordClient, DMChannel, Message as DiscordMessage } from 'better-discord.js'
-import { mapCurrentUser, mapMessage, mapThread } from './mappers'
+import { mapCurrentUser, mapMessage, mapThread, mapUser } from './mappers'
 import { DISCORD_ERROR } from './errors'
 
 const got = require('got')
@@ -25,17 +25,14 @@ export default class DiscordAPI {
   // Authorization token
   private token?: string
 
-  // ID to username mappings
-  private userMappings: Set<{ id: string, username: string }> = new Set()
-
   // Client used to interact with Discord
   private readonly client: DiscordClient = new DiscordClient()
 
+  // ID to username mappings
+  private userMappings: Set<{ id: string, username: string }> = new Set()
+
   // Cookie jar, used for authorization
   public cookieJar?: CookieJar
-
-  // Currently logged in user
-  public currentUser?: CurrentUser
 
   // Events callback
   public eventCallback?: OnServerEventCallback
@@ -45,6 +42,12 @@ export default class DiscordAPI {
 
   // Client is ready
   public ready: boolean = false
+
+  // Currently logged in user
+  public currentUser?: CurrentUser
+
+  // Current user friends
+  public userFriends: User[] = []
 
   // MARK: - Public functions
 
@@ -77,11 +80,13 @@ export default class DiscordAPI {
     this.currentUser = currentUser
     this.userMappings.add({ id: currentUser.id, username: currentUser.displayText })
 
+    this.getUserFriends()
+
     return currentUser
   }
 
   // Fetches all threads
-  public getThreads = async (inboxName: InboxName, pagination?: PaginationArg): Promise<Thread[]> => {
+  public getThreads = async (): Promise<Thread[]> => {
     const res = await this.fetch({ method: 'GET', url: `${API_ENDPOINT}/users/@me/channels` })
     if (!res.body) throw new Error('No response')
 
@@ -99,6 +104,14 @@ export default class DiscordAPI {
 
       return mapThread(thread, this.currentUser, ((messages && messages.length > 0) ? messages[0] : undefined), this.userMappings)
     }))
+  }
+
+  // Creates a new thread
+
+  // Archives selected thread
+  public archiveThread = async (threadID: string) => {
+    const res = await this.fetch({ method: 'DELETE', url: `${API_ENDPOINT}/channels/${threadID}` })
+    console.log(res.body)
   }
 
   // Fetches messages from provided threadID
@@ -186,6 +199,15 @@ export default class DiscordAPI {
   }
 
   // - MARK: Private functions
+
+  private getUserFriends = async () => {
+    const res = await this.fetch({ method: 'GET', url: `${API_ENDPOINT}/users/@me/relationships` })
+    if (!res.body) throw new Error('No response')
+    const parsed = JSON.parse(res.body)
+
+    this.userFriends = parsed.filter(f => f.type === 1) // Only friends
+      .map(f => mapUser(f.user))
+  }
 
   // Handles received messages
   private messageHandler = (message: DiscordMessage) => {
