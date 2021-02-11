@@ -1,7 +1,8 @@
-import { CurrentUser, Message, MessageAttachment, MessageAttachmentType, MessageLink, MessageReaction, TextAttributes, Thread, ThreadType, User } from '@textshq/platform-sdk'
+import { CurrentUser, Message, MessageAction, MessageActionType, MessageAttachment, MessageAttachmentType, MessageLink, MessageReaction, TextAttributes, Thread, ThreadType, User } from '@textshq/platform-sdk'
 
 const USER_REGEX = /<@!(\d*)>/g
 const EMOTE_REGEX = /<(a?):([A-Za-z0-9_]+):(\d+)>/g
+const SUPPORTED_MESSAGE_TYPES = [0, 1, 2, 3, 4, 5, 6, 19]
 
 export function mapUser(user: any): User {
   const imgURL = user.avatar
@@ -40,6 +41,8 @@ export function mapThread(thread: any, currentUser?: User, lastMessage?: any, us
   participants.sort((a, b) => ((a.username ?? '') < (b.username ?? '') ? 1 : -1))
   if (currentUser) participants.push(currentUser)
 
+  const lastMessageSnippet = (lastMessage && SUPPORTED_MESSAGE_TYPES.includes(lastMessage.type)) ? transformEmojisAndTags(mapMessageAction(lastMessage).text, userMappings)?.text : undefined
+
   return {
     _original: JSON.stringify(thread),
     id: thread.id,
@@ -50,7 +53,7 @@ export function mapThread(thread: any, currentUser?: User, lastMessage?: any, us
     timestamp: new Date(thread.timestamp || lastMessage?.timestamp || 0),
     imgURL: thread.icon ? `https://cdn.discordapp.com/channel-icons/${thread.id}/${thread.icon}.png` : undefined,
     description: thread.topic,
-    lastMessageSnippet: lastMessage ? transformEmojisAndTags(lastMessage.content, userMappings).text : undefined,
+    lastMessageSnippet,
     messages: {
       hasMore: true,
       items: [],
@@ -96,7 +99,9 @@ function mapAttachment(a): MessageAttachment {
   }
 }
 
-export function mapMessage(message: any, currentUserID: string, reactionsDetails?: any[], userMappings?: Map<string, string>): Message {
+export function mapMessage(message: any, currentUserID: string, reactionsDetails?: any[], userMappings?: Map<string, string>): Message | null {
+  if (!SUPPORTED_MESSAGE_TYPES.includes(message.type)) return null
+
   const attachments = message.attachments.map(mapAttachment)
 
   const links: MessageLink[] = message.embeds
@@ -137,10 +142,16 @@ export function mapMessage(message: any, currentUserID: string, reactionsDetails
     threadID: message.channel_id,
   }
 
+  const { isAction, parseTemplate, text: mappedMessageText, action } = mapMessageAction(message)
+  mapped.isAction = isAction
+  mapped.parseTemplate = parseTemplate
+  mapped.text = mappedMessageText
+  mapped.action = action
+
   if (mapped.text) {
-    const { text, textAttributes } = transformEmojisAndTags(mapped.text, userMappings)
-    if (text && textAttributes) {
-      mapped.text = text
+    const { text: transformedMessageText, textAttributes } = transformEmojisAndTags(mapped.text, userMappings)
+    if (transformedMessageText && textAttributes) {
+      mapped.text = transformedMessageText
       mapped.textAttributes = textAttributes
     }
   }
@@ -177,8 +188,6 @@ function transformEmojisAndTags(message?: string, userMappings?: Map<string, str
     .replaceAll(USER_REGEX, (matched, user_id, offset) => {
       const username = userMappings.get(user_id)
 
-      if (!username) return
-
       const entity = {
         from: offset - userOffsetRemoved,
         to: offset - userOffsetRemoved + (username ? username.slice(0, -5).length + 1 : matched.length),
@@ -194,4 +203,74 @@ function transformEmojisAndTags(message?: string, userMappings?: Map<string, str
     })
 
   return { text, textAttributes }
+}
+
+function mapMessageAction(message: any): { isAction?: boolean, parseTemplate?: boolean, text: string, action?: MessageAction } {
+  let isAction
+  let parseTemplate
+  let text = message.content
+  let action
+
+  switch (message.type) {
+    // DEFAULT
+    case 0: break
+    // RECIPIENT_ADD
+    case 1:
+      isAction = true
+      parseTemplate = true
+      text = `${message.mentions.map(m => `${m.username}#${m.discriminator}`).join(', ')} joined`
+      action = {
+        type: MessageActionType.THREAD_PARTICIPANTS_REMOVED,
+        participantIDs: message.mentions.map(m => m.id),
+        actorParticipantID: null,
+      }
+      break
+    // RECIPIENT_REMOVE
+    case 2:
+      isAction = true
+      parseTemplate = true
+      text = `${message.mentions.map(m => `${m.username}#${m.discriminator}`).join(', ')} left`
+      action = {
+        type: MessageActionType.THREAD_PARTICIPANTS_REMOVED,
+        participantIDs: message.mentions.map(m => m.id),
+        actorParticipantID: null,
+      }
+      break
+    // CALL
+    case 3:
+      isAction = true
+      parseTemplate = true
+      text = `${message.author.username}#${message.author.discriminator} started a call`
+      break
+    // CHANNEL_NAME_CHANGE
+    case 4:
+      isAction = true
+      parseTemplate = true
+      text = `${message.author.username}#${message.author.discriminator} updated group title to "${message.content}"`
+      action = {
+        type: MessageActionType.THREAD_TITLE_UPDATED,
+        title: message.content,
+        actorParticipantID: null,
+      }
+      break
+    // CHANNEL_ICON_CHANGE
+    case 5:
+      isAction = true
+      parseTemplate = true
+      text = `${message.author.username}#${message.author.discriminator} updated group icon`
+      action = {
+        type: MessageActionType.THREAD_IMG_CHANGED,
+        actorParticipantID: null,
+      }
+      break
+    // CHANNEL_PINNED_MESSAGE
+    case 6:
+      isAction = true
+      parseTemplate = true
+      text = `${message.author.username}#${message.author.discriminator} pinned a message with ID ${message.message_reference.message_id}`
+      break
+    default: break
+  }
+
+  return { isAction, parseTemplate, text, action }
 }

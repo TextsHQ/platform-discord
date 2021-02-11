@@ -1,5 +1,5 @@
 import { CookieJar } from 'tough-cookie'
-import { texts, CurrentUser, MessageContent, PaginationArg, Thread, Message as TextsMessage, ServerEventType, OnServerEventCallback, ActivityType, OnConnStateChangeCallback, User } from '@textshq/platform-sdk'
+import { texts, CurrentUser, MessageContent, PaginationArg, Thread, Message as TextsMessage, ServerEventType, OnServerEventCallback, ActivityType, OnConnStateChangeCallback, User, InboxName } from '@textshq/platform-sdk'
 import { Client as DiscordClient, DMChannel, Message as DiscordMessage } from 'better-discord.js'
 import { mapCurrentUser, mapMessage, mapThread, mapUser } from './mappers'
 import { DISCORD_ERROR } from './errors'
@@ -86,27 +86,28 @@ export default class DiscordAPI {
   }
 
   // Fetches all threads
-  public getThreads = async (): Promise<Thread[]> => {
+  public getThreads = async (inboxName: InboxName, pagination?: PaginationArg): Promise<{ items: Thread[], hasMore: boolean }> => {
     const res = await this.fetch({ method: 'GET', url: `${API_ENDPOINT}/users/@me/channels` })
     if (!res.body) throw new Error('No response')
 
-    return Promise.all(JSON.parse(res.body).map(async (thread, index) => {
+    const threads: Thread[] = await Promise.all(JSON.parse(res.body).map(async (thread, index) => {
       let messages
       if (index <= LIMIT_COUNT) {
         const messagesRes = await this.fetch({ method: 'GET', url: `${API_ENDPOINT}/channels/${thread.id}/messages?limit=1` })
         messages = JSON.parse(messagesRes.body)
-
-        thread.recipients
-          .forEach(r => {
-            this.userMappings.set(r.id, (r.username + '#' + r.discriminator))
-          })
+        thread.recipients.forEach(r => this.userMappings.set(r.id, (r.username + '#' + r.discriminator)))
       }
 
-      return mapThread(thread, this.currentUser, ((messages && messages.length > 0) ? messages[0] : undefined), this.userMappings)
+      return mapThread(thread, this.currentUser, (messages?.length > 0 ? messages[0] : undefined), this.userMappings)
     }))
+
+    return { items: threads, hasMore: false }
   }
 
   // Creates a new thread
+  public createThread = (userIDs: string[], title?: string): Promise<boolean | Thread> => {
+    return null
+  }
 
   // Archives selected thread
   public archiveThread = async (threadID: string) => {
@@ -146,7 +147,7 @@ export default class DiscordAPI {
         return mapMessage(m, currentUser.id, reactionsDetails, this.userMappings)
       }))
 
-    return messages.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
+    return messages.filter(m => m).sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
   }
 
   // Sends a message to provided threadID
@@ -298,15 +299,15 @@ export default class DiscordAPI {
     })
     this.client.on('channelCreate', channel => {
       if (channel.type !== 'dm' && channel.type !== 'group') return
-      if (this.eventCallback) this.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: channel.id }])
+      if (this.eventCallback) this.eventCallback([{ type: ServerEventType.STATE_SYNC, mutationType: 'upsert', objectName: 'thread', objectIDs: { threadID: channel.id }, entries: [{ id: channel.id, isUnread: true }] }])
     })
     this.client.on('channelDelete', channel => {
       if (channel.type !== 'dm' && channel.type !== 'group') return
-      if (this.eventCallback) this.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: channel.id }])
+      if (this.eventCallback) this.eventCallback([{ type: ServerEventType.STATE_SYNC, mutationType: 'update', objectName: 'thread', objectIDs: { threadID: channel.id }, entries: [{ id: channel.id, isUnread: true }] }])
     })
     this.client.on('channelUpdate', (_, channel) => {
       if (channel.type !== 'dm' && channel.type !== 'group') return
-      if (this.eventCallback) this.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: channel.id }])
+      if (this.eventCallback) this.eventCallback([{ type: ServerEventType.STATE_SYNC, mutationType: 'update', objectName: 'participant', objectIDs: { threadID: channel.id }, entries: [{ id: channel.id, isUnread: true }] }])
     })
     this.client.on('relationshipAdd', (_, relation) => {
       console.log('relationshipAdd')
