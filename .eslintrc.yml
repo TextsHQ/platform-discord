@@ -4,6 +4,6 @@ rules:
   arrow-body-style: off
   vars-on-top: off
   prefer-destructuring: off
-  comma-dangle: off
+  no-nested-ternary: off
 parserOptions:
   project: ./tsconfig.json

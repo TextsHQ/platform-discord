@@ -26,7 +26,7 @@ export default class DiscordAPI {
   private token?: string
 
   // ID to username mappings
-  private userMappings = []
+  private userMappings: Set<{ id: string, username: string }> = new Set()
 
   // Client used to interact with Discord
   private readonly client: DiscordClient = new DiscordClient()
@@ -75,7 +75,7 @@ export default class DiscordAPI {
 
     const currentUser: CurrentUser = mapCurrentUser(JSON.parse(res.body))
     this.currentUser = currentUser
-    this.userMappings[currentUser.id] = currentUser.displayText
+    this.userMappings.add({ id: currentUser.id, username: currentUser.displayText })
 
     return currentUser
   }
@@ -88,16 +88,16 @@ export default class DiscordAPI {
     return Promise.all(JSON.parse(res.body).map(async (thread, index) => {
       let messages
       if (index <= LIMIT_COUNT) {
-        const res = await this.fetch({ method: 'GET', url: `${API_ENDPOINT}/channels/${thread.id}/messages?limit=1` })
-        messages = JSON.parse(res.body)
+        const messagesRes = await this.fetch({ method: 'GET', url: `${API_ENDPOINT}/channels/${thread.id}/messages?limit=1` })
+        messages = JSON.parse(messagesRes.body)
 
         thread.recipients
           .forEach(r => {
-            this.userMappings[r.id] = r.username + "#" + r.discriminator
+            this.userMappings.add({ id: r.id, username: r.username + '#' + r.discriminator })
           })
       }
 
-      return mapThread(thread, this.currentUser, ((messages && messages.length > 0) ? messages[0] : undefined), (this.userMappings as [string: string]))
+      return mapThread(thread, this.currentUser, ((messages && messages.length > 0) ? messages[0] : undefined), this.userMappings)
     }))
   }
 
@@ -110,14 +110,15 @@ export default class DiscordAPI {
 
     const options = {
       before: (pagination?.direction === 'before') ? pagination?.cursor : undefined,
-      after: (pagination?.direction === 'after') ? pagination?.cursor : undefined
+      after: (pagination?.direction === 'after') ? pagination?.cursor : undefined,
     }
+
     const paginationQuery = options.before ? `before=${options.before}` : options.after ? `after=${options.after}` : ''
     const res = await this.fetch({ method: 'GET', url: `${API_ENDPOINT}/channels/${threadID}/messages?limit=50&${paginationQuery}` })
     if (!res.body) throw new Error('No response')
 
     return JSON.parse(res.body)
-      .map(m => mapMessage(m, currentUser.id, (this.userMappings as [string: string])))
+      .map(m => mapMessage(m, currentUser.id, this.userMappings))
       .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
   }
 
@@ -127,7 +128,14 @@ export default class DiscordAPI {
     if (!channel) throw new Error('Thread with ID ' + threadID + ' not found!')
     while (!this.ready && WAIT_TILL_READY) await sleep(1000)
 
-    await channel.send(content.text, {
+    const text = (content.text || '').replaceAll(/@([^#@]{3,32}#[0-9]{4})/gi, (_, username) => {
+      const user = Array.from(this.userMappings).find(u => u.username === username)
+      if (user) return `<@!${user.id}>`
+
+      return username
+    })
+
+    await channel.send(text, {
       files: content.fileName && content.filePath ? [{
         attachment: content.filePath,
         name: content.fileName,
