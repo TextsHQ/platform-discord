@@ -117,9 +117,23 @@ export default class DiscordAPI {
     const res = await this.fetch({ method: 'GET', url: `${API_ENDPOINT}/channels/${threadID}/messages?limit=50&${paginationQuery}` })
     if (!res.body) throw new Error('No response')
 
-    return JSON.parse(res.body)
-      .map(m => mapMessage(m, currentUser.id, this.userMappings))
-      .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
+    const messages: TextsMessage[] = await Promise.all(JSON.parse(res.body)
+      .map(async m => {
+        let reactionsDetails
+        if (m.reactions) {
+          reactionsDetails = await Promise.all(m.reactions.map(async r => {
+            const emojiQuery = encodeURIComponent(r.emoji.id ? `${r.emoji.name}:${r.emoji.id}` : r.emoji.name)
+            const reactedRes = await this.fetch({ method: 'GET', url: `${API_ENDPOINT}/channels/${threadID}/messages/${m.id}/reactions/${emojiQuery}` })
+            const parsed = JSON.parse(reactedRes.body)
+            if (parsed) return { emoji: r.emoji, users: parsed }
+            return null
+          }))
+        }
+
+        return mapMessage(m, currentUser.id, reactionsDetails, this.userMappings)
+      }))
+
+    return messages.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
   }
 
   // Sends a message to provided threadID
@@ -128,12 +142,15 @@ export default class DiscordAPI {
     if (!channel) throw new Error('Thread with ID ' + threadID + ' not found!')
     while (!this.ready && WAIT_TILL_READY) await sleep(1000)
 
-    const text = (content.text || '').replaceAll(/@([^#@]{3,32}#[0-9]{4})/gi, (_, username) => {
-      const user = Array.from(this.userMappings).find(u => u.username === username)
-      if (user) return `<@!${user.id}>`
+    let text
+    if (content.text) {
+      text = content.text.replaceAll(/@([^#@]{3,32}#[0-9]{4})/gi, (_, username) => {
+        const user = Array.from(this.userMappings).find(u => u.username === username)
+        if (user) return `<@!${user.id}>`
 
-      return username
-    })
+        return username
+      })
+    }
 
     await channel.send(text, {
       files: content.fileName && content.filePath ? [{

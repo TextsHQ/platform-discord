@@ -4,12 +4,17 @@ const USER_REGEX = /<@!(\d*)>/g
 const EMOTE_REGEX = /<(a?):([A-Za-z0-9_]+):(\d+)>/g
 
 export function mapUser(user: any): User {
+  let imgURL: string | undefined
+  if (user.avatar) {
+    imgURL = `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.${user.avatar.startsWith('a_') ? 'gif' : 'png'}?size=256`
+  }
+
   return {
     id: user.id,
     fullName: user.username,
     username: `${user.username}#${user.discriminator}`,
     nickname: user.username,
-    imgURL: user.avatar ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=256` : undefined,
+    imgURL,
     isVerified: false,
     cannotMessage: false,
     isSelf: false,
@@ -62,7 +67,7 @@ export function mapThread(thread: any, currentUser?: User, lastMessage?: any, us
   }
 }
 
-export function mapMessage(message: any, currentUserID: string, userMappings?: Set<{ id: string, username: string }>): TextsMessage {
+export function mapMessage(message: any, currentUserID: string, reactionsDetails?: any, userMappings?: Set<{ id: string, username: string }>): TextsMessage {
   const attachments: TextsMessageAttachment[] = message.attachments.map(a => {
     // TODO: Improve it
     const lowercased = (a.name || a.url).toLowerCase()
@@ -108,15 +113,19 @@ export function mapMessage(message: any, currentUserID: string, userMappings?: S
       }
     })
 
-  // TODO: Improve this - as of right now, it only displays reactions that current user has added.
-  const reactions: MessageReaction[] = (message.reactions || []).filter(r => r.me).map(r => {
-    return {
-      id: r.emoji.id || r.emoji.name,
-      reactionKey: r.emoji.name,
-      participantID: currentUserID,
-      emoji: r.emoji !== undefined,
-    }
-  })
+  let reactions: MessageReaction[] = []
+  if (reactionsDetails) {
+    reactions = reactionsDetails.flatMap(r => {
+      return r.users.map(u => (
+        {
+          id: r.emoji.id || r.emoji.name,
+          reactionKey: r.emoji.id ? `https://cdn.discordapp.com/emojis/${r.emoji.id}.${r.emoji.animated ? 'gif' : 'png'}` : r.emoji.name,
+          participantID: u.id,
+          emoji: true,
+        }
+      ))
+    })
+  }
 
   const mapped: TextsMessage = {
     _original: message,
