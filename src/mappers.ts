@@ -1,4 +1,5 @@
 import { CurrentUser, Message, MessageAction, MessageActionType, MessageAttachment, MessageAttachmentType, MessageLink, MessageReaction, TextAttributes, Thread, ThreadType, User } from '@textshq/platform-sdk'
+import { MessageType } from './constants'
 
 const USER_REGEX = /<@!(\d*)>/g
 const EMOTE_REGEX = /<(a?):([A-Za-z0-9_]+):(\d+)>/g
@@ -212,10 +213,9 @@ function mapMessageAction(message: any): { isAction?: boolean, parseTemplate?: b
   let action
 
   switch (message.type) {
-    // DEFAULT
-    case 0: break
-    // RECIPIENT_ADD
-    case 1:
+    case MessageType.DEFAULT:
+      break
+    case MessageType.RECIPIENT_ADD:
       isAction = true
       parseTemplate = true
       text = `${message.mentions.map(m => `${m.username}#${m.discriminator}`).join(', ')} joined`
@@ -225,8 +225,7 @@ function mapMessageAction(message: any): { isAction?: boolean, parseTemplate?: b
         actorParticipantID: null,
       }
       break
-    // RECIPIENT_REMOVE
-    case 2:
+    case MessageType.RECIPIENT_REMOVE:
       isAction = true
       parseTemplate = true
       text = `${message.mentions.map(m => `${m.username}#${m.discriminator}`).join(', ')} left`
@@ -236,14 +235,12 @@ function mapMessageAction(message: any): { isAction?: boolean, parseTemplate?: b
         actorParticipantID: null,
       }
       break
-    // CALL
-    case 3:
+    case MessageType.CALL:
       isAction = true
       parseTemplate = true
       text = `${message.author.username}#${message.author.discriminator} started a call`
       break
-    // CHANNEL_NAME_CHANGE
-    case 4:
+    case MessageType.CHANNEL_NAME_CHANGE:
       isAction = true
       parseTemplate = true
       text = `${message.author.username}#${message.author.discriminator} updated group title to "${message.content}"`
@@ -253,8 +250,7 @@ function mapMessageAction(message: any): { isAction?: boolean, parseTemplate?: b
         actorParticipantID: null,
       }
       break
-    // CHANNEL_ICON_CHANGE
-    case 5:
+    case MessageType.CHANNEL_ICON_CHANGE:
       isAction = true
       parseTemplate = true
       text = `${message.author.username}#${message.author.discriminator} updated group icon`
@@ -263,13 +259,15 @@ function mapMessageAction(message: any): { isAction?: boolean, parseTemplate?: b
         actorParticipantID: null,
       }
       break
-    // CHANNEL_PINNED_MESSAGE
-    case 6:
+    case MessageType.CHANNEL_PINNED_MESSAGE:
       isAction = true
       parseTemplate = true
       text = `${message.author.username}#${message.author.discriminator} pinned a message with ID ${message.message_reference.message_id}`
       break
-    default: break
+    case MessageType.REPLY:
+      break
+    default:
+      break
   }
 
   return { isAction, parseTemplate, text, action }
