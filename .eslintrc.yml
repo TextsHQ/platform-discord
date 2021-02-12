@@ -5,5 +5,6 @@ rules:
   vars-on-top: off
   prefer-destructuring: off
   no-nested-ternary: off
+  no-else-return: off
 parserOptions:
   project: ./tsconfig.json

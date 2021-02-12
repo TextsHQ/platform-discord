@@ -1,5 +1,5 @@
 import { CookieJar } from 'tough-cookie'
-import { PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Thread, Message, InboxName, MessageContent, PaginationArg, OnConnStateChangeCallback, ActivityType } from '@textshq/platform-sdk'
+import { PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Thread, Message, InboxName, MessageContent, PaginationArg, OnConnStateChangeCallback, ActivityType, MessageSendOptions } from '@textshq/platform-sdk'
 import DiscordAPI from './network-api'
 
 export default class Discord implements PlatformAPI {
@@ -49,7 +49,7 @@ export default class Discord implements PlatformAPI {
     return { items: await this.api.getMessages(threadID, pagination), hasMore: true }
   }
 
-  sendMessage = async (threadID: string, content: MessageContent) => this.api.sendMessage(threadID, content)
+  sendMessage = async (threadID: string, content: MessageContent, options?: MessageSendOptions) => this.api.sendMessage(threadID, content, options)
 
   deleteMessage = async (threadID: string, messageID: string, forEveryone?: boolean) => this.api.deleteMessage(threadID, messageID, forEveryone)
 

@@ -1,9 +1,10 @@
 import { CookieJar } from 'tough-cookie'
-import { texts, CurrentUser, MessageContent, PaginationArg, Thread, Message as TextsMessage, ServerEventType, OnServerEventCallback, ActivityType, OnConnStateChangeCallback, User, InboxName } from '@textshq/platform-sdk'
+import { texts, CurrentUser, MessageContent, PaginationArg, Thread, Message as TextsMessage, ServerEventType, OnServerEventCallback, ActivityType, OnConnStateChangeCallback, User, InboxName, MessageSendOptions } from '@textshq/platform-sdk'
 import { Client as DiscordClient, DMChannel, Message as DiscordMessage } from 'better-discord.js'
 import { mapCurrentUser, mapMessage, mapThread, mapUser } from './mappers'
-import { DISCORD_ERROR } from './errors'
 
+const FormData = require('form-data')
+const fs = require('fs')
 const got = require('got')
 
 const API_ENDPOINT = 'https://discord.com/api/v8'
@@ -12,9 +13,7 @@ const WAIT_TILL_READY = true
 const RESTART_ON_FAIL = true
 
 function handleErrors(json: any) {
-  if (json.code && DISCORD_ERROR[json.code]) {
-    throw DISCORD_ERROR[json.code]
-  }
+  if (json.message && json.code) throw new Error(json.message)
 }
 
 async function sleep(time: number) {
@@ -151,29 +150,59 @@ export default class DiscordAPI {
   }
 
   // Sends a message to provided threadID
-  public sendMessage = async (threadID: string, content: MessageContent): Promise<boolean> => {
-    const channel: DMChannel = await this.client.channels.fetch(threadID) as DMChannel
-    if (!channel) throw new Error('Thread with ID ' + threadID + ' not found!')
+  public sendMessage = async (threadID: string, content: MessageContent, options?: MessageSendOptions): Promise<boolean> => {
     while (!this.ready && WAIT_TILL_READY) await sleep(1000)
 
-    let text
-    if (content.text) {
-      text = content.text.replaceAll(/@([^#@]{3,32}#[0-9]{4})/gi, (_, username) => {
-        const user = Array.from(this.userMappings).find(u => u[1] === username)
-        if (user) return `<@!${user[0]}>`
+    const method = 'POST'
+    const url = `${API_ENDPOINT}/channels/${threadID}/messages`
+    const text = content.text?.replaceAll(/@([^#@]{3,32}#[0-9]{4})/gi, (_, username) => {
+      const user = Array.from(this.userMappings).find(u => u[1] === username)
+      if (user) return `<@!${user[0]}>`
 
-        return username
-      })
-    }
-
-    await channel.send(text, {
-      files: content.fileName && content.filePath ? [{
-        attachment: content.filePath,
-        name: content.fileName,
-      }] : undefined,
+      return username
     })
 
-    return true
+    const requestContent = {
+      headers: {},
+      message_reference: undefined,
+      text,
+      json: undefined,
+      body: undefined,
+    }
+
+    if (options?.quotedMessageID) {
+      requestContent.message_reference = { message_id: options?.quotedMessageID }
+    }
+
+    if (content.fileBuffer || content.fileName || content.filePath) {
+      const form = new FormData()
+      if (content.fileBuffer) {
+        form.append('file', content.fileBuffer)
+      } else if (content.filePath) {
+        form.append('file', fs.createReadStream(content.filePath))
+      }
+
+      const payload_json = {
+        content: requestContent.text || '',
+        tts: false,
+        message_reference: requestContent.message_reference,
+      }
+      form.append('payload_json', JSON.stringify(payload_json))
+
+      requestContent.headers = form.getHeaders()
+      requestContent.body = form
+    } else {
+      requestContent.headers = { 'Content-Type': 'application/json' }
+      requestContent.json = {
+        content: requestContent.text,
+        tts: false,
+        message_reference: requestContent.message_reference,
+      }
+    }
+
+    const requestData = { url, method, headers: requestContent.headers, json: requestContent.json, body: requestContent.body }
+    const res = await this.fetch(requestData)
+    return res.statusCode === 200
   }
 
   // Deletes provided messageID (only if `forEveryone` is true)
@@ -321,7 +350,7 @@ export default class DiscordAPI {
   private fetch = async ({ headers = {}, ...rest }) => {
     try {
       const res = await got({
-        throwHttpErrors: true,
+        throwHttpErrors: false,
         headers: {
           Authorization: this.token,
           ...headers,
