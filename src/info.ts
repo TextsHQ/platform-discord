@@ -40,10 +40,16 @@ const info: PlatformInfo = {
   attributes: new Set([
     Attribute.SUPPORTS_PRESENCE,
     Attribute.SUPPORTS_STOP_TYPING_INDICATOR,
-    Attribute.SUBSCRIBE_TO_CONN_STATE_CHANGE,
     Attribute.SUPPORTS_QUOTED_MESSAGES,
     Attribute.SUPPORTS_GROUP_IMAGE_CHANGE,
+    Attribute.SUPPORTS_ARCHIVE,
+    Attribute.SUBSCRIBE_TO_CONN_STATE_CHANGE,
   ]),
+  attachments: {
+    supportsCaption: true,
+    gifMimeType: 'image/gif',
+  },
+  maxGroupTitleLength: 100,
   // auth: '<bold>WARNING:</bold> Discord prohibits using third-party clients. <bold>Use at your own risk.</bold>',
 }
 

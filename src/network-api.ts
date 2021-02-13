@@ -177,7 +177,10 @@ export default class DiscordAPI {
     if (content.fileBuffer || content.fileName || content.filePath) {
       const form = new FormData()
       if (content.fileBuffer) {
-        form.append('file', content.fileBuffer)
+        form.append('file', content.fileBuffer, {
+          filename: content.fileName,
+          knownLength: content.fileBuffer?.length,
+        })
       } else if (content.filePath) {
         form.append('file', fs.createReadStream(content.filePath))
       }
@@ -207,7 +210,7 @@ export default class DiscordAPI {
 
   // Deletes provided messageID (only if `forEveryone` is true)
   public deleteMessage = async (threadID: string, messageID: string, forEveryone?: boolean): Promise<boolean> => {
-    if (forEveryone === false) return true
+    if (!forEveryone) return true
 
     const res = await this.fetch({ method: 'DELETE', url: `channels/${threadID}/messages/${messageID}` })
     return res.statusCode === 204
@@ -283,7 +286,7 @@ export default class DiscordAPI {
       texts.log('Gateway warning: ' + warning)
     })
     this.client.on('webhookUpdate', update => {
-      console.log(update)
+      texts.log('Webhook update: ' + update)
     })
 
     this.client.on('message', msg => {
