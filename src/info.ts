@@ -1,8 +1,9 @@
 import { PlatformInfo, MessageDeletionMode, Attribute } from '@textshq/platform-sdk'
+import { supportedReactions, VERSION } from './constants'
 
 const info: PlatformInfo = {
   name: 'discord',
-  version: '0.1.0',
+  version: VERSION,
   tags: ['Alpha', 'Dangerous'],
   displayName: 'Discord',
   icon: `
@@ -30,12 +31,12 @@ const info: PlatformInfo = {
     `,
   },
   deletionMode: MessageDeletionMode.DELETE_FOR_EVERYONE,
-  /* reactions: {
-    supported: [],
+  reactions: {
+    supported: supportedReactions,
     supportsDynamicReactions: true,
     canReactWithAllEmojis: true,
-    allowsMultipleReactionsToSingleMessage: true
-  }, */
+    allowsMultipleReactionsToSingleMessage: true,
+  },
   attributes: new Set([
     Attribute.SUPPORTS_PRESENCE,
     Attribute.SUPPORTS_STOP_TYPING_INDICATOR,

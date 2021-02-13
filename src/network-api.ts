@@ -1,13 +1,13 @@
+import got from 'got'
+import fs from 'fs'
+import FormData from 'form-data'
 import { CookieJar } from 'tough-cookie'
 import { texts, CurrentUser, MessageContent, PaginationArg, Thread, Message as TextsMessage, ServerEventType, OnServerEventCallback, ActivityType, OnConnStateChangeCallback, User, InboxName, MessageSendOptions } from '@textshq/platform-sdk'
-import { Client as DiscordClient, DMChannel, Message as DiscordMessage } from 'better-discord.js'
+import { Client as DiscordClient, DMChannel } from 'better-discord.js'
 import { mapCurrentUser, mapMessage, mapThread, mapUser } from './mappers'
+import { VERSION } from './constants'
 
-const FormData = require('form-data')
-const fs = require('fs')
-const got = require('got')
-
-const API_ENDPOINT = 'https://discord.com/api/v8'
+const API_ENDPOINT = 'https://discord.com/api/v8/'
 const LIMIT_COUNT = 25
 const WAIT_TILL_READY = true
 const RESTART_ON_FAIL = true
@@ -72,7 +72,7 @@ export default class DiscordAPI {
 
   // Fetches the currently logged in user
   public getCurrentUser = async (): Promise<CurrentUser> => {
-    const res = await this.fetch({ method: 'GET', url: `${API_ENDPOINT}/users/@me` })
+    const res = await this.fetch({ method: 'GET', url: 'users/@me' })
     if (!res.body) throw new Error('No response')
 
     const currentUser: CurrentUser = mapCurrentUser(JSON.parse(res.body))
@@ -86,13 +86,13 @@ export default class DiscordAPI {
 
   // Fetches all threads
   public getThreads = async (inboxName: InboxName, pagination?: PaginationArg): Promise<{ items: Thread[], hasMore: boolean }> => {
-    const res = await this.fetch({ method: 'GET', url: `${API_ENDPOINT}/users/@me/channels` })
+    const res = await this.fetch({ method: 'GET', url: 'users/@me/channels' })
     if (!res.body) throw new Error('No response')
 
     const threads: Thread[] = await Promise.all(JSON.parse(res.body).map(async (thread, index) => {
       let messages
       if (index <= LIMIT_COUNT) {
-        const messagesRes = await this.fetch({ method: 'GET', url: `${API_ENDPOINT}/channels/${thread.id}/messages?limit=1` })
+        const messagesRes = await this.fetch({ method: 'GET', url: `channels/${thread.id}/messages?limit=1` })
         messages = JSON.parse(messagesRes.body)
         thread.recipients.forEach(r => this.userMappings.set(r.id, (r.username + '#' + r.discriminator)))
       }
@@ -110,8 +110,8 @@ export default class DiscordAPI {
 
   // Archives selected thread
   public archiveThread = async (threadID: string) => {
-    const res = await this.fetch({ method: 'DELETE', url: `${API_ENDPOINT}/channels/${threadID}` })
-    console.log(res.body)
+    const res = await this.fetch({ method: 'DELETE', url: `channels/${threadID}` })
+    // return res.statusCode === 200
   }
 
   // Fetches messages from provided threadID
@@ -127,7 +127,7 @@ export default class DiscordAPI {
     }
 
     const paginationQuery = options.before ? `before=${options.before}` : options.after ? `after=${options.after}` : ''
-    const res = await this.fetch({ method: 'GET', url: `${API_ENDPOINT}/channels/${threadID}/messages?limit=50&${paginationQuery}` })
+    const res = await this.fetch({ method: 'GET', url: `channels/${threadID}/messages?limit=50&${paginationQuery}` })
     if (!res.body) throw new Error('No response')
 
     const messages: TextsMessage[] = await Promise.all(JSON.parse(res.body)
@@ -136,7 +136,7 @@ export default class DiscordAPI {
         if (m.reactions) {
           reactionsDetails = await Promise.all(m.reactions.map(async r => {
             const emojiQuery = encodeURIComponent(r.emoji.id ? `${r.emoji.name}:${r.emoji.id}` : r.emoji.name)
-            const reactedRes = await this.fetch({ method: 'GET', url: `${API_ENDPOINT}/channels/${threadID}/messages/${m.id}/reactions/${emojiQuery}` })
+            const reactedRes = await this.fetch({ method: 'GET', url: `channels/${threadID}/messages/${m.id}/reactions/${emojiQuery}` })
             const parsed = JSON.parse(reactedRes.body)
             if (parsed) return { emoji: r.emoji, users: parsed }
             return null
@@ -154,7 +154,7 @@ export default class DiscordAPI {
     while (!this.ready && WAIT_TILL_READY) await sleep(1000)
 
     const method = 'POST'
-    const url = `${API_ENDPOINT}/channels/${threadID}/messages`
+    const url = `channels/${threadID}/messages`
     const text = content.text?.replaceAll(/@([^#@]{3,32}#[0-9]{4})/gi, (_, username) => {
       const user = Array.from(this.userMappings).find(u => u[1] === username)
       if (user) return `<@!${user[0]}>`
@@ -209,7 +209,19 @@ export default class DiscordAPI {
   public deleteMessage = async (threadID: string, messageID: string, forEveryone?: boolean): Promise<boolean> => {
     if (forEveryone === false) return true
 
-    const res = await this.fetch({ method: 'DELETE', url: `${API_ENDPOINT}/channels/${threadID}/messages/${messageID}` })
+    const res = await this.fetch({ method: 'DELETE', url: `channels/${threadID}/messages/${messageID}` })
+    return res.statusCode === 204
+  }
+
+  // Adds a reaction with specified reactionKey to supplied message ID
+  public addReaction = async (threadID: string, messageID: string, reactionKey: string): Promise<boolean> => {
+    const res = await this.fetch({ method: 'PUT', url: `channels/${threadID}/messages/${messageID}/reactions/${encodeURIComponent(reactionKey)}/@me` })
+    return res.statusCode === 204
+  }
+
+  // Removes a reaction with specified reactionKey from supplied message ID
+  public removeReaction = async (threadID: string, messageID: string, reactionKey: string): Promise<boolean> => {
+    const res = await this.fetch({ method: 'DELETE', url: `channels/${threadID}/messages/${messageID}/reactions/${encodeURIComponent(reactionKey)}/@me` })
     return res.statusCode === 204
   }
 
@@ -231,27 +243,12 @@ export default class DiscordAPI {
   // - MARK: Private functions
 
   private getUserFriends = async () => {
-    const res = await this.fetch({ method: 'GET', url: `${API_ENDPOINT}/users/@me/relationships` })
+    const res = await this.fetch({ method: 'GET', url: 'users/@me/relationships' })
     if (!res.body) throw new Error('No response')
     const parsed = JSON.parse(res.body)
 
     this.userFriends = parsed.filter(f => f.type === 1) // Only friends
       .map(f => mapUser(f.user))
-  }
-
-  // Handles received messages
-  private messageHandler = (message: DiscordMessage) => {
-    // Ignore messages from guilds - they're not DMs, so we don't care 🤷‍♂️
-    if (message.guild) return
-
-    if (message.type === 'RECIPIENT_ADD' || message.type === 'RECIPIENT_REMOVE' || message.type === 'CALL') {
-      // Custom status
-    }
-
-    // Ignore empty messages
-    if (!message.content && !message.embeds && !message.attachments && !message.reactions) return
-
-    if (this.eventCallback) this.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: message.channel.id }])
   }
 
   // Setups the gateway listeners
@@ -285,8 +282,14 @@ export default class DiscordAPI {
     this.client.on('warn', warning => {
       texts.log('Gateway warning: ' + warning)
     })
+    this.client.on('webhookUpdate', update => {
+      console.log(update)
+    })
 
-    this.client.on('message', this.messageHandler)
+    this.client.on('message', msg => {
+      if (msg.guild) return
+      if (this.eventCallback) this.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: msg.channel.id }])
+    })
     this.client.on('messageUpdate', msg => {
       if (msg.guild) return
       if (this.eventCallback) this.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: msg.channel.id }])
@@ -300,19 +303,19 @@ export default class DiscordAPI {
     })
     this.client.on('messageReactionAdd', reaction => {
       if (reaction.message.guild) return
-      if (this.eventCallback) this.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: reaction.message.id }])
+      if (this.eventCallback) this.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: reaction.message.channel.id }])
     })
     this.client.on('messageReactionRemove', reaction => {
       if (reaction.message.guild) return
-      if (this.eventCallback) this.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: reaction.message.id }])
+      if (this.eventCallback) this.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: reaction.message.channel.id }])
+    })
+    this.client.on('messageReactionRemoveEmoji', reaction => {
+      if (reaction.message.guild) return
+      if (this.eventCallback) this.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: reaction.message.channel.id }])
     })
     this.client.on('messageReactionRemoveAll', message => {
       if (message.guild) return
       if (this.eventCallback) this.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: message.channel.id }])
-    })
-    this.client.on('messageReactionRemoveEmoji', reactionEmoji => {
-      if (reactionEmoji.message.guild) return
-      if (this.eventCallback) this.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: reactionEmoji.message.id }])
     })
     this.client.on('presenceUpdate', (_, presence) => {
       if (presence.guild) return
@@ -351,7 +354,9 @@ export default class DiscordAPI {
     try {
       const res = await got({
         throwHttpErrors: false,
+        prefixUrl: API_ENDPOINT,
         headers: {
+          'User-Agent': `DiscordBot (${VERSION})`,
           Authorization: this.token,
           ...headers,
         },
