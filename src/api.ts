@@ -61,5 +61,5 @@ export default class Discord implements PlatformAPI {
 
   sendActivityIndicator = async (type: ActivityType, threadID: string) => this.api.setTyping(type, threadID)
 
-  sendReadReceipt = async (threadID: string, messageID: string) => { }
+  sendReadReceipt = async (threadID: string, messageID: string) => this.api.sendReadReceipt(threadID, messageID)
 }

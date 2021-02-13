@@ -222,6 +222,11 @@ export default class DiscordAPI {
     return res.statusCode === 204
   }
 
+  // Marks message as read
+  sendReadReceipt = async (threadID: string, messageID: string) => {
+    await this.fetch({ method: 'POST', url: `channels/${threadID}/messages/${messageID}/ack`, json: { token: null } })
+  }
+
   // Adds a reaction with specified reactionKey to supplied message ID
   public addReaction = async (threadID: string, messageID: string, reactionKey: string): Promise<boolean> => {
     const res = await this.fetch({ method: 'PUT', url: `channels/${threadID}/messages/${messageID}/reactions/${encodeURIComponent(reactionKey)}/@me` })
