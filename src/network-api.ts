@@ -104,14 +104,20 @@ export default class DiscordAPI {
   }
 
   // Creates a new thread
-  public createThread = (userIDs: string[], title?: string): Promise<boolean | Thread> => {
-    return null
+  public createThread = async (userIDs: string[], title?: string): Promise<boolean | Thread> => {
+    const res = await this.fetch({
+      method: 'POST',
+      url: 'users/@me/channels',
+      json: userIDs.length === 1 ? { recipient_id: userIDs[0] } : { recipients: userIDs },
+    })
+
+    if (!res.body) throw new Error('No response')
+    return mapThread(JSON.parse(res.body), this.currentUser, null, this.userMappings)
   }
 
   // Archives selected thread
   public archiveThread = async (threadID: string) => {
-    const res = await this.fetch({ method: 'DELETE', url: `channels/${threadID}` })
-    // return res.statusCode === 200
+    await this.fetch({ method: 'DELETE', url: `channels/${threadID}` })
   }
 
   // Fetches messages from provided threadID
@@ -248,9 +254,7 @@ export default class DiscordAPI {
   private getUserFriends = async () => {
     const res = await this.fetch({ method: 'GET', url: 'users/@me/relationships' })
     if (!res.body) throw new Error('No response')
-    const parsed = JSON.parse(res.body)
-
-    this.userFriends = parsed.filter(f => f.type === 1) // Only friends
+    this.userFriends = JSON.parse(res.body).filter(f => f.type === 1) // Only friends
       .map(f => mapUser(f.user))
   }
 

@@ -38,6 +38,8 @@ export default class Discord implements PlatformAPI {
 
   searchUsers = async (typed: string) => this.api.userFriends.filter(u => u.username.toLowerCase().includes(typed.toLowerCase()))
 
+  // getPresence = async () => this.api.getUsersPresence()
+
   getThreads = async (inboxName: InboxName, pagination?: PaginationArg): Promise<Paginated<Thread>> => this.api.getThreads(inboxName, pagination)
 
   createThread = (userIDs: string[], title?: string) => this.api.createThread(userIDs, title)
