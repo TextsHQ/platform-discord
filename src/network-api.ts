@@ -3,7 +3,7 @@ import fs from 'fs'
 import FormData from 'form-data'
 import { CookieJar } from 'tough-cookie'
 import { texts, CurrentUser, MessageContent, PaginationArg, Thread, Message as TextsMessage, ServerEventType, OnServerEventCallback, ActivityType, OnConnStateChangeCallback, User, InboxName, MessageSendOptions } from '@textshq/platform-sdk'
-import { Client as DiscordClient, DMChannel } from 'better-discord.js'
+import { Client as DiscordClient } from 'better-discord.js'
 import { mapCurrentUser, mapMessage, mapThread, mapUser } from './mappers'
 import { VERSION } from './constants'
 
@@ -21,36 +21,27 @@ async function sleep(time: number) {
 }
 
 export default class DiscordAPI {
-  // Authorization token
   private token?: string
 
-  // Client used to interact with Discord
   private readonly client: DiscordClient = new DiscordClient()
 
-  // ID to username mappings
+  // ID-to-username mappings
   private userMappings: Map<string, string> = new Map()
 
-  // Cookie jar, used for authorization
   public cookieJar?: CookieJar
 
-  // Events callback
   public eventCallback?: OnServerEventCallback
 
-  // Connection state change callback
   public connectionStateChangeCallback?: OnConnStateChangeCallback
 
-  // Client is ready
   public ready: boolean = false
 
-  // Currently logged in user
   public currentUser?: CurrentUser
 
-  // Current user friends
   public userFriends: User[] = []
 
   // MARK: - Public functions
 
-  // Logs in and setups the gateway listeners
   public login = async (cookieJar: CookieJar) => {
     if (!cookieJar) throw TypeError()
     this.cookieJar = cookieJar
@@ -64,13 +55,15 @@ export default class DiscordAPI {
     this.setupGatewayListeners()
   }
 
-  // Logs out, destroying client
   public logout = async () => {
+    this.fetch({ method: 'POST', url: 'auth/logout', json: { provider: null, voip_provider: null } })
+  }
+
+  public dispose = () => {
     this.ready = false
     this.client.destroy()
   }
 
-  // Fetches the currently logged in user
   public getCurrentUser = async (): Promise<CurrentUser> => {
     const res = await this.fetch({ method: 'GET', url: 'users/@me' })
     if (!res.body) throw new Error('No response')
@@ -84,7 +77,6 @@ export default class DiscordAPI {
     return currentUser
   }
 
-  // Fetches all threads
   public getThreads = async (inboxName: InboxName, pagination?: PaginationArg): Promise<{ items: Thread[], hasMore: boolean }> => {
     const res = await this.fetch({ method: 'GET', url: 'users/@me/channels' })
     if (!res.body) throw new Error('No response')
@@ -103,8 +95,9 @@ export default class DiscordAPI {
     return { items: threads, hasMore: false }
   }
 
-  // Creates a new thread
   public createThread = async (userIDs: string[], title?: string): Promise<boolean | Thread> => {
+    while (!this.ready && WAIT_TILL_READY) await sleep(1000)
+
     const res = await this.fetch({
       method: 'POST',
       url: 'users/@me/channels',
@@ -115,12 +108,10 @@ export default class DiscordAPI {
     return mapThread(JSON.parse(res.body), this.currentUser, null, this.userMappings)
   }
 
-  // Archives selected thread
   public archiveThread = async (threadID: string) => {
     await this.fetch({ method: 'DELETE', url: `channels/${threadID}` })
   }
 
-  // Fetches messages from provided threadID
   public getMessages = async (threadID: string, pagination?: PaginationArg): Promise<TextsMessage[]> => {
     if (!this.currentUser) throw new Error('No current user')
     const currentUser = this.currentUser
@@ -155,7 +146,6 @@ export default class DiscordAPI {
     return messages.filter(m => m).sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
   }
 
-  // Sends a message to provided threadID
   public sendMessage = async (threadID: string, content: MessageContent, options?: MessageSendOptions): Promise<boolean> => {
     while (!this.ready && WAIT_TILL_READY) await sleep(1000)
 
@@ -214,44 +204,36 @@ export default class DiscordAPI {
     return res.statusCode === 200
   }
 
-  // Deletes provided messageID (only if `forEveryone` is true)
   public deleteMessage = async (threadID: string, messageID: string, forEveryone?: boolean): Promise<boolean> => {
     if (!forEveryone) return true
+
+    while (!this.ready && WAIT_TILL_READY) await sleep(1000)
 
     const res = await this.fetch({ method: 'DELETE', url: `channels/${threadID}/messages/${messageID}` })
     return res.statusCode === 204
   }
 
-  // Marks message as read
-  sendReadReceipt = async (threadID: string, messageID: string) => {
+  public sendReadReceipt = async (threadID: string, messageID: string) => {
+    while (!this.ready && WAIT_TILL_READY) await sleep(1000)
     await this.fetch({ method: 'POST', url: `channels/${threadID}/messages/${messageID}/ack`, json: { token: null } })
   }
 
-  // Adds a reaction with specified reactionKey to supplied message ID
   public addReaction = async (threadID: string, messageID: string, reactionKey: string): Promise<boolean> => {
+    while (!this.ready && WAIT_TILL_READY) await sleep(1000)
+
     const res = await this.fetch({ method: 'PUT', url: `channels/${threadID}/messages/${messageID}/reactions/${encodeURIComponent(reactionKey)}/@me` })
     return res.statusCode === 204
   }
 
-  // Removes a reaction with specified reactionKey from supplied message ID
   public removeReaction = async (threadID: string, messageID: string, reactionKey: string): Promise<boolean> => {
+    while (!this.ready && WAIT_TILL_READY) await sleep(1000)
+
     const res = await this.fetch({ method: 'DELETE', url: `channels/${threadID}/messages/${messageID}/reactions/${encodeURIComponent(reactionKey)}/@me` })
     return res.statusCode === 204
   }
 
-  // Sends the TYPING || NOT_TYPING event to channel with provided threadID
   public setTyping = async (type: ActivityType, threadID: string): Promise<void> => {
-    if (type !== ActivityType.NONE && type !== ActivityType.TYPING) return
-
-    const channel: DMChannel = await this.client.channels.fetch(threadID) as DMChannel
-    if (!channel) throw new Error('Thread with ID ' + threadID + ' not found!')
-    while (!this.ready && WAIT_TILL_READY) await sleep(1000)
-
-    if (type === ActivityType.TYPING) {
-      channel.startTyping()
-    } else if (type === ActivityType.NONE) {
-      channel.stopTyping()
-    }
+    if (type === ActivityType.TYPING && this.ready) this.fetch({ method: 'POST', url: `channels/${threadID}/typing` })
   }
 
   // - MARK: Private functions
@@ -263,7 +245,6 @@ export default class DiscordAPI {
       .map(f => mapUser(f.user))
   }
 
-  // Setups the gateway listeners
   private setupGatewayListeners = () => {
     texts.log('Connecting to gateway...')
 
@@ -275,8 +256,6 @@ export default class DiscordAPI {
     this.client.on('disconnect', () => {
       texts.log('Disconnected from gateway.')
       this.ready = false
-
-      if (RESTART_ON_FAIL) this.client.login(this.token, false)
     })
     this.client.on('invalidated', () => {
       texts.log('Gateway connection invalidated')
@@ -325,13 +304,12 @@ export default class DiscordAPI {
       if (reaction.message.guild) return
       if (this.eventCallback) this.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: reaction.message.channel.id }])
     })
-    this.client.on('messageReactionRemoveAll', message => {
-      if (message.guild) return
-      if (this.eventCallback) this.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: message.channel.id }])
+    this.client.on('messageReactionRemoveAll', msg => {
+      if (msg.guild) return
+      if (this.eventCallback) this.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: msg.channel.id }])
     })
     this.client.on('presenceUpdate', (_, presence) => {
       if (presence.guild) return
-
       if (this.eventCallback) this.eventCallback([{ type: ServerEventType.USER_PRESENCE_UPDATED, presence: { userID: presence.userID, isActive: presence.status === 'online' || presence.status === 'idle', lastActive: new Date() } }])
     })
     this.client.on('typingStart', (channel, user) => {
@@ -361,7 +339,6 @@ export default class DiscordAPI {
     })
   }
 
-  // Fetch with the authorization token
   private fetch = async ({ headers = {}, ...rest }) => {
     try {
       const res = await got({
@@ -369,6 +346,7 @@ export default class DiscordAPI {
         prefixUrl: API_ENDPOINT,
         headers: {
           'User-Agent': `DiscordBot (${VERSION})`,
+          'Accept-Encoding': 'gzip, deflate, br',
           Authorization: this.token,
           ...headers,
         },

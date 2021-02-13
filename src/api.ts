@@ -11,7 +11,7 @@ export default class Discord implements PlatformAPI {
     await this.api.login(cookieJar)
   }
 
-  dispose = async () => this.api.logout()
+  dispose = async () => this.api.dispose()
 
   login = async (creds): Promise<LoginResult> => {
     if (!creds.cookieJarJSON) return { type: 'error' }
