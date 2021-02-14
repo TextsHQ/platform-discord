@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "main": "dist/index.js",
   "scripts": {
-    "postinstall": "yarn tsc || true",
-    "build": "yarn tsc",
+    "postinstall": "yarn tsc --watch || true",
+    "build": "yarn tsc --watch",
     "lint": "eslint src --ext ts,tsx,js,jsx --cache"
   },
   "husky": {

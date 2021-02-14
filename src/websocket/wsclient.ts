@@ -76,15 +76,12 @@ export default class WSClient {
 
     this.ws.on('close', (code, reason) => {
       this.ready = false
-      if (this.onChangedReadyState) this.onChangedReadyState(false)
+      this.onChangedReadyState?.(false)
       if (code === undefined && this.restartOnFail) this.resumeConnectionOnConnect = true
-
-      if (this.onConnectionClosed) this.onConnectionClosed(code, reason)
+      this.onConnectionClosed?.(code, reason)
     })
 
-    this.ws.on('error', error => {
-      if (this.onError) this.onError(error)
-    })
+    this.ws.on('error', error => this.onError?.(error) )
 
     this.ws.on('unexpected-response', (request, response) => {
       console.log('Unexpected response: ' + request, response)
@@ -98,14 +95,14 @@ export default class WSClient {
     try {
       unpacked = erlpack.unpack(event.data as Buffer)
       this.lastSequenceNumber = unpacked.s
-      if (this.onMessage && unpacked.d) this.onMessage(unpacked.op, unpacked.d, unpacked.t)
+      this.onMessage?.(unpacked.op, unpacked.d, unpacked.t)
 
       switch (unpacked.op) {
         case OPCode.DISPATCH:
           if (!this.ready && unpacked.t === GatewayMessageType.READY) {
             this.sessionID = unpacked.d.session_id
             this.ready = true
-            if (this.onChangedReadyState) this.onChangedReadyState(true)
+            this.onChangedReadyState?.(true)
           }
 
           break
@@ -123,7 +120,7 @@ export default class WSClient {
     } catch (e) {
       console.error('Error unpacking: ' + e)
       console.error(event)
-      if (this.onError) this.onError(e)
+      this.onError?.(e)
     }
   }
 
