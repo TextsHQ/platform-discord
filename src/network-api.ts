@@ -3,18 +3,15 @@ import fs from 'fs'
 import FormData from 'form-data'
 import { CookieJar } from 'tough-cookie'
 import { texts, CurrentUser, MessageContent, PaginationArg, Thread, Message as TextsMessage, ServerEventType, OnServerEventCallback, ActivityType, OnConnStateChangeCallback, User, InboxName, MessageSendOptions } from '@textshq/platform-sdk'
-import { Client as DiscordClient } from 'better-discord.js'
 import { mapCurrentUser, mapMessage, mapThread, mapUser } from './mappers'
 import { VERSION } from './constants'
+import WSClient from './websocket/wsclient'
+import { GatewayMessageType, OPCode } from './websocket/constants'
 
 const API_ENDPOINT = 'https://discord.com/api/v8/'
 const LIMIT_COUNT = 25
 const WAIT_TILL_READY = true
 const RESTART_ON_FAIL = true
-
-function handleErrors(json: any) {
-  if (json.message && json.code) throw new Error(json.message)
-}
 
 async function sleep(time: number) {
   return new Promise(resolve => setTimeout(resolve, time))
@@ -23,7 +20,7 @@ async function sleep(time: number) {
 export default class DiscordAPI {
   private token?: string
 
-  private readonly client: DiscordClient = new DiscordClient()
+  private client?: WSClient
 
   // ID-to-username mappings
   private userMappings: Map<string, string> = new Map()
@@ -51,7 +48,12 @@ export default class DiscordAPI {
 
     if (!this.token) throw new Error('No token found.')
 
-    this.client.login(this.token, false)
+    const gatewayRes = await got({ url: `${API_ENDPOINT}/gateway` })
+    const gateway: string = JSON.parse(gatewayRes.body).url ?? 'wss://gateway.discord.gg'
+
+    this.client = new WSClient(`${gateway}/?v=8&encoding=etf`, this.token)
+    this.client.restartOnFail = RESTART_ON_FAIL
+
     this.setupGatewayListeners()
   }
 
@@ -61,7 +63,8 @@ export default class DiscordAPI {
 
   public dispose = () => {
     this.ready = false
-    this.client.destroy()
+    this.client.disconnect()
+    this.client = null
   }
 
   public getCurrentUser = async (): Promise<CurrentUser> => {
@@ -151,10 +154,11 @@ export default class DiscordAPI {
 
     const method = 'POST'
     const url = `channels/${threadID}/messages`
-    const text = content.text?.replaceAll(/@([^#@]{3,32}#[0-9]{4})/gi, (_, username) => {
+
+    // @ts-expect-error
+    const text = content.text.replaceAll(/@([^#@]{3,32}#[0-9]{4})/gi, (_, username) => {
       const user = Array.from(this.userMappings).find(u => u[1] === username)
       if (user) return `<@!${user[0]}>`
-
       return username
     })
 
@@ -248,95 +252,102 @@ export default class DiscordAPI {
   private setupGatewayListeners = () => {
     texts.log('Connecting to gateway...')
 
-    this.client.on('ready', () => {
-      texts.log('Connected to gateway.')
-      this.client.user?.setStatus('online')
-      this.ready = true
-    })
-    this.client.on('disconnect', () => {
-      texts.log('Disconnected from gateway.')
-      this.ready = false
-    })
-    this.client.on('invalidated', () => {
-      texts.log('Gateway connection invalidated')
+    this.client.onChangedReadyState = ready => {
+      texts.log('Connection state changed: ' + ready)
+      this.ready = ready
+    }
+
+    this.client.onConnectionClosed = (code, reason) => {
+      texts.log('Connection to websocket closed with code ' + code + '. Reason: ' + reason)
       this.ready = false
 
-      if (RESTART_ON_FAIL) this.client.login(this.token, false)
-    })
-    this.client.on('error', error => {
-      texts.error('Gateway error:' + error)
-      this.ready = false
+      switch (code) {
+        case 4004:
+          this.logout()
+          throw new Error('Unauthorized')
+        case 4007:
+          console.log('Incorrect sequence number')
+          break
+        case 4008:
+          console.log('Ratelimited')
+          break
+        case 4009:
+          console.log('Session timed out')
+          break
+        default:
+          break
+      }
+    }
 
-      if (RESTART_ON_FAIL) this.client.login(this.token, false)
+    this.client.onError = error => {
       throw error
-    })
-    this.client.on('warn', warning => {
-      texts.log('Gateway warning: ' + warning)
-    })
-    this.client.on('webhookUpdate', update => {
-      texts.log('Webhook update: ' + update)
-    })
+    }
 
-    this.client.on('message', msg => {
-      if (msg.guild) return
-      if (this.eventCallback) this.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: msg.channel.id }])
-    })
-    this.client.on('messageUpdate', msg => {
-      if (msg.guild) return
-      if (this.eventCallback) this.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: msg.channel.id }])
-    })
-    this.client.on('messageDelete', msg => {
-      if (msg.guild) return
-      if (this.eventCallback) this.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: msg.channel.id }])
-    })
-    this.client.on('messageDeleteBulk', msgs => {
-      if (this.eventCallback) this.eventCallback(msgs.filter(m => !m.guild).map(m => ({ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: m.channel.id })))
-    })
-    this.client.on('messageReactionAdd', reaction => {
-      if (reaction.message.guild) return
-      if (this.eventCallback) this.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: reaction.message.channel.id }])
-    })
-    this.client.on('messageReactionRemove', reaction => {
-      if (reaction.message.guild) return
-      if (this.eventCallback) this.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: reaction.message.channel.id }])
-    })
-    this.client.on('messageReactionRemoveEmoji', reaction => {
-      if (reaction.message.guild) return
-      if (this.eventCallback) this.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: reaction.message.channel.id }])
-    })
-    this.client.on('messageReactionRemoveAll', msg => {
-      if (msg.guild) return
-      if (this.eventCallback) this.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: msg.channel.id }])
-    })
-    this.client.on('presenceUpdate', (_, presence) => {
-      if (presence.guild) return
-      if (this.eventCallback) this.eventCallback([{ type: ServerEventType.USER_PRESENCE_UPDATED, presence: { userID: presence.userID, isActive: presence.status === 'online' || presence.status === 'idle', lastActive: new Date() } }])
-    })
-    this.client.on('typingStart', (channel, user) => {
-      if (channel.type !== 'dm' && channel.type !== 'group') return
-      if (this.eventCallback) this.eventCallback([{ type: ServerEventType.PARTICIPANT_TYPING, typing: user.typingIn(channel.id), participantID: user.id, threadID: channel.id }])
-    })
-    this.client.on('userUpdate', (_, user) => {
-      if (this.eventCallback) this.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: user.id }])
-    })
-    this.client.on('channelCreate', channel => {
-      if (channel.type !== 'dm' && channel.type !== 'group') return
-      if (this.eventCallback) this.eventCallback([{ type: ServerEventType.STATE_SYNC, mutationType: 'upsert', objectName: 'thread', objectIDs: { threadID: channel.id }, entries: [{ id: channel.id, isUnread: true }] }])
-    })
-    this.client.on('channelDelete', channel => {
-      if (channel.type !== 'dm' && channel.type !== 'group') return
-      if (this.eventCallback) this.eventCallback([{ type: ServerEventType.STATE_SYNC, mutationType: 'update', objectName: 'thread', objectIDs: { threadID: channel.id }, entries: [{ id: channel.id, isUnread: true }] }])
-    })
-    this.client.on('channelUpdate', (_, channel) => {
-      if (channel.type !== 'dm' && channel.type !== 'group') return
-      if (this.eventCallback) this.eventCallback([{ type: ServerEventType.STATE_SYNC, mutationType: 'update', objectName: 'participant', objectIDs: { threadID: channel.id }, entries: [{ id: channel.id, isUnread: true }] }])
-    })
-    this.client.on('relationshipAdd', (_, relation) => {
-      console.log('relationshipAdd')
-    })
-    this.client.on('rateLimit', limit => {
-      texts.log('We\'re being ratelimited: ' + limit.limit, limit.timeout)
-    })
+    this.client.onMessage = (opcode, message, type) => {
+      switch (type) {
+        case GatewayMessageType.HELLO:
+          break
+        case GatewayMessageType.INVALID_SESSION:
+          break
+        case GatewayMessageType.READY:
+          // TODO: Get read state
+          const notes = message.notes
+          const presences = message.presences
+          const read_state = message.read_state
+          const user_settings = message.user_settings
+          break
+        case GatewayMessageType.RECONNECT:
+          break
+        case GatewayMessageType.RESUMED:
+          break
+
+        case GatewayMessageType.CHANNEL_CREATE:
+        case GatewayMessageType.CHANNEL_DELETE:
+          if (this.eventCallback) this.eventCallback([{ type: ServerEventType.STATE_SYNC, mutationType: 'upsert', objectName: 'thread', objectIDs: { threadID: message.id }, entries: [{ id: message.id, isUnread: true }] }])
+          break
+
+        case GatewayMessageType.CHANNEL_PINS_UPDATE:
+        case GatewayMessageType.CHANNEL_UPDATE:
+        case GatewayMessageType.MESSAGE_CREATE:
+        case GatewayMessageType.MESSAGE_DELETE:
+        case GatewayMessageType.MESSAGE_UPDATE:
+          if (this.eventCallback) this.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: message.channel_id }])
+          break
+
+        case GatewayMessageType.MESSAGE_DELETE_BULK:
+          // TODO: Test it
+          if (this.eventCallback) this.eventCallback(message.map(m => ({ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: m.channel_id })))
+          break
+
+        case GatewayMessageType.MESSAGE_REACTION_ADD:
+        case GatewayMessageType.MESSAGE_REACTION_REMOVE:
+        case GatewayMessageType.MESSAGE_REACTION_REMOVE_ALL:
+        case GatewayMessageType.MESSAGE_REACTION_REMOVE_EMOJI:
+          if (this.eventCallback) this.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: message.channel_id }])
+          break
+
+        case GatewayMessageType.TYPING_START:
+          if (this.eventCallback) this.eventCallback([{ type: ServerEventType.PARTICIPANT_TYPING, typing: true, participantID: message.user_id, threadID: message.channel_id }])
+          break
+
+        case GatewayMessageType.PRESENCE_UPDATE:
+        case GatewayMessageType.USER_UPDATE:
+          if (this.eventCallback) this.eventCallback([{ type: ServerEventType.USER_PRESENCE_UPDATED, presence: { userID: message.user.id, isActive: status === 'online', lastActive: new Date() } }])
+          break
+
+        case GatewayMessageType.RELATIONSHIP_ADD:
+        case GatewayMessageType.RELATIONSHIP_REMOVE:
+          this.getUserFriends()
+          break
+
+        default:
+          break
+      }
+    }
+  }
+
+  private handleErrors = (json: any) => {
+    if (json.message && json.code) console.error(json)
   }
 
   private fetch = async ({ headers = {}, ...rest }) => {
@@ -353,7 +364,7 @@ export default class DiscordAPI {
         ...rest,
       })
 
-      if (res.body && JSON.parse(res.body)) handleErrors(JSON.parse(res.body))
+      if (res.body && JSON.parse(res.body)) this.handleErrors(JSON.parse(res.body))
       return res
     } catch (err) {
       if (err.code === 'ECONNREFUSED' && (err.message.endsWith('0.0.0.0:443') || err.message.endsWith('127.0.0.1:443'))) {

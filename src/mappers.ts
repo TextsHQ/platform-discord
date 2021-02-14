@@ -168,6 +168,7 @@ function transformEmojisAndTags(message?: string, userMappings?: Map<string, str
   const textAttributes = { entities: [] }
 
   const text = message
+    // @ts-expect-error
     .replaceAll(EMOTE_REGEX, (matched, animated, emote_name, emote_id, offset) => {
       const entity = {
         from: offset - emojiOffsetRemoved,
@@ -238,7 +239,21 @@ function mapMessageAction(message: any): { isAction?: boolean, parseTemplate?: b
     case MessageType.CALL:
       isAction = true
       parseTemplate = true
-      text = `${message.author.username}#${message.author.discriminator} started a call`
+      if (message.call?.ended_timestamp) {
+        const startDate = new Date(message.timestamp)
+        const endDate = new Date(message.call?.ended_timestamp)
+        const timeLasted = (endDate.getTime() - startDate.getTime()) / 1000 / 60
+
+        if (timeLasted >= 60 * 60) {
+          text = `${message.author.username}#${message.author.discriminator} started a call, which lasted ${Math.floor(timeLasted)} minute(s)`
+        } else if (timeLasted >= 60 * 60 * 60) {
+          text = `${message.author.username}#${message.author.discriminator} started a call, which lasted ${Math.floor(timeLasted)} hour(s)`
+        } else {
+          text = `${message.author.username}#${message.author.discriminator} started a call, which lasted ${Math.floor(timeLasted)} second(s)`
+        }
+      } else {
+        text = `${message.author.username}#${message.author.discriminator} started a call`
+      }
       break
     case MessageType.CHANNEL_NAME_CHANGE:
       isAction = true

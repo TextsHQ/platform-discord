@@ -1,6 +1,6 @@
 import { SupportedReaction } from '@textshq/platform-sdk'
 
-export const VERSION = '0.1.0-internal'
+export const VERSION = '1.0.0'
 
 export enum MessageType {
   DEFAULT = 0,
