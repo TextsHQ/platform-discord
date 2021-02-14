@@ -66,40 +66,6 @@ export function mapThread(thread: any, isUnread: boolean, currentUser?: User, la
   }
 }
 
-function mapAttachment(a): MessageAttachment {
-  // TODO: Improve it
-  const lowercased = (a.name || a.url).toLowerCase()
-  let type = MessageAttachmentType.UNKNOWN
-
-  let isGif = false
-  let isVoiceNote = false
-
-  if (lowercased.endsWith('.png') || lowercased.endsWith('.jpg') || lowercased.endsWith('.jpeg')) {
-    type = MessageAttachmentType.IMG
-  } else if (lowercased.endsWith('.gif') || lowercased.endsWith('.gifv')) {
-    type = MessageAttachmentType.IMG
-    isGif = true
-  } else if (lowercased.endsWith('.mp4') || lowercased.endsWith('.mov') || lowercased.endsWith('.webm')) {
-    type = MessageAttachmentType.VIDEO
-  } else if (lowercased.endsWith('.mp3') || lowercased.endsWith('.flac') || lowercased.endsWith('.wav') || lowercased.endsWith('.ogg')) {
-    type = MessageAttachmentType.AUDIO
-    isVoiceNote = true
-  }
-
-  return {
-    id: a.id,
-    type,
-    isGif,
-    // isSticker?: boolean,
-    isVoiceNote,
-    size: a.width && a.height ? { width: a.width, height: a.height } : undefined,
-    srcURL: a.url,
-    posterImg: a.proxyURL,
-    fileName: a.name || undefined,
-    fileSize: a.size || undefined,
-  }
-}
-
 export function mapMessage(message: any, currentUserID: string, reactionsDetails?: any[], userMappings?: Map<string, string>): Message | null {
   if (!SUPPORTED_MESSAGE_TYPES.includes(message.type)) return null
 
@@ -158,6 +124,40 @@ export function mapMessage(message: any, currentUserID: string, reactionsDetails
   }
 
   return mapped
+}
+
+function mapAttachment(a): MessageAttachment {
+  // TODO: Improve it
+  const lowercased = (a.name || a.url).toLowerCase()
+  let type = MessageAttachmentType.UNKNOWN
+
+  let isGif = false
+  let isVoiceNote = false
+
+  if (lowercased.endsWith('.png') || lowercased.endsWith('.jpg') || lowercased.endsWith('.jpeg')) {
+    type = MessageAttachmentType.IMG
+  } else if (lowercased.endsWith('.gif') || lowercased.endsWith('.gifv')) {
+    type = MessageAttachmentType.IMG
+    isGif = true
+  } else if (lowercased.endsWith('.mp4') || lowercased.endsWith('.mov') || lowercased.endsWith('.webm')) {
+    type = MessageAttachmentType.VIDEO
+  } else if (lowercased.endsWith('.mp3') || lowercased.endsWith('.flac') || lowercased.endsWith('.wav') || lowercased.endsWith('.ogg')) {
+    type = MessageAttachmentType.AUDIO
+    isVoiceNote = true
+  }
+
+  return {
+    id: a.id,
+    type,
+    isGif,
+    // isSticker?: boolean,
+    isVoiceNote,
+    size: a.width && a.height ? { width: a.width, height: a.height } : undefined,
+    srcURL: a.url,
+    posterImg: a.proxyURL,
+    fileName: a.name || undefined,
+    fileSize: a.size || undefined,
+  }
 }
 
 function transformEmojisAndTags(message?: string, userMappings?: Map<string, string>): { text?: string, textAttributes?: TextAttributes } {

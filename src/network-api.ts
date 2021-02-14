@@ -87,17 +87,18 @@ export default class DiscordAPI {
     if (!res.body) throw new Error('No response')
 
     const threads: Thread[] = await Promise.all(JSON.parse(res.body).map(async (thread, index) => {
-      let messages
+      /* let messages
       if (index <= LIMIT_COUNT) {
         const messagesRes = await this.fetch({ method: 'GET', url: `channels/${thread.id}/messages?limit=1` })
         messages = JSON.parse(messagesRes.body)
-        thread.recipients.forEach(r => this.userMappings.set(r.id, (r.username + '#' + r.discriminator)))
-      }
+      } */
 
-      return mapThread(thread, this.unreadThreads.get(thread.id) != null, this.currentUser, (messages?.length > 0 ? messages[0] : undefined), this.userMappings)
+      thread.recipients.forEach(r => this.userMappings.set(r.id, (r.username + '#' + r.discriminator)))
+      return mapThread(thread, this.unreadThreads.get(thread.id) != null, this.currentUser, undefined, this.userMappings)
     }))
 
-    return { items: threads, hasMore: false }
+    // TODO: Add lastMessageID property to Thread
+    return { items: threads.sort((a, b) => JSON.parse(a._original).last_message_id - JSON.parse(b._original).last_message_id).reverse(), hasMore: false }
   }
 
   public createThread = async (userIDs: string[], title?: string): Promise<boolean | Thread> => {
