@@ -35,10 +35,10 @@ const MAP_THREAD_TYPE: ThreadType[] = [
   'single', // GUILD_STORE
 ]
 
-export function mapThread(thread: any, currentUser?: User, lastMessage?: any, userMappings?: Map<string, string>): Thread {
+export function mapThread(thread: any, isUnread: boolean, currentUser?: User, lastMessage?: any, userMappings?: Map<string, string>): Thread {
   const type: ThreadType = MAP_THREAD_TYPE[thread.type]
 
-  const participants: User[] = thread.recipients.map(mapUser)
+  const participants: User[] = thread.recipients?.map(mapUser)
   participants.sort((a, b) => ((a.username ?? '') < (b.username ?? '') ? 1 : -1))
   if (currentUser) participants.push(currentUser)
 
@@ -48,7 +48,7 @@ export function mapThread(thread: any, currentUser?: User, lastMessage?: any, us
     _original: JSON.stringify(thread),
     id: thread.id,
     title: thread.name,
-    isUnread: false,
+    isUnread,
     isReadOnly: false,
     type,
     timestamp: new Date(thread.timestamp || lastMessage?.timestamp || 0),
@@ -242,7 +242,7 @@ function mapMessageAction(message: any): { isAction?: boolean, parseTemplate?: b
       if (message.call?.ended_timestamp) {
         const startDate = new Date(message.timestamp)
         const endDate = new Date(message.call?.ended_timestamp)
-        const timeLasted = (endDate.getTime() - startDate.getTime()) / 1000 / 60
+        const timeLasted = (endDate.getTime() - startDate.getTime()) / 1000
 
         if (timeLasted >= 60 * 60) {
           text = `${message.author.username}#${message.author.discriminator} started a call, which lasted ${Math.floor(timeLasted)} minute(s)`

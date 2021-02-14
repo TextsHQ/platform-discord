@@ -25,6 +25,8 @@ export default class DiscordAPI {
   // ID-to-username mappings
   private userMappings: Map<string, string> = new Map()
 
+  private unreadThreads: Map<string, string> = new Map()
+
   public cookieJar?: CookieJar
 
   public eventCallback?: OnServerEventCallback
@@ -92,13 +94,15 @@ export default class DiscordAPI {
         thread.recipients.forEach(r => this.userMappings.set(r.id, (r.username + '#' + r.discriminator)))
       }
 
-      return mapThread(thread, this.currentUser, (messages?.length > 0 ? messages[0] : undefined), this.userMappings)
+      return mapThread(thread, this.unreadThreads.get(thread.id) != null, this.currentUser, (messages?.length > 0 ? messages[0] : undefined), this.userMappings)
     }))
 
     return { items: threads, hasMore: false }
   }
 
   public createThread = async (userIDs: string[], title?: string): Promise<boolean | Thread> => {
+    if (userIDs.length === 1 && userIDs[0] === this.currentUser?.id) return false
+
     while (!this.ready && WAIT_TILL_READY) await sleep(1000)
 
     const res = await this.fetch({
@@ -108,7 +112,7 @@ export default class DiscordAPI {
     })
 
     if (!res.body) throw new Error('No response')
-    return mapThread(JSON.parse(res.body), this.currentUser, null, this.userMappings)
+    return mapThread(JSON.parse(res.body), false, this.currentUser, null, this.userMappings)
   }
 
   public archiveThread = async (threadID: string) => {
@@ -219,7 +223,8 @@ export default class DiscordAPI {
 
   public sendReadReceipt = async (threadID: string, messageID: string) => {
     while (!this.ready && WAIT_TILL_READY) await sleep(1000)
-    await this.fetch({ method: 'POST', url: `channels/${threadID}/messages/${messageID}/ack`, json: { token: null } })
+    const res = await this.fetch({ method: 'POST', url: `channels/${threadID}/messages/${messageID || this.unreadThreads.get(threadID)}/ack`, json: { token: null } })
+    if (res.statusCode === 204) this.unreadThreads.delete(threadID)
   }
 
   public addReaction = async (threadID: string, messageID: string, reactionKey: string): Promise<boolean> => {
@@ -283,27 +288,37 @@ export default class DiscordAPI {
       throw error
     }
 
-    this.client.onMessage = (opcode, message, type) => {
+    this.client.onMessage = (opcode, payload, type) => {
       switch (type) {
         case GatewayMessageType.HELLO:
           break
+
         case GatewayMessageType.INVALID_SESSION:
           break
+
         case GatewayMessageType.READY:
-          // TODO: Get read state
-          const notes = message.notes
-          const presences = message.presences
-          const read_state = message.read_state
-          const user_settings = message.user_settings
+          const notes = payload.notes
+          const user_settings = payload.user_settings
+          const presences = payload.presences
+
+          payload.read_state.filter(p => p.mention_count > 0).forEach(p => {
+            this.unreadThreads.set(p.id, p.last_message_id)
+          })
+
           break
+
         case GatewayMessageType.RECONNECT:
           break
+
         case GatewayMessageType.RESUMED:
           break
 
         case GatewayMessageType.CHANNEL_CREATE:
+          if (this.eventCallback) this.eventCallback([{ type: ServerEventType.STATE_SYNC, mutationType: 'update', objectName: 'thread', objectIDs: { threadID: payload.id }, entries: [{ id: payload.id, isUnread: true }] }])
+          break
+
         case GatewayMessageType.CHANNEL_DELETE:
-          if (this.eventCallback) this.eventCallback([{ type: ServerEventType.STATE_SYNC, mutationType: 'upsert', objectName: 'thread', objectIDs: { threadID: message.id }, entries: [{ id: message.id, isUnread: true }] }])
+          if (this.eventCallback) this.eventCallback([{ type: ServerEventType.STATE_SYNC, mutationType: 'delete', objectName: 'thread', objectIDs: { threadID: payload.id }, entries: [ payload.id ] }])
           break
 
         case GatewayMessageType.CHANNEL_PINS_UPDATE:
@@ -311,28 +326,29 @@ export default class DiscordAPI {
         case GatewayMessageType.MESSAGE_CREATE:
         case GatewayMessageType.MESSAGE_DELETE:
         case GatewayMessageType.MESSAGE_UPDATE:
-          if (this.eventCallback) this.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: message.channel_id }])
+          if (this.eventCallback) this.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: payload.channel_id }])
           break
 
         case GatewayMessageType.MESSAGE_DELETE_BULK:
-          // TODO: Test it
-          if (this.eventCallback) this.eventCallback(message.map(m => ({ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: m.channel_id })))
+          if (this.eventCallback) this.eventCallback(payload.map(m => ({ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: m.channel_id })))
           break
 
         case GatewayMessageType.MESSAGE_REACTION_ADD:
         case GatewayMessageType.MESSAGE_REACTION_REMOVE:
         case GatewayMessageType.MESSAGE_REACTION_REMOVE_ALL:
         case GatewayMessageType.MESSAGE_REACTION_REMOVE_EMOJI:
-          if (this.eventCallback) this.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: message.channel_id }])
+          if (this.eventCallback) this.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: payload.channel_id }])
           break
 
         case GatewayMessageType.TYPING_START:
-          if (this.eventCallback) this.eventCallback([{ type: ServerEventType.PARTICIPANT_TYPING, typing: true, participantID: message.user_id, threadID: message.channel_id }])
+          if (this.eventCallback) this.eventCallback([{ type: ServerEventType.PARTICIPANT_TYPING, typing: true, participantID: payload.user_id, threadID: payload.channel_id }])
           break
 
         case GatewayMessageType.PRESENCE_UPDATE:
+          if (this.eventCallback) this.eventCallback([{ type: ServerEventType.USER_PRESENCE_UPDATED, presence: { userID: payload.user.id, isActive: payload.status === 'online', lastActive: new Date() } }])
+          break
+
         case GatewayMessageType.USER_UPDATE:
-          if (this.eventCallback) this.eventCallback([{ type: ServerEventType.USER_PRESENCE_UPDATED, presence: { userID: message.user.id, isActive: status === 'online', lastActive: new Date() } }])
           break
 
         case GatewayMessageType.RELATIONSHIP_ADD:

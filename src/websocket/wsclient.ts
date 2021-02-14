@@ -2,7 +2,7 @@ import os from 'os'
 import WebSocket, { MessageEvent } from 'ws'
 import erlpack from 'erlpack'
 import { DiscordPresenceStatus, OPCode, GatewayMessageType } from './constants'
-import { GatewayMessage, DiscordUser } from './types'
+import { GatewayMessage } from './types'
 
 const REQUESTS_PER_MINUTE_LIMIT = 120
 
@@ -83,8 +83,6 @@ export default class WSClient {
     })
 
     this.ws.on('error', error => {
-      this.ready = false
-      if (this.onChangedReadyState) this.onChangedReadyState(false)
       if (this.onError) this.onError(error)
     })
 
@@ -98,7 +96,6 @@ export default class WSClient {
   private messageHandler = (event: MessageEvent) => {
     let unpacked: GatewayMessage | undefined
     try {
-      // TODO: status is not defined?
       unpacked = erlpack.unpack(event.data as Buffer)
       this.lastSequenceNumber = unpacked.s
       if (this.onMessage && unpacked.d) this.onMessage(unpacked.op, unpacked.d, unpacked.t)
@@ -124,7 +121,8 @@ export default class WSClient {
           break
       }
     } catch (e) {
-      console.error('Error unpacking: ' + e, event)
+      console.error('Error unpacking: ' + e)
+      console.error(event)
       if (this.onError) this.onError(e)
     }
   }
