@@ -1,7 +1,5 @@
 import { SupportedReaction } from '@textshq/platform-sdk'
 
-export const VERSION = '1.0.0'
-
 export enum MessageType {
   DEFAULT = 0,
   RECIPIENT_ADD = 1,
@@ -22,7 +20,7 @@ export enum MessageType {
   APPLICATION_COMMAND = 20,
 }
 
-export const supportedReactions: Record<string, SupportedReaction> = {
+export const tempSupportedReactions: Record<string, SupportedReaction> = {
   '❤️': { title: 'Heart', render: '❤️' },
   'chocoAYAYA:503343473349361675': { title: 'chocoAYAYA', render: 'https://cdn.discordapp.com/emojis/503343473349361675.png' },
 }

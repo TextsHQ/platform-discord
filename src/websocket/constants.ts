@@ -48,6 +48,8 @@ export enum GatewayMessageType {
 
 export enum GatewayCloseCode {
   RECONNECT_REQUESTED = 1001,
+  DISCONNECTED = 1005,
+  ADDRESS_NOT_FOUND = 1006,
   UNKNOWN_ERROR = 4000,
   UNKNOWN_OPCODE = 4001,
   DECODE_ERROR = 4002,

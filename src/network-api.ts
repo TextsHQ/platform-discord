@@ -4,7 +4,6 @@ import FormData from 'form-data'
 import { CookieJar } from 'tough-cookie'
 import { texts, CurrentUser, MessageContent, PaginationArg, Thread, Message as TextsMessage, ServerEventType, OnServerEventCallback, ActivityType, OnConnStateChangeCallback, User, InboxName, MessageSendOptions } from '@textshq/platform-sdk'
 import { mapCurrentUser, mapMessage, mapThread, mapUser } from './mappers'
-import { VERSION } from './constants'
 import WSClient from './websocket/wsclient'
 import { GatewayCloseCode, GatewayMessageType } from './websocket/constants'
 
@@ -30,7 +29,9 @@ export default class DiscordAPI {
 
   public eventCallback?: OnServerEventCallback
 
-  public connectionStateChangeCallback?: OnConnStateChangeCallback
+  public startPolling?: () => void
+
+  public stopPolling?: () => void
 
   public ready: boolean = false
 
@@ -49,13 +50,7 @@ export default class DiscordAPI {
 
     if (!this.token) throw new Error('No token found.')
 
-    const gatewayRes = await got({ url: `${API_ENDPOINT}/gateway` })
-    const gateway: string = JSON.parse(gatewayRes.body).url ?? 'wss://gateway.discord.gg'
-
-    this.client = new WSClient(`${gateway}/?v=8&encoding=etf`, this.token)
-    this.client.restartOnFail = RESTART_ON_FAIL
-
-    this.setupGatewayListeners()
+    this.setupWebsocket()
   }
 
   public logout = async () => {
@@ -65,8 +60,19 @@ export default class DiscordAPI {
 
   public dispose = () => {
     this.ready = false
-    this.client.disconnect()
+    this.client?.disconnect()
     this.client = null
+  }
+
+  public setupWebsocket = async () => {
+    const gatewayRes = await got({ url: `${API_ENDPOINT}/gateway` })
+    const gateway: string = JSON.parse(gatewayRes.body).url ?? 'wss://gateway.discord.gg'
+
+    this.client = null
+    this.client = new WSClient(`${gateway}/?v=8&encoding=etf`, this.token)
+    this.client.restartOnFail = RESTART_ON_FAIL
+
+    this.setupGatewayListeners()
   }
 
   public getCurrentUser = async (): Promise<CurrentUser> => {
@@ -268,6 +274,9 @@ export default class DiscordAPI {
       this.ready = false
 
       switch (code) {
+        case GatewayCloseCode.ADDRESS_NOT_FOUND:
+          this.startPolling?.()
+          break
         case GatewayCloseCode.RECONNECT_REQUESTED:
           texts.log('Gateway requested client reconnect.')
           break
@@ -414,8 +423,9 @@ export default class DiscordAPI {
       const res = await got({
         throwHttpErrors: false,
         prefixUrl: API_ENDPOINT,
+        timeout: 10000,
         headers: {
-          'User-Agent': `DiscordBot (${VERSION})`,
+          'User-Agent': texts.constants.USER_AGENT,
           'Accept-Encoding': 'gzip, deflate, br',
           Authorization: this.token,
           ...headers,
@@ -429,8 +439,11 @@ export default class DiscordAPI {
       if (err.code === 'ECONNREFUSED' && (err.message.endsWith('0.0.0.0:443') || err.message.endsWith('127.0.0.1:443'))) {
         texts.error('Discord is blocked')
         throw new Error('Discord seems to be blocked on your device. This could have been done by an app or a manual entry in /etc/hosts')
+      } else if (err.code === 'ENOTFOUND') {
+        this.startPolling?.()
+      } else {
+        throw err
       }
-      throw err
     }
   }
 }

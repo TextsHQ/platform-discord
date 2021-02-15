@@ -1,7 +1,7 @@
 import os from 'os'
 import WebSocket, { MessageEvent } from 'ws'
 import erlpack from 'erlpack'
-import { DiscordPresenceStatus, OPCode, GatewayMessageType } from './constants'
+import { DiscordPresenceStatus, OPCode, GatewayMessageType, GatewayCloseCode } from './constants'
 import { GatewayMessage } from './types'
 
 export default class WSClient {
@@ -15,7 +15,7 @@ export default class WSClient {
 
   private resumeConnectionOnConnect = false
 
-  private heartbeatInterval?
+  private heartbeatInterval?: NodeJS.Timeout
 
   public ready = false
 
@@ -34,10 +34,12 @@ export default class WSClient {
   constructor(gateway: string, token: string) {
     this.token = token
     this.gateway = gateway
+    this.connect()
+  }
 
+  public connect = () => {
     console.log('Opening gateway connection...')
     this.ws = new WebSocket(this.gateway)
-
     this.setupHandlers()
   }
 
@@ -76,9 +78,11 @@ export default class WSClient {
           this.resumeConnectionOnConnect = true
         }
 
-        this.ws = null
-        this.ws = new WebSocket(this.gateway)
-        this.setupHandlers()
+        if (code !== GatewayCloseCode.DISCONNECTED) {
+          this.ws = null
+          this.ws = new WebSocket(this.gateway)
+          this.setupHandlers()
+        }
       }
       this.onConnectionClosed?.(code, reason)
     })

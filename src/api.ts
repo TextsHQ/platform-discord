@@ -1,17 +1,21 @@
 import { CookieJar } from 'tough-cookie'
-import { PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Thread, Message, InboxName, MessageContent, PaginationArg, OnConnStateChangeCallback, ActivityType, MessageSendOptions } from '@textshq/platform-sdk'
+import { PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Message, InboxName, MessageContent, PaginationArg, OnConnStateChangeCallback, ActivityType, MessageSendOptions, texts } from '@textshq/platform-sdk'
 import DiscordAPI from './network-api'
-
 export default class Discord implements PlatformAPI {
   private api: DiscordAPI = new DiscordAPI()
+
+  private pollingInterval?: NodeJS.Timeout
 
   init = async (cookieJarJSON: any) => {
     if (!cookieJarJSON) return
     const cookieJar = CookieJar.fromJSON(cookieJarJSON)
     await this.api.login(cookieJar)
+
+    this.api.startPolling = this.startPolling
+    this.api.stopPolling = this.stopPolling
   }
 
-  dispose = async () => this.api.dispose()
+  dispose = () => this.api.dispose()
 
   login = async (creds): Promise<LoginResult> => {
     if (!creds.cookieJarJSON) return { type: 'error' }
@@ -19,28 +23,43 @@ export default class Discord implements PlatformAPI {
     return { type: 'success' }
   }
 
-  logout = async () => this.api.logout()
+  logout = () => this.api.logout()
+
+  startPolling = async () => {
+    if (this.pollingInterval) return
+
+    texts.log('Starting polling')
+    this.api.ready = false
+
+    this.pollingInterval = setInterval(async () => {
+      const currentUser = await this.api.getCurrentUser()
+      if (currentUser) this.stopPolling()
+    }, 10_000)
+  }
+
+  stopPolling = () => {
+    if (this.pollingInterval) {
+      texts.log('Stopping polling')
+      clearInterval(this.pollingInterval)
+      this.pollingInterval = null
+      this.api.ready = true
+      this.api.setupWebsocket()
+    }
+  }
 
   serializeSession = () => this.api.cookieJar.toJSON()
 
   subscribeToEvents = (onEvent: OnServerEventCallback) => {
     this.api.eventCallback = onEvent
-    this.poll()
   }
 
-  onConnectionStateChange = async (onEvent: OnConnStateChangeCallback): Promise<void> => {
-    this.api.connectionStateChangeCallback = onEvent
-  }
+  getCurrentUser = () => this.api.getCurrentUser()
 
-  poll = async () => { }
+  searchUsers = (typed: string) => this.api.userFriends.filter(u => u.username.toLowerCase().includes(typed.toLowerCase()))
 
-  getCurrentUser = async () => this.api.getCurrentUser()
+  // getPresence = () => this.api.getUsersPresence()
 
-  searchUsers = async (typed: string) => this.api.userFriends.filter(u => u.username.toLowerCase().includes(typed.toLowerCase()))
-
-  // getPresence = async () => this.api.getUsersPresence()
-
-  getThreads = async (inboxName: InboxName, pagination?: PaginationArg): Promise<Paginated<Thread>> => this.api.getThreads(inboxName, pagination)
+  getThreads = (inboxName: InboxName, pagination?: PaginationArg) => this.api.getThreads(inboxName, pagination)
 
   createThread = (userIDs: string[], title?: string) => this.api.createThread(userIDs, title)
 
@@ -51,15 +70,15 @@ export default class Discord implements PlatformAPI {
     return { items: await this.api.getMessages(threadID, pagination), hasMore: true }
   }
 
-  sendMessage = async (threadID: string, content: MessageContent, options?: MessageSendOptions) => this.api.sendMessage(threadID, content, options)
+  sendMessage = (threadID: string, content: MessageContent, options?: MessageSendOptions) => this.api.sendMessage(threadID, content, options)
 
-  deleteMessage = async (threadID: string, messageID: string, forEveryone?: boolean) => this.api.deleteMessage(threadID, messageID, forEveryone)
+  deleteMessage = (threadID: string, messageID: string, forEveryone?: boolean) => this.api.deleteMessage(threadID, messageID, forEveryone)
 
-  addReaction = async (threadID: string, messageID: string, reactionKey: string) => this.api.addReaction(threadID, messageID, reactionKey)
+  addReaction = (threadID: string, messageID: string, reactionKey: string) => this.api.addReaction(threadID, messageID, reactionKey)
 
-  removeReaction = async (threadID: string, messageID: string, reactionKey: string) => this.api.removeReaction(threadID, messageID, reactionKey)
+  removeReaction = (threadID: string, messageID: string, reactionKey: string) => this.api.removeReaction(threadID, messageID, reactionKey)
 
-  sendActivityIndicator = async (type: ActivityType, threadID: string) => this.api.setTyping(type, threadID)
+  sendActivityIndicator = (type: ActivityType, threadID: string) => this.api.setTyping(type, threadID)
 
-  sendReadReceipt = async (threadID: string, messageID: string) => this.api.sendReadReceipt(threadID, messageID)
+  sendReadReceipt = (threadID: string, messageID: string) => this.api.sendReadReceipt(threadID, messageID)
 }
