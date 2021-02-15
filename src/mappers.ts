@@ -94,7 +94,7 @@ export function mapMessage(message: any, currentUserID: string, reactionsDetails
     }))) || []
 
   const mapped: Message = {
-    _original: message,
+    _original: JSON.stringify(message),
     id: message.id,
     timestamp: new Date(message.timestamp),
     editedTimestamp: message.edited_timestamp ? new Date(message.edited_timestamp) : undefined,
