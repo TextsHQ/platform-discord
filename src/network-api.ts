@@ -10,6 +10,7 @@ import { GatewayCloseCode, GatewayMessageType } from './websocket/constants'
 const API_ENDPOINT = 'https://discord.com/api/v8/'
 const WAIT_TILL_READY = true
 const RESTART_ON_FAIL = true
+const ACT_AS_USER = false
 
 async function sleep(time: number) {
   return new Promise(resolve => setTimeout(resolve, time))
@@ -69,7 +70,7 @@ export default class DiscordAPI {
     const gateway: string = JSON.parse(gatewayRes?.body)?.url ?? 'wss://gateway.discord.gg'
 
     this.client = null
-    this.client = new WSClient(`${gateway}/?v=8&encoding=etf`, this.token)
+    this.client = new WSClient(`${gateway}/?v=8&encoding=etf`, this.token, ACT_AS_USER)
     this.client.restartOnFail = RESTART_ON_FAIL
 
     this.setupGatewayListeners()
@@ -92,19 +93,13 @@ export default class DiscordAPI {
     const res = await this.fetch({ method: 'GET', url: 'users/@me/channels' })
     if (!res?.body) throw new Error('No response')
 
-    const threads: Thread[] = await Promise.all(JSON.parse(res?.body).map(async (thread, index) => {
-      /* let messages
-      if (index <= LIMIT_COUNT) {
-        const messagesRes = await this.fetch({ method: 'GET', url: `channels/${thread.id}/messages?limit=1` })
-        messages = JSON.parse(messagesres?.body)
-      } */
-
+    const threads: Thread[] = JSON.parse(res?.body).map(thread => {
       thread.recipients.forEach(r => this.userMappings.set(r.id, (r.username + '#' + r.discriminator)))
       return mapThread(thread, this.unreadThreads.get(thread.id) != null, this.currentUser)
-    }))
+    })
 
     // TODO: Add lastMessageID property to Thread
-    return { items: threads.sort((a, b) => JSON.parse(a._original).last_message_id - JSON.parse(b._original).last_message_id).reverse(), hasMore: false }
+    return { items: threads.sort((a, b) => JSON.parse(a._original).last_message_id - JSON.parse(b._original).last_message_id), hasMore: false }
   }
 
   public createThread = async (userIDs: string[], title?: string): Promise<boolean | Thread> => {
@@ -304,11 +299,12 @@ export default class DiscordAPI {
           break
 
         case GatewayMessageType.READY:
-          const notes = payload.notes
-          const user_settings = payload.user_settings
-          const presences = payload.presences
+          // const notes = payload.notes
+          // const user_settings = payload.user_settings
+          // const presences = payload.presences
 
-          payload.read_state.filter(p => p.mention_count > 0).forEach(p => {
+          const read_state = ACT_AS_USER ? payload.read_state?.entries : payload.read_state
+          read_state?.filter(p => p.mention_count > 0).forEach(p => {
             this.unreadThreads.set(p.id, p.last_message_id)
           })
 

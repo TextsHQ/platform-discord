@@ -10,6 +10,8 @@ export default class WSClient {
 
   private token: string
 
+  private actAsUser: boolean
+
   private sessionID?: number | undefined
 
   private lastSequenceNumber?: number | undefined
@@ -32,8 +34,9 @@ export default class WSClient {
 
   public onConnectionClosed?: (code: number, reason: string) => void
 
-  constructor(gateway: string, token: string) {
+  constructor(gateway: string, token: string, actAsUser: boolean = false) {
     this.token = token
+    this.actAsUser = actAsUser
     this.gateway = gateway
     this.connect()
   }
@@ -144,22 +147,35 @@ export default class WSClient {
   }
 
   private login = () => {
-    // TODO: Check intents in Discord client
     const payload: GatewayMessage = {
       op: OPCode.IDENTIFY,
       d: {
         token: this.token,
-        intents: 28672, // DIRECT_MESSAGES, DIRECT_MESSAGE_REACTIONS, DIRECT_MESSAGE_TYPING
-        compress: true,
+        properties: {
+          os: os.platform(),
+          browser: 'Chrome',
+          device: '',
+          system_locale: '',
+          browser_user_agent: texts.constants.USER_AGENT,
+          browser_version: texts.constants.APP_VERSION,
+          os_version: os.version(),
+          referrer: '',
+          referring_domain: '',
+          referrer_current: '',
+          referring_domain_current: '',
+          release_channel: 'stable',
+          client_build_number: 76771,
+          client_event_source: null
+        },
         presence: {
           status: DiscordPresenceStatus.ONLINE,
+          since: 0,
+          activites: [],
           afk: false,
         },
-        properties: {
-          $os: os.platform(),
-          $browser: 'Texts',
-          $device: os.hostname(),
-        },
+        compress: true,
+        capabilities: this.actAsUser ? 61 : undefined,
+        intents: this.actAsUser ? undefined : 28672, // DIRECT_MESSAGES, DIRECT_MESSAGE_REACTIONS, DIRECT_MESSAGE_TYPING
       },
     }
     const packed = erlpack.pack(payload)
