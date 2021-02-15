@@ -3,6 +3,7 @@ import WebSocket, { MessageEvent } from 'ws'
 import erlpack from 'erlpack'
 import { DiscordPresenceStatus, OPCode, GatewayMessageType, GatewayCloseCode } from './constants'
 import { GatewayMessage } from './types'
+import { texts } from '@textshq/platform-sdk'
 
 export default class WSClient {
   private ws?: WebSocket
@@ -38,7 +39,7 @@ export default class WSClient {
   }
 
   public connect = () => {
-    console.log('Opening gateway connection...')
+    texts.log('Opening gateway connection...')
     this.ws = new WebSocket(this.gateway)
     this.setupHandlers()
   }
@@ -90,7 +91,7 @@ export default class WSClient {
     this.ws?.on('error', error => this.onError?.(error) )
 
     this.ws?.on('unexpected-response', (request, response) => {
-      console.log('Unexpected response: ' + request, response)
+      texts.log('Unexpected response: ' + request, response)
     })
 
     this.ws.onmessage = this.messageHandler
@@ -124,21 +125,21 @@ export default class WSClient {
           break
       }
     } catch (e) {
-      console.error('Error unpacking: ' + e)
-      console.error(event)
+      texts.error('Error unpacking: ' + e)
+      texts.error(event)
       this.onError?.(e)
     }
   }
 
   private sendHeartbeat = () => {
-    // console.log('[!] Sending heartbeat')
+    // texts.log('[!] Sending heartbeat')
     const payload: GatewayMessage = { op: OPCode.HEARTBEAT, d: this.lastSequenceNumber }
     const packed = erlpack.pack(payload)
     this.ws.send(packed)
   }
 
   private setHeartbeatInterval = (interval: number) => {
-    console.log('Heartbeat interval set to ' + interval)
+    texts.log('Heartbeat interval set to ' + interval)
     this.heartbeatInterval = setInterval(this.sendHeartbeat, interval)
   }
 

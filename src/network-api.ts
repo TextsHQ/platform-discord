@@ -2,7 +2,7 @@ import got from 'got'
 import fs from 'fs'
 import FormData from 'form-data'
 import { CookieJar } from 'tough-cookie'
-import { texts, CurrentUser, MessageContent, PaginationArg, Thread, Message as TextsMessage, ServerEventType, OnServerEventCallback, ActivityType, OnConnStateChangeCallback, User, InboxName, MessageSendOptions } from '@textshq/platform-sdk'
+import { texts, CurrentUser, MessageContent, PaginationArg, Thread, Message as TextsMessage, ServerEventType, OnServerEventCallback, ActivityType, OnConnStateChangeCallback, User, InboxName, MessageSendOptions, ReAuthError } from '@textshq/platform-sdk'
 import { mapCurrentUser, mapMessage, mapThread, mapUser } from './mappers'
 import WSClient from './websocket/wsclient'
 import { GatewayCloseCode, GatewayMessageType } from './websocket/constants'
@@ -66,7 +66,7 @@ export default class DiscordAPI {
 
   public setupWebsocket = async () => {
     const gatewayRes = await got({ url: `${API_ENDPOINT}/gateway` })
-    const gateway: string = JSON.parse(gatewayRes.body).url ?? 'wss://gateway.discord.gg'
+    const gateway: string = JSON.parse(gatewayRes?.body)?.url ?? 'wss://gateway.discord.gg'
 
     this.client = null
     this.client = new WSClient(`${gateway}/?v=8&encoding=etf`, this.token)
@@ -77,9 +77,9 @@ export default class DiscordAPI {
 
   public getCurrentUser = async (): Promise<CurrentUser> => {
     const res = await this.fetch({ method: 'GET', url: 'users/@me' })
-    if (!res.body) throw new Error('No response')
+    if (!res?.body) throw new Error('No response')
 
-    const currentUser: CurrentUser = mapCurrentUser(JSON.parse(res.body))
+    const currentUser: CurrentUser = mapCurrentUser(JSON.parse(res?.body))
     this.currentUser = currentUser
     this.userMappings.set(currentUser.id, currentUser.displayText)
 
@@ -90,13 +90,13 @@ export default class DiscordAPI {
 
   public getThreads = async (inboxName: InboxName, pagination?: PaginationArg): Promise<{ items: Thread[], hasMore: boolean }> => {
     const res = await this.fetch({ method: 'GET', url: 'users/@me/channels' })
-    if (!res.body) throw new Error('No response')
+    if (!res?.body) throw new Error('No response')
 
-    const threads: Thread[] = await Promise.all(JSON.parse(res.body).map(async (thread, index) => {
+    const threads: Thread[] = await Promise.all(JSON.parse(res?.body).map(async (thread, index) => {
       /* let messages
       if (index <= LIMIT_COUNT) {
         const messagesRes = await this.fetch({ method: 'GET', url: `channels/${thread.id}/messages?limit=1` })
-        messages = JSON.parse(messagesRes.body)
+        messages = JSON.parse(messagesres?.body)
       } */
 
       thread.recipients.forEach(r => this.userMappings.set(r.id, (r.username + '#' + r.discriminator)))
@@ -118,8 +118,8 @@ export default class DiscordAPI {
       json: userIDs.length === 1 ? { recipient_id: userIDs[0] } : { recipients: userIDs },
     })
 
-    if (!res.body) throw new Error('No response')
-    return mapThread(JSON.parse(res.body), false, this.currentUser, null, this.userMappings)
+    if (!res?.body) throw new Error('No response')
+    return mapThread(JSON.parse(res?.body), false, this.currentUser, null, this.userMappings)
   }
 
   public archiveThread = async (threadID: string) => {
@@ -139,16 +139,16 @@ export default class DiscordAPI {
 
     const paginationQuery = options.before ? `before=${options.before}` : options.after ? `after=${options.after}` : ''
     const res = await this.fetch({ method: 'GET', url: `channels/${threadID}/messages?limit=50&${paginationQuery}` })
-    if (!res.body) throw new Error('No response')
+    if (!res?.body) throw new Error('No response')
 
-    const messages: TextsMessage[] = await Promise.all(JSON.parse(res.body)
+    const messages: TextsMessage[] = await Promise.all(JSON.parse(res?.body)
       .map(async m => {
         let reactionsDetails
         if (m.reactions) {
           reactionsDetails = await Promise.all(m.reactions.map(async r => {
             const emojiQuery = encodeURIComponent(r.emoji.id ? `${r.emoji.name}:${r.emoji.id}` : r.emoji.name)
             const reactedRes = await this.fetch({ method: 'GET', url: `channels/${threadID}/messages/${m.id}/reactions/${emojiQuery}` })
-            const parsed = JSON.parse(reactedRes.body)
+            const parsed = JSON.parse(reactedRes?.body)
             if (parsed) return { emoji: r.emoji, users: parsed }
             return null
           }))
@@ -216,7 +216,7 @@ export default class DiscordAPI {
 
     const requestData = { url, method, headers: requestContent.headers, json: requestContent.json, body: requestContent.body }
     const res = await this.fetch(requestData)
-    return res.statusCode === 200
+    return res?.statusCode === 200
   }
 
   public deleteMessage = async (threadID: string, messageID: string, forEveryone?: boolean): Promise<boolean> => {
@@ -225,27 +225,27 @@ export default class DiscordAPI {
     while (!this.ready && WAIT_TILL_READY) await sleep(1000)
 
     const res = await this.fetch({ method: 'DELETE', url: `channels/${threadID}/messages/${messageID}` })
-    return res.statusCode === 204
+    return res?.statusCode === 204
   }
 
   public sendReadReceipt = async (threadID: string, messageID: string) => {
     while (!this.ready && WAIT_TILL_READY) await sleep(1000)
     const res = await this.fetch({ method: 'POST', url: `channels/${threadID}/messages/${messageID || this.unreadThreads.get(threadID)}/ack`, json: { token: null } })
-    if (res.statusCode === 204) this.unreadThreads.delete(threadID)
+    if (res?.statusCode === 204) this.unreadThreads.delete(threadID)
   }
 
   public addReaction = async (threadID: string, messageID: string, reactionKey: string): Promise<boolean> => {
     while (!this.ready && WAIT_TILL_READY) await sleep(1000)
 
     const res = await this.fetch({ method: 'PUT', url: `channels/${threadID}/messages/${messageID}/reactions/${encodeURIComponent(reactionKey)}/@me` })
-    return res.statusCode === 204
+    return res?.statusCode === 204
   }
 
   public removeReaction = async (threadID: string, messageID: string, reactionKey: string): Promise<boolean> => {
     while (!this.ready && WAIT_TILL_READY) await sleep(1000)
 
     const res = await this.fetch({ method: 'DELETE', url: `channels/${threadID}/messages/${messageID}/reactions/${encodeURIComponent(reactionKey)}/@me` })
-    return res.statusCode === 204
+    return res?.statusCode === 204
   }
 
   public setTyping = async (type: ActivityType, threadID: string): Promise<void> => {
@@ -256,8 +256,8 @@ export default class DiscordAPI {
 
   private getUserFriends = async () => {
     const res = await this.fetch({ method: 'GET', url: 'users/@me/relationships' })
-    if (!res.body) throw new Error('No response')
-    this.userFriends = JSON.parse(res.body).filter(f => f.type === 1) // Only friends
+    if (!res?.body) throw new Error('No response')
+    this.userFriends = JSON.parse(res?.body).filter(f => f.type === 1) // Only friends
       .map(f => mapUser(f.user))
   }
 
@@ -281,8 +281,8 @@ export default class DiscordAPI {
           texts.log('Gateway requested client reconnect.')
           break
         case GatewayCloseCode.AUTHENTICATION_FAILED:
-          this.logout()
-          throw new Error('Unauthorized')
+          this.client = null
+          throw new ReAuthError('Access token invalid')
         case GatewayCloseCode.SESSION_TIMED_OUT:
           texts.log('Gateway session timed out.')
           break
@@ -415,7 +415,7 @@ export default class DiscordAPI {
   }
 
   private handleErrors = (json: any) => {
-    if (json.message && json.code) console.error(json)
+    if (json.message && json.code) texts.error(json)
   }
 
   private fetch = async ({ headers = {}, ...rest }) => {
@@ -433,7 +433,7 @@ export default class DiscordAPI {
         ...rest,
       })
 
-      if (res.body && JSON.parse(res.body)) this.handleErrors(JSON.parse(res.body))
+      if (res?.body && JSON.parse(res?.body)) this.handleErrors(JSON.parse(res?.body))
       return res
     } catch (err) {
       if (err.code === 'ECONNREFUSED' && (err.message.endsWith('0.0.0.0:443') || err.message.endsWith('127.0.0.1:443'))) {
