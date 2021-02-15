@@ -326,14 +326,14 @@ export default class DiscordAPI {
             mutationType: 'update',
             objectName: 'thread',
             objectIDs: {
-              threadID: payload.id
+              threadID: payload.id,
             },
             entries: [
               {
                 id: payload.id,
-                isUnread: true
-              }
-            ]
+                isUnread: true,
+              },
+            ],
           }])
           break
 
@@ -343,9 +343,9 @@ export default class DiscordAPI {
             mutationType: 'delete',
             objectName: 'thread',
             objectIDs: {
-              threadID: payload.id
+              threadID: payload.id,
             },
-            entries: [ payload.id ]
+            entries: [payload.id],
           }])
           break
 
@@ -363,14 +363,14 @@ export default class DiscordAPI {
             mutationType: 'update',
             objectName: 'thread',
             objectIDs: {
-              threadID: payload.channel_id
+              threadID: payload.channel_id,
             },
             entries: [
               {
                 id: payload.channel_id,
-                isUnread: false
-              }
-            ]
+                isUnread: false,
+              },
+            ],
           }])
           break
 
@@ -395,8 +395,8 @@ export default class DiscordAPI {
             presence: {
               userID: payload.user.id,
               isActive: payload.status === 'online',
-              lastActive: new Date()
-            }
+              lastActive: new Date(),
+            },
           }])
           break
 

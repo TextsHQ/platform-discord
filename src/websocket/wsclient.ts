@@ -1,9 +1,9 @@
 import os from 'os'
 import WebSocket, { MessageEvent } from 'ws'
 import erlpack from 'erlpack'
+import { texts } from '@textshq/platform-sdk'
 import { DiscordPresenceStatus, OPCode, GatewayMessageType, GatewayCloseCode } from './constants'
 import { GatewayMessage } from './types'
-import { texts } from '@textshq/platform-sdk'
 
 export default class WSClient {
   private ws?: WebSocket
@@ -88,7 +88,7 @@ export default class WSClient {
       this.onConnectionClosed?.(code, reason)
     })
 
-    this.ws?.on('error', error => this.onError?.(error) )
+    this.ws?.on('error', error => this.onError?.(error))
 
     this.ws?.on('unexpected-response', (request, response) => {
       texts.log('Unexpected response: ' + request, response)

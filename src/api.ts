@@ -1,6 +1,7 @@
 import { CookieJar } from 'tough-cookie'
 import { PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Message, InboxName, MessageContent, PaginationArg, OnConnStateChangeCallback, ActivityType, MessageSendOptions, texts } from '@textshq/platform-sdk'
 import DiscordAPI from './network-api'
+
 export default class Discord implements PlatformAPI {
   private api: DiscordAPI = new DiscordAPI()
 
