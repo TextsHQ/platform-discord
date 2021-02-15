@@ -13,13 +13,13 @@ export default class WSClient {
 
   private lastSequenceNumber?: number | undefined
 
-  private resumeConnectionOnConnect: boolean = false
+  private resumeConnectionOnConnect = false
 
   private heartbeatInterval?
 
-  public ready: boolean = false
+  public ready = false
 
-  public restartOnFail: boolean = true
+  public restartOnFail = true
 
   public gateway: string
 
@@ -34,6 +34,8 @@ export default class WSClient {
   constructor(gateway: string, token: string) {
     this.token = token
     this.gateway = gateway
+
+    console.log('Opening gateway connection...')
     this.ws = new WebSocket(this.gateway)
 
     this.setupHandlers()

@@ -6,10 +6,9 @@ import { texts, CurrentUser, MessageContent, PaginationArg, Thread, Message as T
 import { mapCurrentUser, mapMessage, mapThread, mapUser } from './mappers'
 import { VERSION } from './constants'
 import WSClient from './websocket/wsclient'
-import { GatewayMessageType, OPCode } from './websocket/constants'
+import { GatewayCloseCode, GatewayMessageType } from './websocket/constants'
 
 const API_ENDPOINT = 'https://discord.com/api/v8/'
-const LIMIT_COUNT = 25
 const WAIT_TILL_READY = true
 const RESTART_ON_FAIL = true
 
@@ -259,10 +258,8 @@ export default class DiscordAPI {
   private setupGatewayListeners = () => {
     if (!this.client) throw new Error('WSClient not initialized!')
 
-    texts.log('Connecting to gateway...')
-
     this.client.onChangedReadyState = ready => {
-      texts.log('Connection state changed: ' + ready)
+      texts.log('Connection state: ' + ready)
       this.ready = ready
     }
 
@@ -271,20 +268,14 @@ export default class DiscordAPI {
       this.ready = false
 
       switch (code) {
-        case 1001:
+        case GatewayCloseCode.RECONNECT_REQUESTED:
           texts.log('Gateway requested client reconnect.')
           break
-        case 4004:
+        case GatewayCloseCode.AUTHENTICATION_FAILED:
           this.logout()
           throw new Error('Unauthorized')
-        case 4007:
-          console.log('Incorrect sequence number')
-          break
-        case 4008:
-          console.log('Ratelimited')
-          break
-        case 4009:
-          console.log('Session timed out')
+        case GatewayCloseCode.SESSION_TIMED_OUT:
+          texts.log('Gateway session timed out.')
           break
         default:
           break
