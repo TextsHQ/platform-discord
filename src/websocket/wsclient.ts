@@ -4,18 +4,14 @@ import erlpack from 'erlpack'
 import { DiscordPresenceStatus, OPCode, GatewayMessageType } from './constants'
 import { GatewayMessage } from './types'
 
-const REQUESTS_PER_MINUTE_LIMIT = 120
-
 export default class WSClient {
-  private readonly ws: WebSocket
+  private ws?: WebSocket
 
   private token: string
 
   private sessionID?: number | undefined
 
   private lastSequenceNumber?: number | undefined
-
-  private requestsPerMinuteLeft: number = REQUESTS_PER_MINUTE_LIMIT
 
   private resumeConnectionOnConnect: boolean = false
 
@@ -24,6 +20,8 @@ export default class WSClient {
   public ready: boolean = false
 
   public restartOnFail: boolean = true
+
+  public gateway: string
 
   public onMessage?: (opcode: OPCode, message: any, type?: GatewayMessageType) => void
 
@@ -35,27 +33,20 @@ export default class WSClient {
 
   constructor(gateway: string, token: string) {
     this.token = token
-    this.ws = new WebSocket(gateway)
+    this.gateway = gateway
+    this.ws = new WebSocket(this.gateway)
 
     this.setupHandlers()
-
-    /*
-      Discord will disconnect us from gateway if we issue to many requests per minute.
-      This is optional, but it's better than having to reconnect.
-     */
-    setInterval(() => {
-      this.requestsPerMinuteLeft = REQUESTS_PER_MINUTE_LIMIT
-    }, 60000)
   }
 
   public disconnect = () => {
     clearInterval(this.heartbeatInterval)
     this.lastSequenceNumber = null
-    this.ws.close()
+    this.ws?.close()
   }
 
   private setupHandlers = () => {
-    this.ws.on('open', () => {
+    this.ws?.on('open', () => {
       if (!this.ready) {
         if (this.resumeConnectionOnConnect) {
           this.resumeConnectionOnConnect = false
@@ -67,23 +58,32 @@ export default class WSClient {
               seq: this.lastSequenceNumber,
             },
           }
-          this.send(payload, true)
+          const packed = erlpack.pack(payload)
+          this.ws.send(packed)
         } else {
           this.login()
         }
       }
     })
 
-    this.ws.on('close', (code, reason) => {
+    this.ws?.on('close', (code, reason) => {
       this.ready = false
       this.onChangedReadyState?.(false)
-      if (code === undefined && this.restartOnFail) this.resumeConnectionOnConnect = true
+      if (this.restartOnFail) {
+        if (code === undefined) {
+          this.resumeConnectionOnConnect = true
+        }
+
+        this.ws = null
+        this.ws = new WebSocket(this.gateway)
+        this.setupHandlers()
+      }
       this.onConnectionClosed?.(code, reason)
     })
 
-    this.ws.on('error', error => this.onError?.(error) )
+    this.ws?.on('error', error => this.onError?.(error) )
 
-    this.ws.on('unexpected-response', (request, response) => {
+    this.ws?.on('unexpected-response', (request, response) => {
       console.log('Unexpected response: ' + request, response)
     })
 
@@ -127,7 +127,8 @@ export default class WSClient {
   private sendHeartbeat = () => {
     // console.log('[!] Sending heartbeat')
     const payload: GatewayMessage = { op: OPCode.HEARTBEAT, d: this.lastSequenceNumber }
-    this.send(payload)
+    const packed = erlpack.pack(payload)
+    this.ws.send(packed)
   }
 
   private setHeartbeatInterval = (interval: number) => {
@@ -154,13 +155,7 @@ export default class WSClient {
         },
       },
     }
-    this.send(payload)
-  }
-
-  private send = (payload: GatewayMessage, force: boolean = false): boolean => {
-    if (this.requestsPerMinuteLeft === 0 && !force) return false
     const packed = erlpack.pack(payload)
     this.ws.send(packed)
-    return true
   }
 }

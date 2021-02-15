@@ -61,6 +61,7 @@ export default class DiscordAPI {
 
   public logout = async () => {
     this.fetch({ method: 'POST', url: 'auth/logout', json: { provider: null, voip_provider: null } })
+    this.client = null
   }
 
   public dispose = () => {
@@ -270,6 +271,9 @@ export default class DiscordAPI {
       this.ready = false
 
       switch (code) {
+        case 1001:
+          texts.log('Gateway requested client reconnect.')
+          break
         case 4004:
           this.logout()
           throw new Error('Unauthorized')
