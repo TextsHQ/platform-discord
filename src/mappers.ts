@@ -40,14 +40,12 @@ const MAP_THREAD_TYPE: ThreadType[] = [
   'single', // GUILD_STORE
 ]
 
-export function mapThread(thread: any, isUnread: boolean, currentUser?: User, lastMessage?: any, userMappings?: Map<string, string>): Thread {
+export function mapThread(thread: any, isUnread: boolean, currentUser?: User): Thread {
   const type: ThreadType = MAP_THREAD_TYPE[thread.type]
 
   const participants: User[] = thread.recipients?.map(mapUser)
   participants.sort((a, b) => ((a.username ?? '') < (b.username ?? '') ? 1 : -1))
   if (currentUser) participants.push(currentUser)
-
-  const messages = lastMessage ? [mapMessage(lastMessage, currentUser.id, [], userMappings)] : []
 
   return {
     _original: JSON.stringify(thread),
@@ -56,12 +54,11 @@ export function mapThread(thread: any, isUnread: boolean, currentUser?: User, la
     isUnread,
     isReadOnly: false,
     type,
-    timestamp: new Date(thread.timestamp || lastMessage?.timestamp || 0),
     imgURL: thread.icon ? getThreadIcon(thread.id, thread.icon) : undefined,
     description: thread.topic,
     messages: {
       hasMore: true,
-      items: messages,
+      items: [],
     },
     participants: {
       hasMore: false,

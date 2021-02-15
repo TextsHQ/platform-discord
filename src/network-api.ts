@@ -100,7 +100,7 @@ export default class DiscordAPI {
       } */
 
       thread.recipients.forEach(r => this.userMappings.set(r.id, (r.username + '#' + r.discriminator)))
-      return mapThread(thread, this.unreadThreads.get(thread.id) != null, this.currentUser, undefined, this.userMappings)
+      return mapThread(thread, this.unreadThreads.get(thread.id) != null, this.currentUser)
     }))
 
     // TODO: Add lastMessageID property to Thread
@@ -119,7 +119,7 @@ export default class DiscordAPI {
     })
 
     if (!res?.body) throw new Error('No response')
-    return mapThread(JSON.parse(res?.body), false, this.currentUser, null, this.userMappings)
+    return mapThread(JSON.parse(res?.body), false, this.currentUser)
   }
 
   public archiveThread = async (threadID: string) => {
