@@ -2,7 +2,7 @@ import got from 'got'
 import fs from 'fs'
 import FormData from 'form-data'
 import { CookieJar } from 'tough-cookie'
-import { texts, CurrentUser, MessageContent, PaginationArg, Thread, Message as TextsMessage, ServerEventType, OnServerEventCallback, ActivityType, OnConnStateChangeCallback, User, InboxName, MessageSendOptions, ReAuthError } from '@textshq/platform-sdk'
+import { texts, CurrentUser, MessageContent, PaginationArg, Thread, Message as TextsMessage, ServerEventType, OnServerEventCallback, ActivityType, User, InboxName, MessageSendOptions, ReAuthError } from '@textshq/platform-sdk'
 import { mapCurrentUser, mapMessage, mapThread, mapUser } from './mappers'
 import WSClient from './websocket/wsclient'
 import { GatewayCloseCode, GatewayMessageType } from './websocket/constants'
@@ -10,7 +10,8 @@ import { GatewayCloseCode, GatewayMessageType } from './websocket/constants'
 const API_ENDPOINT = 'https://discord.com/api/v8/'
 const WAIT_TILL_READY = true
 const RESTART_ON_FAIL = true
-const ACT_AS_USER = false
+const ACT_AS_USER = true
+const LIMIT_COUNT = 25
 
 async function sleep(time: number) {
   return new Promise(resolve => setTimeout(resolve, time))
@@ -93,19 +94,24 @@ export default class DiscordAPI {
     const res = await this.fetch({ method: 'GET', url: 'users/@me/channels' })
     if (!res?.body) throw new Error('No response')
 
-    const threads: Thread[] = JSON.parse(res?.body).map(thread => {
-      thread.recipients.forEach(r => this.userMappings.set(r.id, (r.username + '#' + r.discriminator)))
-      return mapThread(thread, this.unreadThreads.get(thread.id) != null, this.currentUser)
-    })
+    const threads: Thread[] = await Promise.all(JSON.parse(res?.body).map(async (thread, index) => {
+      let messages
+      if (index <= LIMIT_COUNT) {
+        const messagesRes = await this.fetch({ method: 'GET', url: `channels/${thread.id}/messages?limit=1` })
+        messages = JSON.parse(messagesRes?.body)
+      }
+
+      return mapThread(thread, this.unreadThreads.get(thread.id) != null, this.currentUser, (messages?.length > 0 ? messages[0] : undefined), this.userMappings)
+    }))
 
     // TODO: Add lastMessageID property to Thread
-    return { items: threads.sort((a, b) => JSON.parse(a._original).last_message_id - JSON.parse(b._original).last_message_id), hasMore: false }
+    return { items: threads, hasMore: false }
   }
 
   public createThread = async (userIDs: string[], title?: string): Promise<boolean | Thread> => {
     if (userIDs.length === 1 && userIDs[0] === this.currentUser?.id) return false
 
-    while (!this.ready && WAIT_TILL_READY) await sleep(1000)
+    await this.waitUntilReady()
 
     const res = await this.fetch({
       method: 'POST',
@@ -125,7 +131,7 @@ export default class DiscordAPI {
     if (!this.currentUser) throw new Error('No current user')
     const currentUser = this.currentUser
 
-    while (!this.ready && WAIT_TILL_READY) await sleep(1000)
+    await this.waitUntilReady()
 
     const options = {
       before: (pagination?.direction === 'before') ? pagination?.cursor : undefined,
@@ -156,7 +162,7 @@ export default class DiscordAPI {
   }
 
   public sendMessage = async (threadID: string, content: MessageContent, options?: MessageSendOptions): Promise<boolean> => {
-    while (!this.ready && WAIT_TILL_READY) await sleep(1000)
+    await this.waitUntilReady()
 
     const method = 'POST'
     const url = `channels/${threadID}/messages`
@@ -217,27 +223,27 @@ export default class DiscordAPI {
   public deleteMessage = async (threadID: string, messageID: string, forEveryone?: boolean): Promise<boolean> => {
     if (!forEveryone) return true
 
-    while (!this.ready && WAIT_TILL_READY) await sleep(1000)
+    await this.waitUntilReady()
 
     const res = await this.fetch({ method: 'DELETE', url: `channels/${threadID}/messages/${messageID}` })
     return res?.statusCode === 204
   }
 
   public sendReadReceipt = async (threadID: string, messageID: string) => {
-    while (!this.ready && WAIT_TILL_READY) await sleep(1000)
+    await this.waitUntilReady()
     const res = await this.fetch({ method: 'POST', url: `channels/${threadID}/messages/${messageID || this.unreadThreads.get(threadID)}/ack`, json: { token: null } })
     if (res?.statusCode === 204) this.unreadThreads.delete(threadID)
   }
 
   public addReaction = async (threadID: string, messageID: string, reactionKey: string): Promise<boolean> => {
-    while (!this.ready && WAIT_TILL_READY) await sleep(1000)
+    await this.waitUntilReady()
 
     const res = await this.fetch({ method: 'PUT', url: `channels/${threadID}/messages/${messageID}/reactions/${encodeURIComponent(reactionKey)}/@me` })
     return res?.statusCode === 204
   }
 
   public removeReaction = async (threadID: string, messageID: string, reactionKey: string): Promise<boolean> => {
-    while (!this.ready && WAIT_TILL_READY) await sleep(1000)
+    await this.waitUntilReady()
 
     const res = await this.fetch({ method: 'DELETE', url: `channels/${threadID}/messages/${messageID}/reactions/${encodeURIComponent(reactionKey)}/@me` })
     return res?.statusCode === 204
@@ -303,10 +309,13 @@ export default class DiscordAPI {
           // const user_settings = payload.user_settings
           // const presences = payload.presences
 
-          const read_state = ACT_AS_USER ? payload.read_state?.entries : payload.read_state
-          read_state?.filter(p => p.mention_count > 0).forEach(p => {
-            this.unreadThreads.set(p.id, p.last_message_id)
-          })
+          if (ACT_AS_USER) {
+            payload.relationships?.forEach(r => this.userMappings.set(r.id, (r.username + '#' + r.discriminator)))
+            payload.read_state?.entries?.filter(p => p.mention_count > 0).forEach(p => this.unreadThreads.set(p.id, p.last_message_id))
+          } else {
+            payload.relationships?.forEach(r => this.userMappings.set(r.id, (r.user.username + '#' + r.user.discriminator)))
+            payload.read_state?.filter(p => p.mention_count > 0).forEach(p => this.unreadThreads.set(p.id, p.last_message_id))
+          }
 
           break
 
@@ -412,6 +421,10 @@ export default class DiscordAPI {
 
   private handleErrors = (json: any) => {
     if (json.message && json.code) texts.error(json)
+  }
+
+  private waitUntilReady = async () => {
+    while (!this.ready && WAIT_TILL_READY) await sleep(1000)
   }
 
   private fetch = async ({ headers = {}, ...rest }) => {

@@ -40,12 +40,16 @@ const MAP_THREAD_TYPE: ThreadType[] = [
   'single', // GUILD_STORE
 ]
 
-export function mapThread(thread: any, isUnread: boolean, currentUser?: User): Thread {
+export function mapThread(thread: any, isUnread: boolean, currentUser?: User, lastMessage?: any, userMappings?: Map<string, string>): Thread {
   const type: ThreadType = MAP_THREAD_TYPE[thread.type]
 
   const participants: User[] = thread.recipients?.map(mapUser)
   participants.sort((a, b) => ((a.username ?? '') < (b.username ?? '') ? 1 : -1))
   if (currentUser) participants.push(currentUser)
+
+  // const lastMessageSnippet = (lastMessage && SUPPORTED_MESSAGE_TYPES.includes(lastMessage.type)) ? transformEmojisAndTags(mapMessageType(lastMessage)?.text, userMappings)?.text : undefined
+
+  const lastMessageSnippet = (lastMessage && SUPPORTED_MESSAGE_TYPES.includes(lastMessage.type)) ? transformEmojisAndTags(mapMessageType(lastMessage)?.text)?.text : undefined
 
   return {
     _original: JSON.stringify(thread),
@@ -56,6 +60,8 @@ export function mapThread(thread: any, isUnread: boolean, currentUser?: User): T
     type,
     imgURL: thread.icon ? getThreadIcon(thread.id, thread.icon) : undefined,
     description: thread.topic,
+    timestamp: lastMessage?.timestamp ? new Date(lastMessage.timestamp) : undefined,
+    lastMessageSnippet,
     messages: {
       hasMore: true,
       items: [],
@@ -206,8 +212,6 @@ function transformEmojisAndTags(message?: string, userMappings?: Map<string, str
 
 function mapMessageType(message: any): Partial<Message> {
   switch (message.type) {
-    case MessageType.DEFAULT:
-      break
     case MessageType.RECIPIENT_ADD:
       return {
         isAction: true,
@@ -277,9 +281,8 @@ function mapMessageType(message: any): Partial<Message> {
         linkedMessageID: message.message_reference.message_id,
         text: `{{${message.author.id}}} pinned a message`,
       }
-    case MessageType.REPLY:
-      break
     default:
+      return { text: message.content }
       break
   }
 }
