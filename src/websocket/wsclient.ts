@@ -175,7 +175,13 @@ export default class WSClient {
         },
         compress: true,
         capabilities: this.actAsUser ? 61 : undefined,
-        intents: this.actAsUser ? undefined : 28672, // DIRECT_MESSAGES, DIRECT_MESSAGE_REACTIONS, DIRECT_MESSAGE_TYPING
+        intents: this.actAsUser ? undefined : 28672,
+        client_state: this.actAsUser ? {
+          guild_hashes: {},
+          highest_last_message_id: "0",
+          read_state_version: 0,
+          user_guild_settings_version: -1
+        } : undefined,
       },
     }
     const packed = erlpack.pack(payload)

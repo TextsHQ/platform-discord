@@ -47,9 +47,7 @@ export function mapThread(thread: any, isUnread: boolean, currentUser?: User, la
   participants.sort((a, b) => ((a.username ?? '') < (b.username ?? '') ? 1 : -1))
   if (currentUser) participants.push(currentUser)
 
-  // const lastMessageSnippet = (lastMessage && SUPPORTED_MESSAGE_TYPES.includes(lastMessage.type)) ? transformEmojisAndTags(mapMessageType(lastMessage)?.text, userMappings)?.text : undefined
-
-  const lastMessageSnippet = (lastMessage && SUPPORTED_MESSAGE_TYPES.includes(lastMessage.type)) ? transformEmojisAndTags(mapMessageType(lastMessage)?.text)?.text : undefined
+  const messages = (lastMessage && currentUser.id) ? [mapMessage(lastMessage, currentUser.id, [], userMappings)] : []
 
   return {
     _original: JSON.stringify(thread),
@@ -61,10 +59,9 @@ export function mapThread(thread: any, isUnread: boolean, currentUser?: User, la
     imgURL: thread.icon ? getThreadIcon(thread.id, thread.icon) : undefined,
     description: thread.topic,
     timestamp: lastMessage?.timestamp ? new Date(lastMessage.timestamp) : undefined,
-    lastMessageSnippet,
     messages: {
       hasMore: true,
-      items: [],
+      items: messages,
     },
     participants: {
       hasMore: false,

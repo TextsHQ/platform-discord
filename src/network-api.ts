@@ -10,7 +10,7 @@ import { GatewayCloseCode, GatewayMessageType } from './websocket/constants'
 const API_ENDPOINT = 'https://discord.com/api/v8/'
 const WAIT_TILL_READY = true
 const RESTART_ON_FAIL = true
-const ACT_AS_USER = true
+const ACT_AS_USER = false
 const LIMIT_COUNT = 25
 
 async function sleep(time: number) {
@@ -26,6 +26,8 @@ export default class DiscordAPI {
   private userMappings: Map<string, string> = new Map()
 
   private unreadThreads: Map<string, string> = new Map()
+
+  private unloadedThreads: Map<string, any> = new Map()
 
   public cookieJar?: CookieJar
 
@@ -94,18 +96,14 @@ export default class DiscordAPI {
     const res = await this.fetch({ method: 'GET', url: 'users/@me/channels' })
     if (!res?.body) throw new Error('No response')
 
-    const threads: Thread[] = await Promise.all(JSON.parse(res?.body).map(async (thread, index) => {
-      let messages
-      if (index <= LIMIT_COUNT) {
-        const messagesRes = await this.fetch({ method: 'GET', url: `channels/${thread.id}/messages?limit=1` })
-        messages = JSON.parse(messagesRes?.body)
-      }
+    const threads: Thread[] = await Promise.all(JSON.parse(res?.body)
+      .sort((a, b) => a.last_message_id - b.last_message_id)
+      .map(async (thread, index) => {
+        const lastMessage = await this.getLastMessage(thread.id, index)
+        return mapThread(thread, this.unreadThreads.get(thread.id) != null, this.currentUser, lastMessage, this.userMappings)
+      }))
 
-      return mapThread(thread, this.unreadThreads.get(thread.id) != null, this.currentUser, (messages?.length > 0 ? messages[0] : undefined), this.userMappings)
-    }))
-
-    // TODO: Add lastMessageID property to Thread
-    return { items: threads, hasMore: false }
+    return { items: threads, hasMore: this.unloadedThreads.size > 0 }
   }
 
   public createThread = async (userIDs: string[], title?: string): Promise<boolean | Thread> => {
@@ -120,7 +118,7 @@ export default class DiscordAPI {
     })
 
     if (!res?.body) throw new Error('No response')
-    return mapThread(JSON.parse(res?.body), false, this.currentUser)
+    return mapThread(JSON.parse(res?.body), false, this.currentUser, null, this.userMappings)
   }
 
   public archiveThread = async (threadID: string) => {
@@ -262,6 +260,13 @@ export default class DiscordAPI {
       .map(f => mapUser(f.user))
   }
 
+  private getLastMessage = async (threadID: string, index: number): Promise<any | null> => {
+    if (index > LIMIT_COUNT) return
+    const res = await this.fetch({ method: 'GET', url: `channels/${threadID}/messages?limit=1` })
+    if (!res?.body || res.body.length === 0) return
+    return JSON.parse(res?.body)[0]
+  }
+
   private setupGatewayListeners = () => {
     if (!this.client) throw new Error('WSClient not initialized!')
 
@@ -326,6 +331,7 @@ export default class DiscordAPI {
           break
 
         case GatewayMessageType.CHANNEL_CREATE:
+          if (payload.guild_id) return
           this.eventCallback?.([{
             type: ServerEventType.STATE_SYNC,
             mutationType: 'update',
@@ -343,6 +349,7 @@ export default class DiscordAPI {
           break
 
         case GatewayMessageType.CHANNEL_DELETE:
+          if (payload.guild_id) return
           this.eventCallback?.([{
             type: ServerEventType.STATE_SYNC,
             mutationType: 'delete',
@@ -359,6 +366,7 @@ export default class DiscordAPI {
         case GatewayMessageType.MESSAGE_CREATE:
         case GatewayMessageType.MESSAGE_DELETE:
         case GatewayMessageType.MESSAGE_UPDATE:
+          if (payload.guild_id) return
           this.eventCallback?.([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: payload.channel_id }])
           break
 
@@ -380,13 +388,15 @@ export default class DiscordAPI {
           break
 
         case GatewayMessageType.MESSAGE_DELETE_BULK:
-          this.eventCallback?.(payload.map(m => ({ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: m.channel_id })))
+          const messages = ACT_AS_USER ? payload.filter(m => !m.guild_id) : payload
+          this.eventCallback?.(messages.map(m => ({ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: m.channel_id })))
           break
 
         case GatewayMessageType.MESSAGE_REACTION_ADD:
         case GatewayMessageType.MESSAGE_REACTION_REMOVE:
         case GatewayMessageType.MESSAGE_REACTION_REMOVE_ALL:
         case GatewayMessageType.MESSAGE_REACTION_REMOVE_EMOJI:
+          if (payload.guild_id) return
           this.eventCallback?.([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: payload.channel_id }])
           break
 
@@ -395,6 +405,7 @@ export default class DiscordAPI {
           break
 
         case GatewayMessageType.PRESENCE_UPDATE:
+          if (payload.guild_id) return
           this.eventCallback?.([{
             type: ServerEventType.USER_PRESENCE_UPDATED,
             presence: {
