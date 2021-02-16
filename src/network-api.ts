@@ -2,7 +2,7 @@ import got from 'got'
 import fs from 'fs'
 import FormData from 'form-data'
 import { CookieJar } from 'tough-cookie'
-import { texts, CurrentUser, MessageContent, PaginationArg, Thread, Message as TextsMessage, ServerEventType, OnServerEventCallback, ActivityType, User, InboxName, MessageSendOptions, ReAuthError } from '@textshq/platform-sdk'
+import { texts, CurrentUser, MessageContent, PaginationArg, Thread, Message as TextsMessage, ServerEventType, OnServerEventCallback, ActivityType, User, InboxName, MessageSendOptions, ReAuthError, PresenceMap } from '@textshq/platform-sdk'
 import { mapCurrentUser, mapMessage, mapThread, mapUser } from './mappers'
 import WSClient from './websocket/wsclient'
 import { GatewayCloseCode, GatewayMessageType } from './websocket/constants'
@@ -10,8 +10,8 @@ import { GatewayCloseCode, GatewayMessageType } from './websocket/constants'
 const API_ENDPOINT = 'https://discord.com/api/v8/'
 const WAIT_TILL_READY = true
 const RESTART_ON_FAIL = true
-const ACT_AS_USER = false
 const LIMIT_COUNT = 25
+const ACT_AS_USER = true
 
 async function sleep(time: number) {
   return new Promise(resolve => setTimeout(resolve, time))
@@ -28,6 +28,10 @@ export default class DiscordAPI {
   private unreadThreads: Map<string, string> = new Map()
 
   private unloadedThreads: Map<string, any> = new Map()
+
+  private usersPresence: PresenceMap = {}
+
+  private gotInitialUserData: boolean = false
 
   public cookieJar?: CookieJar
 
@@ -251,6 +255,11 @@ export default class DiscordAPI {
     if (type === ActivityType.TYPING && this.ready) this.fetch({ method: 'POST', url: `channels/${threadID}/typing` })
   }
 
+  public getUsersPresence = async () => {
+    while (!this.gotInitialUserData) await sleep(1000)
+    return this.usersPresence
+  }
+
   // - MARK: Private functions
 
   private getUserFriends = async () => {
@@ -312,16 +321,20 @@ export default class DiscordAPI {
         case GatewayMessageType.READY:
           // const notes = payload.notes
           // const user_settings = payload.user_settings
-          // const presences = payload.presences
 
           if (ACT_AS_USER) {
             payload.relationships?.forEach(r => this.userMappings.set(r.id, (r.username + '#' + r.discriminator)))
             payload.read_state?.entries?.filter(p => p.mention_count > 0).forEach(p => this.unreadThreads.set(p.id, p.last_message_id))
+            // apparently there's no presences when acting as a user
           } else {
             payload.relationships?.forEach(r => this.userMappings.set(r.id, (r.user.username + '#' + r.user.discriminator)))
             payload.read_state?.filter(p => p.mention_count > 0).forEach(p => this.unreadThreads.set(p.id, p.last_message_id))
+            payload.presences?.forEach(p => {
+              this.usersPresence[p.user.id] = { userID: p.user.id, isActive: p.status === 'online', lastActive: new Date(parseInt(p.last_modified)) }
+            })
           }
 
+          this.gotInitialUserData = true
           break
 
         case GatewayMessageType.RECONNECT:
@@ -406,6 +419,7 @@ export default class DiscordAPI {
 
         case GatewayMessageType.PRESENCE_UPDATE:
           if (payload.guild_id) return
+          this.usersPresence[payload.user.id] = { userID: payload.user.id, isActive: payload.status === 'online', lastActive: new Date(parseInt(payload.last_modified)) }
           this.eventCallback?.([{
             type: ServerEventType.USER_PRESENCE_UPDATED,
             presence: {
@@ -430,7 +444,8 @@ export default class DiscordAPI {
     }
   }
 
-  private handleErrors = (json: any) => {
+  private handleErrors = (json: any, statusCode: number) => {
+    if (statusCode === 401) throw new ReAuthError('Unauthorized')
     if (json.message && json.code) texts.error(json)
   }
 
@@ -453,7 +468,7 @@ export default class DiscordAPI {
         ...rest,
       })
 
-      if (res?.body && JSON.parse(res?.body)) this.handleErrors(JSON.parse(res?.body))
+      if (res?.body && JSON.parse(res?.body)) this.handleErrors(JSON.parse(res?.body), res.statusCode)
       return res
     } catch (err) {
       if (err.code === 'ECONNREFUSED' && (err.message.endsWith('0.0.0.0:443') || err.message.endsWith('127.0.0.1:443'))) {

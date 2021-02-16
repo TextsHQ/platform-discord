@@ -58,7 +58,7 @@ export default class Discord implements PlatformAPI {
 
   searchUsers = (typed: string) => this.api.userFriends.filter(u => u.username.toLowerCase().includes(typed.toLowerCase()))
 
-  // getPresence = () => this.api.getUsersPresence()
+  getPresence = () => this.api.getUsersPresence()
 
   getThreads = (inboxName: InboxName, pagination?: PaginationArg) => this.api.getThreads(inboxName, pagination)
 
