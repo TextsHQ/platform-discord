@@ -2,7 +2,7 @@ import got from 'got'
 import fs from 'fs'
 import FormData from 'form-data'
 import { CookieJar } from 'tough-cookie'
-import { texts, CurrentUser, MessageContent, PaginationArg, Thread, Message as TextsMessage, ServerEventType, OnServerEventCallback, ActivityType, User, InboxName, MessageSendOptions, ReAuthError, PresenceMap } from '@textshq/platform-sdk'
+import { texts, CurrentUser, MessageContent, PaginationArg, Thread, Message as TextsMessage, ServerEventType, OnServerEventCallback, ActivityType, User, InboxName, MessageSendOptions, ReAuthError, PresenceMap, Paginated } from '@textshq/platform-sdk'
 import { mapCurrentUser, mapMessage, mapThread, mapUser } from './mappers'
 import WSClient from './websocket/wsclient'
 import { GatewayCloseCode, GatewayMessageType } from './websocket/constants'
@@ -27,7 +27,7 @@ export default class DiscordAPI {
 
   private unreadThreads: Map<string, string> = new Map()
 
-  private unloadedThreads: Map<string, any> = new Map()
+  private unloadedThreads: Set<any> = new Set()
 
   private usersPresence: PresenceMap = {}
 
@@ -96,18 +96,26 @@ export default class DiscordAPI {
     return currentUser
   }
 
-  public getThreads = async (inboxName: InboxName, pagination?: PaginationArg): Promise<{ items: Thread[], hasMore: boolean }> => {
-    const res = await this.fetch({ method: 'GET', url: 'users/@me/channels' })
-    if (!res?.body) throw new Error('No response')
+  public getThreads = async (inboxName: InboxName, pagination?: PaginationArg): Promise<Paginated<Thread>> => {
+    if (this.unloadedThreads.size === 0) {
+      // Fetch new threads
+      const res = await this.fetch({ method: 'GET', url: 'users/@me/channels' })
+      if (!res?.body) throw new Error('No response')
 
-    const threads: Thread[] = await Promise.all(JSON.parse(res?.body)
-      .sort((a, b) => a.last_message_id - b.last_message_id)
-      .map(async (thread, index) => {
-        const lastMessage = await this.getLastMessage(thread.id, index)
-        return mapThread(thread, this.unreadThreads.get(thread.id) != null, this.currentUser, lastMessage, this.userMappings)
-      }))
+      const threads: Thread[] = await Promise.all(JSON.parse(res?.body)
+        .sort((a, b) => a.last_message_id - b.last_message_id)
+        .reverse()
+        .map(async (thread, index) => {
+          const lastMessage = await this.getLastMessage(thread, index)
+          return mapThread(thread, this.unreadThreads.get(thread.id) != null, this.currentUser, lastMessage, this.userMappings)
+        }))
 
-    return { items: threads, hasMore: this.unloadedThreads.size > 0 }
+      return { items: threads.filter(t => t.messages.items.length > 0), hasMore: this.unloadedThreads.size > 0 }
+    } else {
+      // Get unloaded threads
+      console.log("GETTING UNLOADED, SIZE: " + this.unloadedThreads.size)
+      return { items: [], hasMore: false }
+    }
   }
 
   public createThread = async (userIDs: string[], title?: string): Promise<boolean | Thread> => {
@@ -269,10 +277,17 @@ export default class DiscordAPI {
       .map(f => mapUser(f.user))
   }
 
-  private getLastMessage = async (threadID: string, index: number): Promise<any | null> => {
-    if (index > LIMIT_COUNT) return
-    const res = await this.fetch({ method: 'GET', url: `channels/${threadID}/messages?limit=1` })
+  private getLastMessage = async (thread: any, index: number): Promise<any | null> => {
+    if (index > LIMIT_COUNT) {
+      texts.log('Thread with ID ' + thread.id + ' is over the fetch limit. Saving for later.')
+      this.unloadedThreads.add(thread)
+      return
+    }
+
+    const res = await this.fetch({ method: 'GET', url: `channels/${thread.id}/messages?limit=1` })
     if (!res?.body || res.body.length === 0) return
+
+    if (this.unloadedThreads.has(thread)) this.unloadedThreads.delete(thread)
     return JSON.parse(res?.body)[0]
   }
 
