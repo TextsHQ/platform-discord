@@ -11,7 +11,7 @@ const API_ENDPOINT = 'https://discord.com/api/v8/'
 const WAIT_TILL_READY = true
 const RESTART_ON_FAIL = true
 const LIMIT_COUNT = 25
-const ACT_AS_USER = true
+const ACT_AS_USER = false
 
 async function sleep(time: number) {
   return new Promise(resolve => setTimeout(resolve, time))
@@ -97,12 +97,19 @@ export default class DiscordAPI {
   }
 
   public getThreads = async (inboxName: InboxName, pagination?: PaginationArg): Promise<Paginated<Thread>> => {
-    if (this.unloadedThreads.size === 0) {
+    let unmapped
+    if (this.unloadedThreads.size > 0 && pagination) {
+      // Get unloaded threads
+      unmapped = Array.from(this.unloadedThreads)
+    } else {
       // Fetch new threads
+      this.unloadedThreads.clear()
       const res = await this.fetch({ method: 'GET', url: 'users/@me/channels' })
       if (!res?.body) throw new Error('No response')
+      unmapped = JSON.parse(res?.body)
+    }
 
-      const threads: Thread[] = await Promise.all(JSON.parse(res?.body)
+    const threads: Thread[] = await Promise.all(unmapped
         .sort((a, b) => a.last_message_id - b.last_message_id)
         .reverse()
         .map(async (thread, index) => {
@@ -111,11 +118,6 @@ export default class DiscordAPI {
         }))
 
       return { items: threads.filter(t => t.messages.items.length > 0), hasMore: this.unloadedThreads.size > 0 }
-    } else {
-      // Get unloaded threads
-      console.log("GETTING UNLOADED, SIZE: " + this.unloadedThreads.size)
-      return { items: [], hasMore: false }
-    }
   }
 
   public createThread = async (userIDs: string[], title?: string): Promise<boolean | Thread> => {
@@ -267,6 +269,8 @@ export default class DiscordAPI {
     while (!this.gotInitialUserData) await sleep(1000)
     return this.usersPresence
   }
+
+  public refresh = () => { }
 
   // - MARK: Private functions
 

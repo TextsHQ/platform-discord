@@ -45,6 +45,7 @@ export default class Discord implements PlatformAPI {
       this.pollingInterval = null
       this.api.ready = true
       this.api.setupWebsocket()
+      this.api.refresh()
     }
   }
 

@@ -239,9 +239,9 @@ function mapMessageType(message: any): Partial<Message> {
         const timeLasted = (endDate.getTime() - startDate.getTime()) / 1000
 
         if (timeLasted >= 60 * 60) {
-          text = `{{${message.author.id}}} started a call, which lasted ${Math.floor(timeLasted)} minute(s)`
-        } else if (timeLasted >= 60 * 60 * 60) {
-          text = `{{${message.author.id}}} started a call, which lasted ${Math.floor(timeLasted)} hour(s)`
+          text = `{{${message.author.id}}} started a call, which lasted ${Math.floor((timeLasted / 60) / 60)} hour(s)`
+        } else if (timeLasted >= 60) {
+          text = `{{${message.author.id}}} started a call, which lasted ${Math.floor(timeLasted / 60)} minute(s)`
         } else {
           text = `{{${message.author.id}}} started a call, which lasted ${Math.floor(timeLasted)} second(s)`
         }
