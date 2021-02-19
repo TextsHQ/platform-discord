@@ -189,7 +189,6 @@ export default class DiscordAPI {
     const requestContent = {
       headers: {},
       message_reference: undefined,
-      text,
       json: undefined,
       body: undefined,
     }
@@ -210,7 +209,7 @@ export default class DiscordAPI {
       }
 
       const payload_json = {
-        content: requestContent.text || '',
+        content: text || '',
         tts: false,
         message_reference: requestContent.message_reference,
       }
@@ -221,13 +220,31 @@ export default class DiscordAPI {
     } else {
       requestContent.headers = { 'Content-Type': 'application/json' }
       requestContent.json = {
-        content: requestContent.text,
+        content: text,
         tts: false,
         message_reference: requestContent.message_reference,
       }
     }
 
     const requestData = { url, method, headers: requestContent.headers, json: requestContent.json, body: requestContent.body }
+    const res = await this.fetch(requestData)
+    return res?.statusCode === 200
+  }
+
+  public editMessage = async (threadID: string, messageID: string, content: MessageContent, options?: MessageSendOptions): Promise<boolean> => {
+    await this.waitUntilReady()
+
+    const method = 'PATCH'
+    const url = `channels/${threadID}/messages/${messageID}`
+
+    // @ts-expect-error
+    const text = content.text?.replaceAll(/@([^#@]{3,32}#[0-9]{4})/gi, (_, username) => {
+      const user = Array.from(this.userMappings).find(u => u[1] === username)
+      if (user) return `<@!${user[0]}>`
+      return username
+    })
+
+    const requestData = { url, method, json: { content: text } }
     const res = await this.fetch(requestData)
     return res?.statusCode === 200
   }

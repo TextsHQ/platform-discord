@@ -74,6 +74,8 @@ export default class Discord implements PlatformAPI {
 
   sendMessage = (threadID: string, content: MessageContent, options?: MessageSendOptions) => this.api.sendMessage(threadID, content, options)
 
+  editMessage = (threadID: string, messageID: string, content: MessageContent, options?: MessageSendOptions) => this.api.editMessage(threadID, messageID, content, options)
+
   deleteMessage = (threadID: string, messageID: string, forEveryone?: boolean) => this.api.deleteMessage(threadID, messageID, forEveryone)
 
   addReaction = (threadID: string, messageID: string, reactionKey: string) => this.api.addReaction(threadID, messageID, reactionKey)
