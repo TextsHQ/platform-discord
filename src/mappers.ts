@@ -192,14 +192,14 @@ function transformEmojisAndTags(message?: string, userMappings?: Map<string, str
 
       const entity = {
         from: offset - userOffsetRemoved,
-        to: offset - userOffsetRemoved + (username ? username.slice(0, -5).length + 1 : matched.length),
+        to: offset - userOffsetRemoved + (username ? [...username.slice(0, -5)].length + 1 : matched.length),
         mentionedUser: {
           id: user_id,
           username,
         },
       }
 
-      userOffsetRemoved += username ? matched.length - `@${username.slice(0, -5)}`.length : 0
+      userOffsetRemoved += username ? matched.length - ([...username.slice(0, -5)].length + 1) : 0
       textAttributes.entities.push(entity)
       return username ? `@${username.slice(0, -5)}` : matched
     })
