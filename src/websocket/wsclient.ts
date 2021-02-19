@@ -77,7 +77,7 @@ export default class WSClient {
     this.ws?.on('close', (code, reason) => {
       this.ready = false
       this.onChangedReadyState?.(false)
-      if (this.restartOnFail) {
+      if (this.restartOnFail && code !== GatewayCloseCode.UNKNOWN_ERROR) {
         if (code === undefined) {
           this.resumeConnectionOnConnect = true
         }

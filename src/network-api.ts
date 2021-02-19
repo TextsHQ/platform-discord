@@ -1,7 +1,6 @@
 import got from 'got'
 import fs from 'fs'
 import FormData from 'form-data'
-import { CookieJar } from 'tough-cookie'
 import { texts, CurrentUser, MessageContent, PaginationArg, Thread, Message as TextsMessage, ServerEventType, OnServerEventCallback, ActivityType, User, InboxName, MessageSendOptions, ReAuthError, PresenceMap, Paginated } from '@textshq/platform-sdk'
 import { mapCurrentUser, mapMessage, mapThread, mapUser } from './mappers'
 import WSClient from './websocket/wsclient'
@@ -18,8 +17,6 @@ async function sleep(time: number) {
 }
 
 export default class DiscordAPI {
-  private token?: string
-
   private client?: WSClient
 
   // ID-to-username mappings
@@ -33,7 +30,7 @@ export default class DiscordAPI {
 
   private gotInitialUserData: boolean = false
 
-  public cookieJar?: CookieJar
+  public token?: string
 
   public eventCallback?: OnServerEventCallback
 
@@ -49,15 +46,9 @@ export default class DiscordAPI {
 
   // MARK: - Public functions
 
-  public login = async (cookieJar: CookieJar) => {
-    if (!cookieJar) throw TypeError()
-    this.cookieJar = cookieJar
-
-    const cookies = this.cookieJar.getCookiesSync('https://discord.com')
-    this.token = cookies.find(c => c.key === 'token')?.value
-
-    if (!this.token) throw new Error('No token found.')
-
+  public login = async (token: string) => {
+    if (!token) throw new Error('No token found.')
+    this.token = token
     this.setupWebsocket()
   }
 

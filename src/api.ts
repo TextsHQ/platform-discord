@@ -1,5 +1,4 @@
-import { CookieJar } from 'tough-cookie'
-import { PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Message, InboxName, MessageContent, PaginationArg, OnConnStateChangeCallback, ActivityType, MessageSendOptions, texts } from '@textshq/platform-sdk'
+import { PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Message, InboxName, MessageContent, PaginationArg, ActivityType, MessageSendOptions, texts, AccountInfo, LoginCreds } from '@textshq/platform-sdk'
 import DiscordAPI from './network-api'
 
 export default class Discord implements PlatformAPI {
@@ -7,10 +6,8 @@ export default class Discord implements PlatformAPI {
 
   private pollingInterval?: NodeJS.Timeout
 
-  init = async (cookieJarJSON: any) => {
-    if (!cookieJarJSON) return
-    const cookieJar = CookieJar.fromJSON(cookieJarJSON)
-    await this.api.login(cookieJar)
+  init = async (session: any, { accountID }: AccountInfo) => {
+    await this.api.login(session)
 
     this.api.startPolling = this.startPolling
     this.api.stopPolling = this.stopPolling
@@ -18,9 +15,9 @@ export default class Discord implements PlatformAPI {
 
   dispose = () => this.api.dispose()
 
-  login = async (creds): Promise<LoginResult> => {
-    if (!creds.cookieJarJSON) return { type: 'error' }
-    await this.api.login(CookieJar.fromJSON(creds.cookieJarJSON as any))
+  login = async ({ jsCodeResult }: LoginCreds): Promise<LoginResult> => {
+    if (!jsCodeResult) return { type: 'error' }
+    await this.api.login(jsCodeResult)
     return { type: 'success' }
   }
 
@@ -49,7 +46,7 @@ export default class Discord implements PlatformAPI {
     }
   }
 
-  serializeSession = () => this.api.cookieJar.toJSON()
+  serializeSession = () => this.api.token
 
   subscribeToEvents = (onEvent: OnServerEventCallback) => {
     this.api.eventCallback = onEvent

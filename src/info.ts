@@ -14,17 +14,18 @@ const info: PlatformInfo = {
   loginMode: 'browser',
   browserLogin: {
     loginURL: 'https://discord.com/login',
-    authCookieName: 'token',
     windowWidth: 950,
     windowHeight: 650,
+    runJSOnClose: 'token',
     runJSOnLaunch: `
+      let token = ""
       const iframe = document.createElement('iframe');
       document.head.append(iframe);
       const i = setInterval(() => {
         if (iframe.contentWindow.localStorage.token) {
+          token = iframe.contentWindow.localStorage.token.slice(1, -1);
           clearInterval(i);
-          document.cookie = "token=" + iframe.contentWindow.localStorage.token.slice(1, -1);
-          return true;
+          setTimeout(() => window.close(), 100)
         }
       }, 100)
     `,
