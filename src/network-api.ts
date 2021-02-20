@@ -67,7 +67,6 @@ export default class DiscordAPI {
     const gatewayRes = await got({ url: `${API_ENDPOINT}/gateway` })
     const gateway: string = JSON.parse(gatewayRes?.body)?.url ?? 'wss://gateway.discord.gg'
 
-    this.client = null
     this.client = new WSClient(`${gateway}/?v=8&encoding=etf`, this.token, ACT_AS_USER)
     this.client.restartOnFail = RESTART_ON_FAIL
 
@@ -78,7 +77,7 @@ export default class DiscordAPI {
     const res = await this.fetch({ method: 'GET', url: 'users/@me' })
     if (!res?.body) throw new Error('No response')
 
-    const currentUser: CurrentUser = mapCurrentUser(JSON.parse(res?.body))
+    const currentUser = mapCurrentUser(JSON.parse(res?.body))
     this.currentUser = currentUser
     this.userMappings.set(currentUser.id, currentUser.displayText)
 

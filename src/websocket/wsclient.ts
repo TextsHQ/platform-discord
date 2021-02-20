@@ -16,32 +16,37 @@ export default class WSClient {
 
   private heartbeatInterval?: NodeJS.Timeout
 
-  public ready = false
+  ready = false
 
-  public restartOnFail = true
+  restartOnFail = true
 
-  public onMessage?: (opcode: OPCode, message: any, type?: GatewayMessageType) => void
+  onMessage?: (opcode: OPCode, message: any, type?: GatewayMessageType) => void
 
-  public onChangedReadyState?: (ready: boolean) => void
+  onChangedReadyState?: (ready: boolean) => void
 
-  public onError?: (error: Error) => void
+  onError?: (error: Error) => void
 
-  public onConnectionClosed?: (code: number, reason: string) => void
+  onConnectionClosed?: (code: number, reason: string) => void
 
   constructor(public gateway: string, private token: string, private actAsUser = false) {
     this.connect()
   }
 
-  public connect = () => {
+  connect = () => {
     texts.log('Opening gateway connection...')
     this.ws = new WebSocket(this.gateway)
     this.setupHandlers()
   }
 
-  public disconnect = () => {
+  disconnect = () => {
     clearInterval(this.heartbeatInterval)
     this.lastSequenceNumber = null
     this.ws?.close()
+  }
+
+  private send = (payload: GatewayMessage) => {
+    const packed = erlpack.pack(payload)
+    this.ws.send(packed)
   }
 
   private setupHandlers = () => {
@@ -57,8 +62,7 @@ export default class WSClient {
               seq: this.lastSequenceNumber,
             },
           }
-          const packed = erlpack.pack(payload)
-          this.ws.send(packed)
+          this.send(payload)
         } else {
           this.login()
         }
@@ -88,36 +92,39 @@ export default class WSClient {
       texts.log('Unexpected response: ' + request, response)
     })
 
-    this.ws.onmessage = this.messageHandler
+    this.ws.onmessage = this.wsOnMessage
   }
 
-  private messageHandler = (event: MessageEvent) => {
-    let unpacked: GatewayMessage | undefined
+  private processMessage = (message: GatewayMessage) => {
+    this.lastSequenceNumber = message.s
+    this.onMessage?.(message.op, message.d, message.t)
+
+    switch (message.op) {
+      case OPCode.DISPATCH:
+        if (!this.ready && message.t === GatewayMessageType.READY) {
+          this.sessionID = message.d.session_id
+          this.ready = true
+          this.onChangedReadyState?.(true)
+        }
+
+        break
+      case OPCode.HEARTBEAT:
+        this.sendHeartbeat()
+        break
+      case OPCode.HELLO:
+        this.setHeartbeatInterval(message.d.heartbeat_interval)
+        break
+      case OPCode.HEARTBEAT_ACK:
+        break
+      default:
+        break
+    }
+  }
+
+  private wsOnMessage = (event: MessageEvent) => {
     try {
-      unpacked = erlpack.unpack(event.data as Buffer)
-      this.lastSequenceNumber = unpacked.s
-      this.onMessage?.(unpacked.op, unpacked.d, unpacked.t)
-
-      switch (unpacked.op) {
-        case OPCode.DISPATCH:
-          if (!this.ready && unpacked.t === GatewayMessageType.READY) {
-            this.sessionID = unpacked.d.session_id
-            this.ready = true
-            this.onChangedReadyState?.(true)
-          }
-
-          break
-        case OPCode.HEARTBEAT:
-          this.sendHeartbeat()
-          break
-        case OPCode.HELLO:
-          this.setHeartbeatInterval(unpacked.d.heartbeat_interval)
-          break
-        case OPCode.HEARTBEAT_ACK:
-          break
-        default:
-          break
-      }
+      const unpacked: GatewayMessage | undefined = erlpack.unpack(event.data as Buffer)
+      if (unpacked) this.processMessage(unpacked)
     } catch (e) {
       texts.error('Error unpacking: ' + e)
       texts.error(event)
@@ -128,8 +135,7 @@ export default class WSClient {
   private sendHeartbeat = () => {
     // texts.log('[!] Sending heartbeat')
     const payload: GatewayMessage = { op: OPCode.HEARTBEAT, d: this.lastSequenceNumber }
-    const packed = erlpack.pack(payload)
-    this.ws.send(packed)
+    this.send(payload)
   }
 
   private setHeartbeatInterval = (interval: number) => {
@@ -175,7 +181,6 @@ export default class WSClient {
         } : undefined,
       },
     }
-    const packed = erlpack.pack(payload)
-    this.ws.send(packed)
+    this.send(payload)
   }
 }

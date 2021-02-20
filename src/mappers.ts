@@ -1,8 +1,10 @@
-import { CurrentUser, Message, MessageActionType, MessageAttachment, MessageAttachmentType, MessageLink, MessageReaction, TextAttributes, Thread, ThreadType, User } from '@textshq/platform-sdk'
+import { CurrentUser, Message, MessageActionType, MessageAttachment, MessageAttachmentType, MessageLink, MessageReaction, TextAttributes, TextEntity, Thread, ThreadType, User } from '@textshq/platform-sdk'
 import { MessageType } from './constants'
 
 const USER_REGEX = /<@!(\d*)>/g
 const EMOTE_REGEX = /<(a?):([A-Za-z0-9_]+):(\d+)>/g
+
+// https://discord.com/developers/docs/resources/channel#message-object-message-types
 const SUPPORTED_MESSAGE_TYPES = [0, 1, 2, 3, 4, 5, 6, 19]
 
 const getUserAvatar = (userID: string, avatarID: string) =>
@@ -24,9 +26,10 @@ export function mapUser(user: any): User {
 }
 
 export function mapCurrentUser(user: any): CurrentUser {
+  const mapped = mapUser(user)
   return {
-    displayText: `${user.username}#${user.discriminator}`,
-    ...mapUser(user),
+    displayText: mapped.username,
+    ...mapped,
   }
 }
 
@@ -160,17 +163,17 @@ function mapAttachment(a): MessageAttachment {
   }
 }
 
-function transformEmojisAndTags(message?: string, userMappings?: Map<string, string>): { text?: string, textAttributes?: TextAttributes } {
+function transformEmojisAndTags(message?: string, userMappings?: Map<string, string>) {
   if (!message) return
 
   let emojiOffsetRemoved = 0
   let userOffsetRemoved = 0
-  const textAttributes = { entities: [] }
+  const textAttributes: TextAttributes = { entities: [] }
 
-  const text = message
+  const text: string = message
     // @ts-expect-error
     .replaceAll(EMOTE_REGEX, (matched, animated, emote_name, emote_id, offset) => {
-      const entity = {
+      const entity: TextEntity = {
         from: offset - emojiOffsetRemoved,
         to: offset - emojiOffsetRemoved + (emote_name.length + 2),
         replaceWithMedia: {
@@ -190,7 +193,7 @@ function transformEmojisAndTags(message?: string, userMappings?: Map<string, str
     .replaceAll(USER_REGEX, (matched, user_id, offset) => {
       const username = userMappings.get(user_id)
 
-      const entity = {
+      const entity: TextEntity = {
         from: offset - userOffsetRemoved,
         to: offset - userOffsetRemoved + (username ? [...username.slice(0, -5)].length + 1 : matched.length),
         mentionedUser: {
