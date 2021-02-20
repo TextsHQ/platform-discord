@@ -50,7 +50,7 @@ export default class WSClient {
         if (this.resumeConnectionOnConnect) {
           this.resumeConnectionOnConnect = false
           const payload: GatewayMessage = {
-            op: 6,
+            op: OPCode.RESUME,
             d: {
               token: this.token,
               session_id: this.sessionID,
