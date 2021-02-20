@@ -26,8 +26,6 @@ export default class DiscordAPI {
 
   private unreadThreads: Map<string, string> = new Map()
 
-  private unloadedThreads: Set<any> = new Set()
-
   private usersPresence: PresenceMap = {}
 
   private gotInitialUserData: boolean = false
@@ -91,27 +89,15 @@ export default class DiscordAPI {
   }
 
   public getThreads = async (inboxName: InboxName, pagination?: PaginationArg): Promise<Paginated<Thread>> => {
-    let unmapped
-    if (this.unloadedThreads.size > 0 && pagination) {
-      // Get unloaded threads
-      unmapped = Array.from(this.unloadedThreads)
-    } else {
-      // Fetch new threads
-      this.unloadedThreads.clear()
-      const res = await this.fetch({ method: 'GET', url: 'users/@me/channels' })
-      if (!res?.body) throw new Error('No response')
-      unmapped = JSON.parse(res?.body)
-    }
+    const res = await this.fetch({ method: 'GET', url: 'users/@me/channels' })
+    if (!res?.body) throw new Error('No response')
 
-    const threads: Thread[] = await Promise.all(unmapped
+    const threads: Thread[] = await Promise.all(JSON.parse(res?.body)
       .sort((a, b) => a.last_message_id - b.last_message_id)
       .reverse()
-      .map(async (thread, index) => {
-        const lastMessage = await this.getLastMessage(thread, index)
-        return mapThread(thread, this.unreadThreads.get(thread.id) != null, this.currentUser, lastMessage, this.userMappings)
-      }))
+      .map(thread => mapThread(thread, this.unreadThreads.get(thread.id) != null, this.currentUser, this.userMappings)))
 
-    return { items: threads.filter(t => t.messages.items.length > 0), hasMore: this.unloadedThreads.size > 0 }
+    return { items: threads, hasMore: false }
   }
 
   public createThread = async (userIDs: string[], title?: string): Promise<boolean | Thread> => {
@@ -126,7 +112,7 @@ export default class DiscordAPI {
     })
 
     if (!res?.body) throw new Error('No response')
-    return mapThread(JSON.parse(res?.body), false, this.currentUser, null, this.userMappings)
+    return mapThread(JSON.parse(res?.body), false, this.currentUser, this.userMappings)
   }
 
   public archiveThread = async (threadID: string) => {
@@ -290,20 +276,6 @@ export default class DiscordAPI {
     if (!res?.body) throw new Error('No response')
     this.userFriends = JSON.parse(res?.body).filter(f => f.type === 1) // Only friends
       .map(f => mapUser(f.user))
-  }
-
-  private getLastMessage = async (thread: any, index: number): Promise<any | null> => {
-    if (index > LIMIT_COUNT) {
-      texts.log('Thread with ID ' + thread.id + ' is over the fetch limit. Saving for later.')
-      this.unloadedThreads.add(thread)
-      return
-    }
-
-    const res = await this.fetch({ method: 'GET', url: `channels/${thread.id}/messages?limit=1` })
-    if (!res?.body || res.body.length === 0) return
-
-    if (this.unloadedThreads.has(thread)) this.unloadedThreads.delete(thread)
-    return JSON.parse(res?.body)[0]
   }
 
   private setupGatewayListeners = () => {

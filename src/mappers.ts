@@ -43,14 +43,14 @@ const MAP_THREAD_TYPE: ThreadType[] = [
   'single', // GUILD_STORE
 ]
 
-export function mapThread(thread: any, isUnread: boolean, currentUser?: User, lastMessage?: any, userMappings?: Map<string, string>): Thread {
+export function mapThread(thread: any, isUnread: boolean, currentUser?: User, userMappings?: Map<string, string>): Thread {
   const type: ThreadType = MAP_THREAD_TYPE[thread.type]
 
   const participants: User[] = thread.recipients?.map(mapUser)
   participants.sort((a, b) => ((a.username ?? '') < (b.username ?? '') ? 1 : -1))
   if (currentUser) participants.push(currentUser)
 
-  const messages = (lastMessage && currentUser.id) ? [mapMessage(lastMessage, currentUser.id, [], userMappings)] : []
+  const timestamp = parseSnowflake(thread.last_message_id)
 
   return {
     _original: JSON.stringify(thread),
@@ -61,10 +61,10 @@ export function mapThread(thread: any, isUnread: boolean, currentUser?: User, la
     type,
     imgURL: thread.icon ? getThreadIcon(thread.id, thread.icon) : undefined,
     description: thread.topic,
-    timestamp: lastMessage?.timestamp ? new Date(lastMessage.timestamp) : undefined,
+    timestamp,
     messages: {
       hasMore: true,
-      items: messages,
+      items: [],
     },
     participants: {
       hasMore: false,
@@ -284,4 +284,12 @@ function mapMessageType(message: any): Partial<Message> {
     default:
       return { text: message.content }
   }
+}
+
+function parseSnowflake(id: string): Date {
+  const discordEpoch = 1420070400000
+  const int = BigInt.asUintN(64, BigInt(id))
+  // @ts-expect-error
+  const dateBits = Number(int >> 22n)
+  return new Date(dateBits + discordEpoch)
 }
