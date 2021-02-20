@@ -280,6 +280,5 @@ function mapMessageType(message: any): Partial<Message> {
       }
     default:
       return { text: message.content }
-      break
   }
 }

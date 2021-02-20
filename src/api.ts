@@ -1,4 +1,4 @@
-import { PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Message, InboxName, MessageContent, PaginationArg, ActivityType, MessageSendOptions, texts, AccountInfo, LoginCreds } from '@textshq/platform-sdk'
+import { PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Message, InboxName, MessageContent, PaginationArg, ActivityType, MessageSendOptions, texts, LoginCreds } from '@textshq/platform-sdk'
 import DiscordAPI from './network-api'
 
 export default class Discord implements PlatformAPI {
@@ -6,7 +6,7 @@ export default class Discord implements PlatformAPI {
 
   private pollingInterval?: NodeJS.Timeout
 
-  init = async (session: any, { accountID }: AccountInfo) => {
+  init = async (session: any) => {
     await this.api.login(session)
 
     this.api.startPolling = this.startPolling
@@ -65,8 +65,8 @@ export default class Discord implements PlatformAPI {
   archiveThread = (threadID: string) => this.api.archiveThread(threadID)
 
   getMessages = async (threadID: string, pagination?: PaginationArg): Promise<Paginated<Message>> => {
-    // TODO: Check if there's more messages
-    return { items: await this.api.getMessages(threadID, pagination), hasMore: true }
+    const items = await this.api.getMessages(threadID, pagination)
+    return { items, hasMore: items.length > 0 }
   }
 
   sendMessage = (threadID: string, content: MessageContent, options?: MessageSendOptions) => this.api.sendMessage(threadID, content, options)

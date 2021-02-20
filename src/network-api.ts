@@ -357,7 +357,7 @@ export default class DiscordAPI {
             payload.relationships?.forEach(r => this.userMappings.set(r.id, (r.user.username + '#' + r.user.discriminator)))
             payload.read_state?.filter(p => p.mention_count > 0).forEach(p => this.unreadThreads.set(p.id, p.last_message_id))
             payload.presences?.forEach(p => {
-              this.usersPresence[p.user.id] = { userID: p.user.id, isActive: p.status === 'online', lastActive: new Date(parseInt(p.last_modified)) }
+              this.usersPresence[p.user.id] = { userID: p.user.id, isActive: p.status === 'online', lastActive: new Date(+p.last_modified) }
             })
           }
 
@@ -427,10 +427,11 @@ export default class DiscordAPI {
           }])
           break
 
-        case GatewayMessageType.MESSAGE_DELETE_BULK:
+        case GatewayMessageType.MESSAGE_DELETE_BULK: {
           const messages = ACT_AS_USER ? payload.filter(m => !m.guild_id) : payload
           this.eventCallback?.(messages.map(m => ({ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: m.channel_id })))
           break
+        }
 
         case GatewayMessageType.MESSAGE_REACTION_ADD:
         case GatewayMessageType.MESSAGE_REACTION_REMOVE:
@@ -446,7 +447,7 @@ export default class DiscordAPI {
 
         case GatewayMessageType.PRESENCE_UPDATE:
           if (payload.guild_id) return
-          this.usersPresence[payload.user.id] = { userID: payload.user.id, isActive: payload.status === 'online', lastActive: new Date(parseInt(payload.last_modified)) }
+          this.usersPresence[payload.user.id] = { userID: payload.user.id, isActive: payload.status === 'online', lastActive: new Date(+payload.last_modified) }
           this.eventCallback?.([{
             type: ServerEventType.USER_PRESENCE_UPDATED,
             presence: {
