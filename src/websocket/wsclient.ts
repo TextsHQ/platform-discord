@@ -3,6 +3,7 @@ import WebSocket, { MessageEvent } from 'ws'
 import { texts } from '@textshq/platform-sdk'
 import { DiscordPresenceStatus, OPCode, GatewayMessageType, GatewayCloseCode } from './constants'
 import { GatewayMessage } from './types'
+import { Packer } from '../packers'
 
 export default class WSClient {
   private ws?: WebSocket
@@ -31,10 +32,7 @@ export default class WSClient {
     public gateway: string,
     private token: string,
     private actAsUser = false,
-    private packer: {
-      pack: (data: any) => any,
-      unpack: (data: WebSocket.Data) => any,
-    },
+    private packer: Packer,
   ) {
     this.connect()
   }
@@ -177,7 +175,7 @@ export default class WSClient {
           activites: [],
           afk: false,
         },
-        compress: true,
+        compress: this.packer.encoding === 'etf',
         capabilities: this.actAsUser ? 61 : undefined,
         intents: this.actAsUser ? undefined : 28672,
         client_state: this.actAsUser ? {
