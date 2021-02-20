@@ -101,14 +101,14 @@ export default class DiscordAPI {
     }
 
     const threads: Thread[] = await Promise.all(unmapped
-        .sort((a, b) => a.last_message_id - b.last_message_id)
-        .reverse()
-        .map(async (thread, index) => {
-          const lastMessage = await this.getLastMessage(thread, index)
-          return mapThread(thread, this.unreadThreads.get(thread.id) != null, this.currentUser, lastMessage, this.userMappings)
-        }))
+      .sort((a, b) => a.last_message_id - b.last_message_id)
+      .reverse()
+      .map(async (thread, index) => {
+        const lastMessage = await this.getLastMessage(thread, index)
+        return mapThread(thread, this.unreadThreads.get(thread.id) != null, this.currentUser, lastMessage, this.userMappings)
+      }))
 
-      return { items: threads.filter(t => t.messages.items.length > 0), hasMore: this.unloadedThreads.size > 0 }
+    return { items: threads.filter(t => t.messages.items.length > 0), hasMore: this.unloadedThreads.size > 0 }
   }
 
   public createThread = async (userIDs: string[], title?: string): Promise<boolean | Thread> => {

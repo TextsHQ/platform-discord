@@ -8,10 +8,6 @@ import { GatewayMessage } from './types'
 export default class WSClient {
   private ws?: WebSocket
 
-  private token: string
-
-  private actAsUser: boolean
-
   private sessionID?: number | undefined
 
   private lastSequenceNumber?: number | undefined
@@ -24,8 +20,6 @@ export default class WSClient {
 
   public restartOnFail = true
 
-  public gateway: string
-
   public onMessage?: (opcode: OPCode, message: any, type?: GatewayMessageType) => void
 
   public onChangedReadyState?: (ready: boolean) => void
@@ -34,10 +28,7 @@ export default class WSClient {
 
   public onConnectionClosed?: (code: number, reason: string) => void
 
-  constructor(gateway: string, token: string, actAsUser: boolean = false) {
-    this.token = token
-    this.actAsUser = actAsUser
-    this.gateway = gateway
+  constructor(public gateway: string, private token: string, private actAsUser = false) {
     this.connect()
   }
 
@@ -165,7 +156,7 @@ export default class WSClient {
           referring_domain_current: '',
           release_channel: 'stable',
           client_build_number: 76771,
-          client_event_source: null
+          client_event_source: null,
         },
         presence: {
           status: DiscordPresenceStatus.ONLINE,
@@ -178,9 +169,9 @@ export default class WSClient {
         intents: this.actAsUser ? undefined : 28672,
         client_state: this.actAsUser ? {
           guild_hashes: {},
-          highest_last_message_id: "0",
+          highest_last_message_id: '0',
           read_state_version: 0,
-          user_guild_settings_version: -1
+          user_guild_settings_version: -1,
         } : undefined,
       },
     }
