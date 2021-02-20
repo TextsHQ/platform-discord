@@ -2,9 +2,11 @@ import got from 'got'
 import fs from 'fs'
 import FormData from 'form-data'
 import { texts, CurrentUser, MessageContent, PaginationArg, Thread, Message as TextsMessage, ServerEventType, OnServerEventCallback, ActivityType, User, InboxName, MessageSendOptions, ReAuthError, PresenceMap, Paginated } from '@textshq/platform-sdk'
+
 import { mapCurrentUser, mapMessage, mapThread, mapUser } from './mappers'
 import WSClient from './websocket/wsclient'
 import { GatewayCloseCode, GatewayMessageType } from './websocket/constants'
+import { defaultPacker } from './packers'
 
 const API_ENDPOINT = 'https://discord.com/api/v8/'
 const WAIT_TILL_READY = true
@@ -65,9 +67,11 @@ export default class DiscordAPI {
 
   public setupWebsocket = async () => {
     const gatewayRes = await got({ url: `${API_ENDPOINT}/gateway` })
-    const gateway: string = JSON.parse(gatewayRes?.body)?.url ?? 'wss://gateway.discord.gg'
+    const gatewayHost = JSON.parse(gatewayRes?.body)?.url as string ?? 'wss://gateway.discord.gg'
+    const gatewayFullURL = `${gatewayHost}/?v=8&encoding=${defaultPacker.encoding}`
 
-    this.client = new WSClient(`${gateway}/?v=8&encoding=etf`, this.token, ACT_AS_USER)
+    this.client = new WSClient(gatewayFullURL, this.token, ACT_AS_USER, defaultPacker)
+    texts.log(gatewayFullURL)
     this.client.restartOnFail = RESTART_ON_FAIL
 
     this.setupGatewayListeners()
@@ -311,7 +315,7 @@ export default class DiscordAPI {
     }
 
     this.client.onConnectionClosed = (code, reason) => {
-      texts.log('Connection to websocket closed with code ' + code + '. Reason: ' + reason)
+      texts.log('Connection to websocket closed with code', code + '. Reason:', reason)
       this.ready = false
 
       switch (code) {

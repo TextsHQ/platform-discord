@@ -1,6 +1,5 @@
 import os from 'os'
 import WebSocket, { MessageEvent } from 'ws'
-import erlpack from 'erlpack'
 import { texts } from '@textshq/platform-sdk'
 import { DiscordPresenceStatus, OPCode, GatewayMessageType, GatewayCloseCode } from './constants'
 import { GatewayMessage } from './types'
@@ -28,7 +27,15 @@ export default class WSClient {
 
   onConnectionClosed?: (code: number, reason: string) => void
 
-  constructor(public gateway: string, private token: string, private actAsUser = false) {
+  constructor(
+    public gateway: string,
+    private token: string,
+    private actAsUser = false,
+    private packer: {
+      pack: (data: any) => any,
+      unpack: (data: WebSocket.Data) => any,
+    },
+  ) {
     this.connect()
   }
 
@@ -42,11 +49,6 @@ export default class WSClient {
     clearInterval(this.heartbeatInterval)
     this.lastSequenceNumber = null
     this.ws?.close()
-  }
-
-  private send = (payload: GatewayMessage) => {
-    const packed = erlpack.pack(payload)
-    this.ws.send(packed)
   }
 
   private setupHandlers = () => {
@@ -121,10 +123,15 @@ export default class WSClient {
     }
   }
 
+  private send = (payload: GatewayMessage) => {
+    const packed = this.packer.pack(payload)
+    this.ws.send(packed)
+  }
+
   private wsOnMessage = (event: MessageEvent) => {
     try {
-      const unpacked: GatewayMessage | undefined = erlpack.unpack(event.data as Buffer)
-      if (unpacked) this.processMessage(unpacked)
+      const unpacked = this.packer.unpack(event.data)
+      if (unpacked) this.processMessage(unpacked as GatewayMessage)
     } catch (e) {
       texts.error('Error unpacking: ' + e)
       texts.error(event)
