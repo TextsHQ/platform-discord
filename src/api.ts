@@ -55,32 +55,45 @@ export default class Discord implements PlatformAPI {
 
   getCurrentUser = () => this.api.getCurrentUser()
 
-  searchUsers = (typed: string) => this.api.userFriends.filter(u => u.username.toLowerCase().includes(typed.toLowerCase()))
+  searchUsers = (typed: string) => {
+    const typedLower = typed.toLowerCase()
+    return this.api.userFriends.filter(u => u.username.toLowerCase().includes(typedLower))
+  }
 
   getPresence = () => this.api.getUsersPresence()
 
-  getThreads = (inboxName: InboxName, pagination?: PaginationArg) => this.api.getThreads(inboxName, pagination)
+  getThreads = (inboxName: InboxName, pagination?: PaginationArg) =>
+    this.api.getThreads(inboxName, pagination)
 
-  createThread = (userIDs: string[], title?: string) => this.api.createThread(userIDs, title)
+  createThread = (userIDs: string[], title?: string) =>
+    this.api.createThread(userIDs, title)
 
-  archiveThread = (threadID: string) => this.api.archiveThread(threadID)
+  archiveThread = (threadID: string) =>
+    this.api.archiveThread(threadID)
 
   getMessages = async (threadID: string, pagination?: PaginationArg): Promise<Paginated<Message>> => {
     const items = await this.api.getMessages(threadID, pagination)
     return { items, hasMore: items.length > 0 }
   }
 
-  sendMessage = (threadID: string, content: MessageContent, options?: MessageSendOptions) => this.api.sendMessage(threadID, content, options)
+  sendMessage = (threadID: string, content: MessageContent, options?: MessageSendOptions) =>
+    this.api.sendMessage(threadID, content, options)
 
-  editMessage = (threadID: string, messageID: string, content: MessageContent, options?: MessageSendOptions) => this.api.editMessage(threadID, messageID, content, options)
+  editMessage = (threadID: string, messageID: string, content: MessageContent, options?: MessageSendOptions) =>
+    this.api.editMessage(threadID, messageID, content, options)
 
-  deleteMessage = (threadID: string, messageID: string, forEveryone?: boolean) => this.api.deleteMessage(threadID, messageID, forEveryone)
+  deleteMessage = (threadID: string, messageID: string, forEveryone?: boolean) =>
+    this.api.deleteMessage(threadID, messageID, forEveryone)
 
-  addReaction = (threadID: string, messageID: string, reactionKey: string) => this.api.addReaction(threadID, messageID, reactionKey)
+  addReaction = (threadID: string, messageID: string, reactionKey: string) =>
+    this.api.addReaction(threadID, messageID, reactionKey)
 
-  removeReaction = (threadID: string, messageID: string, reactionKey: string) => this.api.removeReaction(threadID, messageID, reactionKey)
+  removeReaction = (threadID: string, messageID: string, reactionKey: string) =>
+    this.api.removeReaction(threadID, messageID, reactionKey)
 
-  sendActivityIndicator = (type: ActivityType, threadID: string) => this.api.setTyping(type, threadID)
+  sendActivityIndicator = (type: ActivityType, threadID: string) =>
+    this.api.setTyping(type, threadID)
 
-  sendReadReceipt = (threadID: string, messageID: string) => this.api.sendReadReceipt(threadID, messageID)
+  sendReadReceipt = (threadID: string, messageID: string) =>
+    this.api.sendReadReceipt(threadID, messageID)
 }
