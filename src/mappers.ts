@@ -17,8 +17,9 @@ const getEmojiURL = (emojiID: string, animated: boolean) =>
   `https://cdn.discordapp.com/emojis/${emojiID}.${animated ? 'gif' : 'png'}`
 
 const DISCORD_EPOCH = 1420070400000
-function getTimestampFromSnowflake(id: string): Date {
-  const int = BigInt.asUintN(64, BigInt(id))
+function getTimestampFromSnowflake(snowflake: string) {
+  if (!snowflake) return
+  const int = BigInt.asUintN(64, BigInt(snowflake))
   // @ts-expect-error
   const dateBits = Number(int >> 22n)
   return new Date(dateBits + DISCORD_EPOCH)
@@ -58,8 +59,6 @@ export function mapThread(thread: any, isUnread: boolean, currentUser?: User, us
   participants.sort((a, b) => ((a.username ?? '') < (b.username ?? '') ? 1 : -1))
   if (currentUser) participants.push(currentUser)
 
-  const timestamp = thread.last_message_id ? getTimestampFromSnowflake(thread.last_message_id) : undefined
-
   return {
     _original: JSON.stringify(thread),
     id: thread.id,
@@ -69,7 +68,7 @@ export function mapThread(thread: any, isUnread: boolean, currentUser?: User, us
     type,
     imgURL: thread.icon ? getThreadIcon(thread.id, thread.icon) : undefined,
     description: thread.topic,
-    timestamp,
+    timestamp: getTimestampFromSnowflake(thread.last_message_id),
     messages: {
       hasMore: true,
       items: [],
