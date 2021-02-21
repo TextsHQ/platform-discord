@@ -7,6 +7,7 @@ export default class Discord implements PlatformAPI {
   private pollingInterval?: NodeJS.Timeout
 
   init = async (session: any) => {
+    if (!session) return
     await this.api.login(session)
 
     this.api.startPolling = this.startPolling
