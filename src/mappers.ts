@@ -199,17 +199,25 @@ function transformEmojisAndTags(message?: string, userMappings?: Map<string, str
     })
     .replaceAll(USER_REGEX, (matched, user_id, offset) => {
       const username = userMappings.get(user_id)
+      const usernameLength = [...username.slice(0, -5)].length + 1
 
       const entity: TextEntity = {
         from: offset - userOffsetRemoved,
-        to: offset - userOffsetRemoved + (username ? [...username.slice(0, -5)].length + 1 : matched.length),
+        to: offset - userOffsetRemoved + (username ? usernameLength : matched.length),
         mentionedUser: {
           id: user_id,
           username,
         },
       }
 
-      userOffsetRemoved += username ? matched.length - ([...username.slice(0, -5)].length + 1) : 0
+      textAttributes.entities
+        .filter(a => a.from > entity.from)
+        .forEach(a => {
+          a.from -= username ? matched.length - usernameLength : 0
+          a.to -= username ? matched.length - usernameLength : 0
+        })
+
+      userOffsetRemoved += username ? matched.length - usernameLength : 0
       textAttributes.entities.push(entity)
       return username ? `@${username.slice(0, -5)}` : matched
     })
