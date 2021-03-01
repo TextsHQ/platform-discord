@@ -31,12 +31,12 @@ const info: PlatformInfo = {
     `,
   },
   deletionMode: MessageDeletionMode.DELETE_FOR_EVERYONE,
-  /* reactions: {
-    supported: supportedReactions,
+  reactions: {
+    supported: {},
     supportsDynamicReactions: true,
     canReactWithAllEmojis: true,
     allowsMultipleReactionsToSingleMessage: true,
-  }, */
+  },
   attributes: new Set([
     Attribute.SUPPORTS_PRESENCE,
     Attribute.SUPPORTS_STOP_TYPING_INDICATOR,
