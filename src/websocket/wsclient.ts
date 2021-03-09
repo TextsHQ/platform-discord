@@ -139,6 +139,7 @@ export default class WSClient {
 
   private sendHeartbeat = () => {
     // texts.log('[!] Sending heartbeat')
+    if (this.ws.readyState === this.ws.CONNECTING) return
     const payload: GatewayMessage = { op: OPCode.HEARTBEAT, d: this.lastSequenceNumber }
     this.send(payload)
   }
