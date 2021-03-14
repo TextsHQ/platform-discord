@@ -37,54 +37,6 @@ const flatCases = [
     },
   },
   {
-    text:
-      '***bold-italic*** __*under-italic*__ __**under-bold**__ __***under-bold-italic***__',
-    result: {
-      text: 'bold-italic under-italic under-bold under-bold-italic',
-      textAttributes: {
-        entities: [
-          {
-            from: 0,
-            to: 11,
-            bold: true,
-            italic: true,
-          },
-          {
-            from: 12,
-            to: 24,
-            italic: true,
-          },
-          {
-            from: 12,
-            to: 24,
-            underline: true,
-          },
-          {
-            from: 25,
-            to: 35,
-            bold: true,
-          },
-          {
-            from: 25,
-            to: 35,
-            underline: true,
-          },
-          {
-            from: 36,
-            to: 53,
-            bold: true,
-            italic: true,
-          },
-          {
-            from: 36,
-            to: 53,
-            underline: true,
-          },
-        ],
-      },
-    },
-  },
-  {
     text: '*abc*🤔 **xyz** 123',
     result: {
       text: 'abc🤔 xyz 123',
@@ -161,9 +113,75 @@ const flatCases = [
       },
     },
   },
+  {
+    text: 'a <@!1234> b',
+    result: {
+      text: 'a @user1 b',
+      textAttributes: {
+        entities: [
+          {
+            from: 2,
+            to: 8,
+            mentionedUser: {
+              id: '1234',
+              username: 'user1',
+            },
+          },
+        ],
+      },
+    },
+  },
 ]
 
 const nestedCases = [
+  {
+    text:
+      '***bold-italic*** __*under-italic*__ __**under-bold**__ __***under-bold-italic***__',
+    result: {
+      text: 'bold-italic under-italic under-bold under-bold-italic',
+      textAttributes: {
+        entities: [
+          {
+            from: 0,
+            to: 11,
+            bold: true,
+            italic: true,
+          },
+          {
+            from: 12,
+            to: 24,
+            italic: true,
+          },
+          {
+            from: 12,
+            to: 24,
+            underline: true,
+          },
+          {
+            from: 25,
+            to: 35,
+            bold: true,
+          },
+          {
+            from: 25,
+            to: 35,
+            underline: true,
+          },
+          {
+            from: 36,
+            to: 53,
+            bold: true,
+            italic: true,
+          },
+          {
+            from: 36,
+            to: 53,
+            underline: true,
+          },
+        ],
+      },
+    },
+  },
   {
     text: 'x **b _it_ ~~st~~**',
     result: {
@@ -193,8 +211,14 @@ const nestedCases = [
 
 const cases = [flatCases, nestedCases].flat()
 
+const getUserName = (id: string): string => {
+  return {
+    '1234': 'user1',
+  }[id]
+}
+
 test('text attributes', () => {
   for (const c of cases) {
-    expect(mapTextAttributes(c.text)).toEqual(c.result)
+    expect(mapTextAttributes(c.text, getUserName)).toEqual(c.result)
   }
 })

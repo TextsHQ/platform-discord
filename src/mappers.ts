@@ -1,5 +1,6 @@
 import { CurrentUser, Message, MessageActionType, MessageAttachment, MessageAttachmentType, MessageLink, MessageReaction, TextAttributes, TextEntity, Thread, ThreadType, User } from '@textshq/platform-sdk'
 import { MessageType } from './constants'
+import { mapTextAttributes } from './text-attributes'
 
 const USER_REGEX = /<@!(\d*)>/g
 const EMOTE_REGEX = /<(a?):([A-Za-z0-9_]+):(\d+)>/g
@@ -126,7 +127,10 @@ export function mapMessage(message: any, currentUserID: string, reactionsDetails
   Object.assign(mapped, mapMessageType(message))
 
   if (mapped.text) {
-    const { text: transformedMessageText, textAttributes } = transformEmojisAndTags(mapped.text, userMappings)
+    const getUserName = (id: string): string => {
+      return (userMappings.get(id) || '').slice(0, -5)
+    }
+    const { text: transformedMessageText, textAttributes } = mapTextAttributes(mapped.text, getUserName)
     if (transformedMessageText && textAttributes) {
       mapped.text = transformedMessageText
       mapped.textAttributes = textAttributes

@@ -6,32 +6,48 @@
 import emojiRegex from 'emoji-regex'
 import type { TextEntity } from '@textshq/platform-sdk'
 
+const getClosingToken = (token: string): string => (token === '<' ? '>' : token)
+
+const USER_REGEX = /^@!(\d+)$/
+const EMOTE_REGEX = /^(a?):([A-Za-z0-9_]+):(\d+)$/
+
+const isDiscordEntity = (input: string): boolean => {
+  return USER_REGEX.test(input) || EMOTE_REGEX.test(input)
+}
+
 /**
  * Try to find the closing index for curToken.
  */
 const findClosingIndex = (input: string[], curToken: string) => {
-  const tokenLen = curToken.length
-  let closingIndex = input.indexOf(curToken[0])
+  const closingToken = getClosingToken(curToken)
+  const tokenLen = closingToken.length
+  let closingIndex = input.indexOf(closingToken[0])
   while (closingIndex > -1) {
     let tokenMatched = true
     for (let i = 1; i < tokenLen; i++) {
       // When token has more than one char, make sure the chars after the
       // closingIndex fully match token.
-      if (input[closingIndex + i] !== curToken[i]) {
+      if (input[closingIndex + i] !== closingToken[i]) {
         tokenMatched = false
         break
       }
     }
     if (tokenMatched) {
-      return closingIndex
+      if (
+        curToken !== '<' ||
+        isDiscordEntity(input.slice(0, closingIndex).join(''))
+      ) {
+        return closingIndex
+      }
+      return -1
     }
     // If not fully matched, find the next closingIndex
-    closingIndex = input.indexOf(curToken, closingIndex + 1)
+    closingIndex = input.indexOf(closingToken[0], closingIndex + 1)
   }
   return closingIndex
 }
 
-export function mapTextAttributes(src: string) {
+export function mapTextAttributes(src: string, getUserName: (id: string) => string) {
   if (!src) return
 
   const entities: TextEntity[] = []
@@ -48,31 +64,43 @@ export function mapTextAttributes(src: string) {
         const content = input.slice(0, closingIndex).join('')
         // See if we can find nested entities.
         let nestedAttributes = { text: '', textAttributes: undefined }
-        if (!['`', '```'].includes(curToken)) {
-          nestedAttributes = mapTextAttributes(content)
+        if (!['<', '`', '```'].includes(curToken)) {
+          nestedAttributes = mapTextAttributes(content, getUserName)
         }
         const from = Array.from(output).length
-        let to = from + closingIndex
+        // Construct the entity of the current token.
+        const entity: TextEntity = {
+          from,
+          to: from + closingIndex,
+        }
         if (nestedAttributes.textAttributes) {
           // Nested entities change the output, so update the range.
-          to = from + nestedAttributes.text.length
+          entity.to = from + nestedAttributes.text.length
           // Offset the range of child entities.
           const childEntities = nestedAttributes.textAttributes.entities.map(
-            entity => ({
-              ...entity,
-              from: entity.from + from,
-              to: entity.to + from,
+            en => ({
+              ...en,
+              from: en.from + from,
+              to: en.to + from,
             })
           )
           entities.push(...childEntities)
           output += nestedAttributes.text
+        } else if (curToken === '<') {
+          // Handle discord entity: mention or emoji.
+          let matches = USER_REGEX.exec(content)
+          if (matches) {
+            const id = matches[1]
+            const username = getUserName(id)
+            output += `@${username}`
+            entity.to = from + username.length + 1
+            entity.mentionedUser = {
+              id,
+              username
+            }
+          }
         } else {
           output += content
-        }
-        // Construct the entity of the current token.
-        const entity: TextEntity = {
-          from,
-          to,
         }
         switch (curToken) {
           case '***':
@@ -99,6 +127,9 @@ export function mapTextAttributes(src: string) {
           case '`':
             entity.code = true
             break
+          case '<':
+            // Already handled above.
+            break
         }
         entities.push(entity)
         input = input.slice(closingIndex + curToken.length)
@@ -116,7 +147,7 @@ export function mapTextAttributes(src: string) {
     } else if (['**', '__', '~~'].includes(first2)) {
       curToken = first2
       input = input.slice(curToken.length)
-    } else if (['*', '_', '`'].includes(c1)) {
+    } else if (['*', '_', '`', '<'].includes(c1)) {
       curToken = c1
       input = input.slice(curToken.length)
     } else {
