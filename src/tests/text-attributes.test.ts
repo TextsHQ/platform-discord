@@ -246,7 +246,7 @@ const cases = [flatCases, nestedCases].flat()
 
 const getUserName = (id: string): string => {
   return {
-    '1234': 'user1',
+    1234: 'user1',
   }[id]
 }
 

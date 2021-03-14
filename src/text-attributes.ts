@@ -3,7 +3,6 @@
  * https://support.discord.com/hc/en-us/articles/210298617-Markdown-Text-101-Chat-Formatting-Bold-Italic-Underline-
  */
 
-import emojiRegex from 'emoji-regex'
 import type { TextEntity } from '@textshq/platform-sdk'
 
 const getClosingToken = (token: string): string => (token === '<' ? '>' : token)
@@ -37,8 +36,8 @@ const findClosingIndex = (input: string[], curToken: string) => {
     }
     if (tokenMatched) {
       if (
-        curToken !== '<' ||
-        isDiscordEntity(input.slice(0, closingIndex).join(''))
+        curToken !== '<'
+        || isDiscordEntity(input.slice(0, closingIndex).join(''))
       ) {
         return closingIndex
       }
@@ -85,7 +84,7 @@ export function mapTextAttributes(src: string, getUserName: (id: string) => stri
               ...en,
               from: en.from + from,
               to: en.to + from,
-            })
+            }),
           )
           entities.push(...childEntities)
           output += nestedAttributes.text
@@ -99,9 +98,11 @@ export function mapTextAttributes(src: string, getUserName: (id: string) => stri
             entity.to = from + username.length + 1
             entity.mentionedUser = {
               id,
-              username
+              username,
             }
+          // eslint-disable-next-line no-cond-assign
           } else if (matches = EMOTE_REGEX.exec(content)) {
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
             const [_, animated, name, id] = matches
             output += `:${name}:`
             entity.to = from + name.length + 2

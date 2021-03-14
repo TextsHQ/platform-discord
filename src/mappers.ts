@@ -1,9 +1,6 @@
-import { CurrentUser, Message, MessageActionType, MessageAttachment, MessageAttachmentType, MessageLink, MessageReaction, TextAttributes, TextEntity, Thread, ThreadType, User } from '@textshq/platform-sdk'
+import { CurrentUser, Message, MessageActionType, MessageAttachment, MessageAttachmentType, MessageLink, MessageReaction, Thread, ThreadType, User } from '@textshq/platform-sdk'
 import { MessageType } from './constants'
 import { mapTextAttributes } from './text-attributes'
-
-const USER_REGEX = /<@!(\d*)>/g
-const EMOTE_REGEX = /<(a?):([A-Za-z0-9_]+):(\d+)>/g
 
 // https://discord.com/developers/docs/resources/channel#message-object-message-types
 const SUPPORTED_MESSAGE_TYPES = [0, 1, 2, 3, 4, 5, 6, 19]
@@ -172,61 +169,6 @@ function mapAttachment(a): MessageAttachment {
     fileName: a.name || undefined,
     fileSize: a.size || undefined,
   }
-}
-
-function transformEmojisAndTags(message?: string, userMappings?: Map<string, string>) {
-  if (!message) return
-
-  let emojiOffsetRemoved = 0
-  let userOffsetRemoved = 0
-  const textAttributes: TextAttributes = { entities: [] }
-
-  const text: string = message
-    // @ts-expect-error
-    .replaceAll(EMOTE_REGEX, (matched, animated, emote_name, emote_id, offset) => {
-      const entity: TextEntity = {
-        from: offset - emojiOffsetRemoved,
-        to: offset - emojiOffsetRemoved + (emote_name.length + 2),
-        replaceWithMedia: {
-          mediaType: 'img',
-          srcURL: getEmojiURL(emote_id, animated),
-          size: {
-            width: message.length === matched.length ? 64 : 16,
-            height: message.length === matched.length ? 64 : 16,
-          },
-        },
-      }
-
-      emojiOffsetRemoved += matched.length - (emote_name.length + 2)
-      textAttributes.entities.push(entity)
-      return `:${emote_name}:`
-    })
-    .replaceAll(USER_REGEX, (matched, user_id, offset) => {
-      const username = userMappings.get(user_id)
-      const usernameLength = [...username.slice(0, -5)].length + 1
-
-      const entity: TextEntity = {
-        from: offset - userOffsetRemoved,
-        to: offset - userOffsetRemoved + (username ? usernameLength : matched.length),
-        mentionedUser: {
-          id: user_id,
-          username,
-        },
-      }
-
-      textAttributes.entities
-        .filter(a => a.from > entity.from)
-        .forEach(a => {
-          a.from -= username ? matched.length - usernameLength : 0
-          a.to -= username ? matched.length - usernameLength : 0
-        })
-
-      userOffsetRemoved += username ? matched.length - usernameLength : 0
-      textAttributes.entities.push(entity)
-      return username ? `@${username.slice(0, -5)}` : matched
-    })
-
-  return { text, textAttributes }
 }
 
 function mapMessageType(message: any): Partial<Message> {
