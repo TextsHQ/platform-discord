@@ -37,6 +37,21 @@ const flatCases = [
     },
   },
   {
+    text: '**it*',
+    result: {
+      text: '*it',
+      textAttributes: {
+        entities: [
+          {
+            from: 1,
+            to: 3,
+            italic: true,
+          },
+        ],
+      },
+    },
+  },
+  {
     text: '*abc*🤔 **xyz** 123',
     result: {
       text: 'abc🤔 xyz 123',

@@ -135,6 +135,12 @@ export function mapTextAttributes(src: string, getUserName: (id: string) => stri
         input = input.slice(closingIndex + curToken.length)
         curToken = null
         continue
+      } else {
+        // Unable to find a valid closingIndex, add the first char to the
+        // output, push the remainging back to input.
+        output += curToken[0]
+        input.unshift(...curToken.slice(1))
+        curToken = null
       }
     }
     // Always start from the first char.
