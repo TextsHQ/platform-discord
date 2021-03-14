@@ -5,7 +5,8 @@
   "scripts": {
     "postinstall": "yarn tsc || true",
     "build": "yarn tsc",
-    "lint": "eslint src --ext ts,tsx,js,jsx --cache"
+    "lint": "eslint src --ext ts,tsx,js,jsx --cache",
+    "test": "jest"
   },
   "husky": {
     "hooks": {
@@ -23,8 +24,10 @@
   },
   "devDependencies": {
     "@textshq/eslint-config": "https://github.com/TextsHQ/eslint-config",
-    "@types/ws": "^7.4.0",
+    "@types/jest": "^26.0.20",
     "@types/node": "^14.14.25",
-    "electron-rebuild": "^2.3.5"
+    "@types/ws": "^7.4.0",
+    "electron-rebuild": "^2.3.5",
+    "jest": "^26.6.3"
   }
 }
