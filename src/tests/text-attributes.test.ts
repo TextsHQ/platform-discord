@@ -146,6 +146,24 @@ const flatCases = [
       },
     },
   },
+  {
+    text: 'a <a:pika:123> b',
+    result: {
+      text: 'a :pika: b',
+      textAttributes: {
+        entities: [
+          {
+            from: 2,
+            to: 8,
+            replaceWithMedia: {
+              mediaType: 'img',
+              srcURL: 'https://cdn.discordapp.com/emojis/123.gif',
+            },
+          },
+        ],
+      },
+    },
+  },
 ]
 
 const nestedCases = [

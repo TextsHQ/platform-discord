@@ -15,6 +15,9 @@ const isDiscordEntity = (input: string): boolean => {
   return USER_REGEX.test(input) || EMOTE_REGEX.test(input)
 }
 
+const getEmojiURL = (emojiID: string, animated: boolean) =>
+  `https://cdn.discordapp.com/emojis/${emojiID}.${animated ? 'gif' : 'png'}`
+
 /**
  * Try to find the closing index for curToken.
  */
@@ -97,6 +100,14 @@ export function mapTextAttributes(src: string, getUserName: (id: string) => stri
             entity.mentionedUser = {
               id,
               username
+            }
+          } else if (matches = EMOTE_REGEX.exec(content)) {
+            const [_, animated, name, id] = matches
+            output += `:${name}:`
+            entity.to = from + name.length + 2
+            entity.replaceWithMedia = {
+              mediaType: 'img',
+              srcURL: getEmojiURL(id, !!animated),
             }
           }
         } else {
