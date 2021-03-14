@@ -124,9 +124,7 @@ export function mapMessage(message: any, currentUserID: string, reactionsDetails
   Object.assign(mapped, mapMessageType(message))
 
   if (mapped.text) {
-    const getUserName = (id: string): string => {
-      return (userMappings.get(id) || '').slice(0, -5)
-    }
+    const getUserName = (id: string): string => (userMappings.get(id) || '').slice(0, -5)
     const { text: transformedMessageText, textAttributes } = mapTextAttributes(mapped.text, getUserName)
     if (transformedMessageText && textAttributes) {
       mapped.text = transformedMessageText
@@ -177,7 +175,7 @@ function mapMessageType(message: any): Partial<Message> {
       return {
         isAction: true,
         parseTemplate: true,
-        text: `${message.mentions.map(m => `${m.username}#${m.discriminator}`).join(', ')} joined`,
+        text: `${message.mentions.map(m => `{{${m.id}}}`).join(', ')} joined`,
         action: {
           type: MessageActionType.THREAD_PARTICIPANTS_REMOVED,
           participantIDs: message.mentions.map(m => m.id),
@@ -188,7 +186,7 @@ function mapMessageType(message: any): Partial<Message> {
       return {
         isAction: true,
         parseTemplate: true,
-        text: `${message.mentions.map(m => `${m.username}#${m.discriminator}`).join(', ')} left`,
+        text: `${message.mentions.map(m => `{{${m.id}}}`).join(', ')} left`,
         action: {
           type: MessageActionType.THREAD_PARTICIPANTS_REMOVED,
           participantIDs: message.mentions.map(m => m.id),

@@ -95,20 +95,23 @@ export function mapTextAttributes(src: string, getUserName: (id: string) => stri
             const id = matches[1]
             const username = getUserName(id)
             output += `@${username}`
-            entity.to = from + username.length + 1
+            entity.to = from + [...username].length + 1
             entity.mentionedUser = {
               id,
               username,
             }
           // eslint-disable-next-line no-cond-assign
           } else if (matches = EMOTE_REGEX.exec(content)) {
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            const [_, animated, name, id] = matches
+            const [matched, animated, name, id] = matches
             output += `:${name}:`
             entity.to = from + name.length + 2
             entity.replaceWithMedia = {
               mediaType: 'img',
               srcURL: getEmojiURL(id, !!animated),
+              size: {
+                width: matched.length === (src.length - 2) ? 64 : 16,
+                height: matched.length === (src.length - 2) ? 64 : 16,
+              },
             }
           }
         } else {
