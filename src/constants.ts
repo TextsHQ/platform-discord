@@ -1,4 +1,4 @@
-import { SupportedReaction } from '@textshq/platform-sdk'
+import type { SupportedReaction } from '@textshq/platform-sdk'
 
 export enum MessageType {
   DEFAULT = 0,

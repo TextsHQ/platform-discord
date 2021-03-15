@@ -1,4 +1,4 @@
-import { OPCode, GatewayMessageType } from './constants'
+import type { OPCode, GatewayMessageType } from './constants'
 
 /**
  * @typedef {Object} GatewayMessage - Message from the gateway

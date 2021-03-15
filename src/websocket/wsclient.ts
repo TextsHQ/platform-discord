@@ -2,8 +2,8 @@ import os from 'os'
 import WebSocket, { MessageEvent } from 'ws'
 import { texts } from '@textshq/platform-sdk'
 import { DiscordPresenceStatus, OPCode, GatewayMessageType, GatewayCloseCode } from './constants'
-import { GatewayMessage } from './types'
-import { Packer } from '../packers'
+import type { GatewayMessage } from './types'
+import type { Packer } from '../packers'
 
 export default class WSClient {
   private ws?: WebSocket
