@@ -5,6 +5,8 @@ import { DiscordPresenceStatus, OPCode, GatewayMessageType, GatewayCloseCode } f
 import type { GatewayMessage } from './types'
 import type { Packer } from '../packers'
 
+const promiseDelay = (timeout: number) => new Promise(resolve => setTimeout(resolve, timeout))
+
 export default class WSClient {
   private ws?: WebSocket
 
@@ -121,7 +123,17 @@ export default class WSClient {
     }
   }
 
+  private waitAndSend = async (payload: GatewayMessage) => {
+    while (this.ws.readyState === this.ws.CONNECTING) {
+      await promiseDelay(25)
+    }
+    this.send(payload)
+  }
+
   private send = (payload: GatewayMessage) => {
+    if (this.ws.readyState === this.ws.CONNECTING) {
+      return this.waitAndSend(payload)
+    }
     const packed = this.packer.pack(payload)
     this.ws.send(packed)
   }
@@ -131,8 +143,7 @@ export default class WSClient {
       const unpacked = this.packer.unpack(event.data)
       if (unpacked) this.processMessage(unpacked as GatewayMessage)
     } catch (e) {
-      texts.error('Error unpacking: ' + e)
-      texts.error(event)
+      texts.error('Error unpacking:', e, event)
       this.onError?.(e)
     }
   }
@@ -145,7 +156,7 @@ export default class WSClient {
   }
 
   private setHeartbeatInterval = (interval: number) => {
-    texts.log('Heartbeat interval set to ' + interval)
+    texts.log('Heartbeat interval set to', interval)
     this.heartbeatInterval = setInterval(this.sendHeartbeat, interval)
   }
 
