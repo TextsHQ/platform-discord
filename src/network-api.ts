@@ -266,10 +266,6 @@ export default class DiscordNetworkAPI {
     return this.usersPresence
   }
 
-  refresh = () => { }
-
-  // - MARK: Private functions
-
   private getUserFriends = async () => {
     const res = await this.fetch({ method: 'GET', url: 'users/@me/relationships' })
     if (!res?.body) throw new Error('No response')
