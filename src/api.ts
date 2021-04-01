@@ -1,8 +1,8 @@
 import { PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Message, InboxName, MessageContent, PaginationArg, ActivityType, MessageSendOptions, texts, LoginCreds } from '@textshq/platform-sdk'
-import DiscordAPI from './network-api'
+import DiscordNetworkAPI from './network-api'
 
 export default class Discord implements PlatformAPI {
-  private api: DiscordAPI = new DiscordAPI()
+  private api = new DiscordNetworkAPI()
 
   private pollingInterval?: NodeJS.Timeout
 
@@ -37,14 +37,13 @@ export default class Discord implements PlatformAPI {
   }
 
   stopPolling = () => {
-    if (this.pollingInterval) {
-      texts.log('Stopping polling')
-      clearInterval(this.pollingInterval)
-      this.pollingInterval = null
-      this.api.ready = true
-      this.api.setupWebsocket()
-      this.api.refresh()
-    }
+    if (!this.pollingInterval) return
+    texts.log('Stopping polling')
+    clearInterval(this.pollingInterval)
+    this.pollingInterval = null
+    this.api.ready = true
+    this.api.setupWebsocket()
+    this.api.refresh()
   }
 
   serializeSession = () => this.api.token

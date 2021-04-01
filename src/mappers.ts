@@ -50,23 +50,25 @@ const MAP_THREAD_TYPE: ThreadType[] = [
   'single', // GUILD_STORE
 ]
 
-export function mapThread(thread: any, isUnread: boolean, currentUser?: User, userMappings?: Map<string, string>): Thread {
+export function mapThread(thread: any, lastReadMessageID: string, currentUser?: User, userMappings?: Map<string, string>): Thread {
   const type: ThreadType = MAP_THREAD_TYPE[thread.type]
 
   const participants: User[] = thread.recipients?.map(mapUser)
   participants.sort((a, b) => ((a.username ?? '') < (b.username ?? '') ? 1 : -1))
   if (currentUser) participants.push(currentUser)
 
+  const timestamp = getTimestampFromSnowflake(thread.last_message_id)
+  const lastMessageTimestamp = getTimestampFromSnowflake(lastReadMessageID)
   return {
     _original: JSON.stringify(thread),
     id: thread.id,
     title: thread.name,
-    isUnread,
+    isUnread: timestamp > lastMessageTimestamp,
     isReadOnly: false,
     type,
     imgURL: thread.icon ? getThreadIcon(thread.id, thread.icon) : undefined,
     description: thread.topic,
-    timestamp: getTimestampFromSnowflake(thread.last_message_id),
+    timestamp,
     messages: {
       hasMore: true,
       items: [],

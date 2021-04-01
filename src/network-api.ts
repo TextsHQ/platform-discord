@@ -18,52 +18,50 @@ async function sleep(time: number) {
   return new Promise(resolve => setTimeout(resolve, time))
 }
 
-export default class DiscordAPI {
+export default class DiscordNetworkAPI {
   private client?: WSClient
 
   // ID-to-username mappings
   private userMappings: Map<string, string> = new Map()
 
-  private unreadThreads: Map<string, string> = new Map()
+  private readStateMap: Map<string, string> = new Map()
 
   private usersPresence: PresenceMap = {}
 
-  private gotInitialUserData: boolean = false
+  private gotInitialUserData = false
 
-  public token?: string
+  token?: string
 
-  public eventCallback?: OnServerEventCallback
+  eventCallback?: OnServerEventCallback
 
-  public startPolling?: () => void
+  startPolling?: () => void
 
-  public stopPolling?: () => void
+  stopPolling?: () => void
 
-  public ready: boolean = false
+  ready = false
 
-  public currentUser?: CurrentUser
+  currentUser?: CurrentUser
 
-  public userFriends: User[] = []
+  userFriends: User[] = []
 
-  // MARK: - Public functions
-
-  public login = async (token: string) => {
+  login = async (token: string) => {
     if (!token) throw new Error('No token found.')
     this.token = token
     this.setupWebsocket()
   }
 
-  public logout = async () => {
+  logout = async () => {
     this.fetch({ method: 'POST', url: 'auth/logout', json: { provider: null, voip_provider: null } })
     this.client = null
   }
 
-  public dispose = () => {
+  dispose = () => {
     this.ready = false
     this.client?.disconnect()
     this.client = null
   }
 
-  public setupWebsocket = async () => {
+  setupWebsocket = async () => {
     const gatewayRes = await got({ url: `${API_ENDPOINT}/gateway` })
     const gatewayHost = JSON.parse(gatewayRes?.body)?.url as string ?? 'wss://gateway.discord.gg'
     const gatewayFullURL = `${gatewayHost}/?v=8&encoding=${defaultPacker.encoding}`
@@ -75,7 +73,7 @@ export default class DiscordAPI {
     this.setupGatewayListeners()
   }
 
-  public getCurrentUser = async (): Promise<CurrentUser> => {
+  getCurrentUser = async (): Promise<CurrentUser> => {
     const res = await this.fetch({ method: 'GET', url: 'users/@me' })
     if (!res?.body) throw new Error('No response')
 
@@ -88,19 +86,20 @@ export default class DiscordAPI {
     return currentUser
   }
 
-  public getThreads = async (inboxName: InboxName, pagination?: PaginationArg): Promise<Paginated<Thread>> => {
+  getThreads = async (inboxName: InboxName, pagination?: PaginationArg): Promise<Paginated<Thread>> => {
+    await this.waitForInitialData()
     const res = await this.fetch({ method: 'GET', url: 'users/@me/channels' })
     if (!res?.body) throw new Error('No response')
 
     const threads: Thread[] = await Promise.all(JSON.parse(res?.body)
       .sort((a, b) => a.last_message_id - b.last_message_id)
       .reverse()
-      .map(thread => mapThread(thread, this.unreadThreads.get(thread.id) != null, this.currentUser, this.userMappings)))
+      .map(thread => mapThread(thread, this.readStateMap.get(thread.id), this.currentUser, this.userMappings)))
 
     return { items: threads, hasMore: false }
   }
 
-  public createThread = async (userIDs: string[], title?: string): Promise<boolean | Thread> => {
+  createThread = async (userIDs: string[], title?: string): Promise<boolean | Thread> => {
     if (userIDs.length === 1 && userIDs[0] === this.currentUser?.id) return false
 
     await this.waitUntilReady()
@@ -112,14 +111,14 @@ export default class DiscordAPI {
     })
 
     if (!res?.body) throw new Error('No response')
-    return mapThread(JSON.parse(res?.body), false, this.currentUser, this.userMappings)
+    return mapThread(JSON.parse(res?.body), '', this.currentUser, this.userMappings)
   }
 
-  public archiveThread = async (threadID: string) => {
+  archiveThread = async (threadID: string) => {
     await this.fetch({ method: 'DELETE', url: `channels/${threadID}` })
   }
 
-  public getMessages = async (threadID: string, pagination?: PaginationArg): Promise<TextsMessage[]> => {
+  getMessages = async (threadID: string, pagination?: PaginationArg): Promise<TextsMessage[]> => {
     if (!this.currentUser) throw new Error('No current user')
     const currentUser = this.currentUser
 
@@ -153,13 +152,13 @@ export default class DiscordAPI {
     return messages.filter(m => m).sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
   }
 
-  public sendMessage = async (threadID: string, content: MessageContent, options?: MessageSendOptions): Promise<boolean> => {
+  sendMessage = async (threadID: string, content: MessageContent, options?: MessageSendOptions): Promise<boolean> => {
     await this.waitUntilReady()
 
     const method = 'POST'
     const url = `channels/${threadID}/messages`
 
-    // @ts-expect-error
+    // @ts-expect-error replaceAll
     const text = content.text?.replaceAll(/@([^#@]{3,32}#[0-9]{4})/gi, (_, username) => {
       const user = Array.from(this.userMappings).find(u => u[1] === username)
       if (user) return `<@!${user[0]}>`
@@ -211,7 +210,7 @@ export default class DiscordAPI {
     return res?.statusCode === 200
   }
 
-  public editMessage = async (threadID: string, messageID: string, content: MessageContent, options?: MessageSendOptions): Promise<boolean> => {
+  editMessage = async (threadID: string, messageID: string, content: MessageContent, options?: MessageSendOptions): Promise<boolean> => {
     await this.waitUntilReady()
 
     const method = 'PATCH'
@@ -229,7 +228,7 @@ export default class DiscordAPI {
     return res?.statusCode === 200
   }
 
-  public deleteMessage = async (threadID: string, messageID: string, forEveryone?: boolean): Promise<boolean> => {
+  deleteMessage = async (threadID: string, messageID: string, forEveryone?: boolean): Promise<boolean> => {
     if (!forEveryone) return true
 
     await this.waitUntilReady()
@@ -238,36 +237,36 @@ export default class DiscordAPI {
     return res?.statusCode === 204
   }
 
-  public sendReadReceipt = async (threadID: string, messageID: string) => {
+  sendReadReceipt = async (threadID: string, messageID: string) => {
     await this.waitUntilReady()
-    const res = await this.fetch({ method: 'POST', url: `channels/${threadID}/messages/${messageID || this.unreadThreads.get(threadID)}/ack`, json: { token: null } })
-    if (res?.statusCode === 204) this.unreadThreads.delete(threadID)
+    const res = await this.fetch({ method: 'POST', url: `channels/${threadID}/messages/${messageID}/ack`, json: { token: null } })
+    if (res?.statusCode === 204) this.readStateMap.set(threadID, messageID)
   }
 
-  public addReaction = async (threadID: string, messageID: string, reactionKey: string): Promise<boolean> => {
+  addReaction = async (threadID: string, messageID: string, reactionKey: string): Promise<boolean> => {
     await this.waitUntilReady()
 
     const res = await this.fetch({ method: 'PUT', url: `channels/${threadID}/messages/${messageID}/reactions/${encodeURIComponent(reactionKey)}/@me` })
     return res?.statusCode === 204
   }
 
-  public removeReaction = async (threadID: string, messageID: string, reactionKey: string): Promise<boolean> => {
+  removeReaction = async (threadID: string, messageID: string, reactionKey: string): Promise<boolean> => {
     await this.waitUntilReady()
 
     const res = await this.fetch({ method: 'DELETE', url: `channels/${threadID}/messages/${messageID}/reactions/${encodeURIComponent(reactionKey)}/@me` })
     return res?.statusCode === 204
   }
 
-  public setTyping = async (type: ActivityType, threadID: string): Promise<void> => {
+  setTyping = async (type: ActivityType, threadID: string): Promise<void> => {
     if (type === ActivityType.TYPING && this.ready) this.fetch({ method: 'POST', url: `channels/${threadID}/typing` })
   }
 
-  public getUsersPresence = async () => {
-    while (!this.gotInitialUserData) await sleep(1000)
+  getUsersPresence = async () => {
+    await this.waitForInitialData()
     return this.usersPresence
   }
 
-  public refresh = () => { }
+  refresh = () => { }
 
   // - MARK: Private functions
 
@@ -326,11 +325,11 @@ export default class DiscordAPI {
 
           if (ACT_AS_USER) {
             payload.relationships?.forEach(r => this.userMappings.set(r.id, (r.username + '#' + r.discriminator)))
-            payload.read_state?.entries?.filter(p => p.mention_count > 0).forEach(p => this.unreadThreads.set(p.id, p.last_message_id))
+            payload.read_state?.entries?.forEach(p => this.readStateMap.set(p.id, p.last_message_id))
             // apparently there's no presences when acting as a user
           } else {
             payload.relationships?.forEach(r => this.userMappings.set(r.id, (r.user.username + '#' + r.user.discriminator)))
-            payload.read_state?.filter(p => p.mention_count > 0).forEach(p => this.unreadThreads.set(p.id, p.last_message_id))
+            payload.read_state?.forEach(p => this.readStateMap.set(p.id, p.last_message_id))
             payload.presences?.forEach(p => {
               this.usersPresence[p.user.id] = { userID: p.user.id, isActive: p.status === 'online', lastActive: new Date(+p.last_modified) }
             })
@@ -452,8 +451,12 @@ export default class DiscordAPI {
     if (json.message && json.code) texts.error(json)
   }
 
+  private waitForInitialData = async () => {
+    while (!this.gotInitialUserData) await sleep(100)
+  }
+
   private waitUntilReady = async () => {
-    while (!this.ready && WAIT_TILL_READY) await sleep(1000)
+    while (!this.ready && WAIT_TILL_READY) await sleep(100)
   }
 
   private fetch = async ({ headers = {}, ...rest }) => {
