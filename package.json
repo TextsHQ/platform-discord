@@ -18,7 +18,6 @@
     "erlpack": "^0.1.3",
     "eslint": "^7.19.0",
     "form-data": "^3.0.0",
-    "got": "^11.8.1",
     "ws": "^7.4.3"
   },
   "devDependencies": {

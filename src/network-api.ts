@@ -1,7 +1,6 @@
-import got from 'got'
 import fs from 'fs'
 import FormData from 'form-data'
-import { texts, CurrentUser, MessageContent, PaginationArg, Thread, Message as TextsMessage, ServerEventType, OnServerEventCallback, ActivityType, User, InboxName, MessageSendOptions, ReAuthError, PresenceMap, Paginated } from '@textshq/platform-sdk'
+import { texts, CurrentUser, MessageContent, PaginationArg, Thread, Message as TextsMessage, ServerEventType, OnServerEventCallback, ActivityType, User, InboxName, MessageSendOptions, ReAuthError, PresenceMap, Paginated, FetchOptions } from '@textshq/platform-sdk'
 
 import { mapCurrentUser, mapMessage, mapThread, mapUser } from './mappers'
 import WSClient from './websocket/wsclient'
@@ -62,8 +61,8 @@ export default class DiscordNetworkAPI {
   }
 
   setupWebsocket = async () => {
-    const gatewayRes = await got({ url: `${API_ENDPOINT}/gateway` })
-    const gatewayHost = JSON.parse(gatewayRes?.body)?.url as string ?? 'wss://gateway.discord.gg'
+    const gatewayRes = await texts.fetch(`${API_ENDPOINT}/gateway`, { headers: { 'User-Agent': texts.constants.USER_AGENT } })
+    const gatewayHost = JSON.parse(gatewayRes?.body.toString('utf-8'))?.url as string ?? 'wss://gateway.discord.gg'
     const gatewayFullURL = `${gatewayHost}/?v=8&encoding=${defaultPacker.encoding}`
 
     this.client = new WSClient(gatewayFullURL, this.token, ACT_AS_USER, defaultPacker)
@@ -75,9 +74,9 @@ export default class DiscordNetworkAPI {
 
   getCurrentUser = async (): Promise<CurrentUser> => {
     const res = await this.fetch({ method: 'GET', url: 'users/@me' })
-    if (!res?.body) throw new Error('No response')
+    if (!res?.json) throw new Error('No response')
 
-    const currentUser = mapCurrentUser(JSON.parse(res?.body))
+    const currentUser = mapCurrentUser(res?.json)
     this.currentUser = currentUser
     this.userMappings.set(currentUser.id, currentUser.displayText)
 
@@ -89,9 +88,9 @@ export default class DiscordNetworkAPI {
   getThreads = async (inboxName: InboxName, pagination?: PaginationArg): Promise<Paginated<Thread>> => {
     await this.waitForInitialData()
     const res = await this.fetch({ method: 'GET', url: 'users/@me/channels' })
-    if (!res?.body) throw new Error('No response')
+    if (!res?.json) throw new Error('No response')
 
-    const threads: Thread[] = await Promise.all(JSON.parse(res?.body)
+    const threads: Thread[] = await Promise.all(res?.json
       .sort((a, b) => a.last_message_id - b.last_message_id)
       .reverse()
       .map(thread => mapThread(thread, this.readStateMap.get(thread.id), this.currentUser, this.userMappings)))
@@ -110,8 +109,8 @@ export default class DiscordNetworkAPI {
       json: userIDs.length === 1 ? { recipient_id: userIDs[0] } : { recipients: userIDs },
     })
 
-    if (!res?.body) throw new Error('No response')
-    return mapThread(JSON.parse(res?.body), '', this.currentUser, this.userMappings)
+    if (!res?.json) throw new Error('No response')
+    return mapThread(res?.json, '', this.currentUser, this.userMappings)
   }
 
   archiveThread = async (threadID: string) => {
@@ -131,16 +130,16 @@ export default class DiscordNetworkAPI {
 
     const paginationQuery = options.before ? `before=${options.before}` : options.after ? `after=${options.after}` : ''
     const res = await this.fetch({ method: 'GET', url: `channels/${threadID}/messages?limit=50&${paginationQuery}` })
-    if (!res?.body) throw new Error('No response')
+    if (!res?.json) throw new Error('No response')
 
-    const messages: TextsMessage[] = await Promise.all(JSON.parse(res?.body)
+    const messages: TextsMessage[] = await Promise.all(res?.json
       .map(async m => {
         let reactionsDetails
         if (m.reactions) {
           reactionsDetails = await Promise.all(m.reactions.map(async r => {
             const emojiQuery = encodeURIComponent(r.emoji.id ? `${r.emoji.name}:${r.emoji.id}` : r.emoji.name)
             const reactedRes = await this.fetch({ method: 'GET', url: `channels/${threadID}/messages/${m.id}/reactions/${emojiQuery}` })
-            const parsed = JSON.parse(reactedRes?.body)
+            const parsed = reactedRes?.json
             if (parsed) return { emoji: r.emoji, users: parsed }
             return null
           }))
@@ -154,9 +153,6 @@ export default class DiscordNetworkAPI {
 
   sendMessage = async (threadID: string, content: MessageContent, options?: MessageSendOptions): Promise<boolean> => {
     await this.waitUntilReady()
-
-    const method = 'POST'
-    const url = `channels/${threadID}/messages`
 
     // @ts-expect-error replaceAll
     const text = content.text?.replaceAll(/@([^#@]{3,32}#[0-9]{4})/gi, (_, username) => {
@@ -176,7 +172,7 @@ export default class DiscordNetworkAPI {
       requestContent.message_reference = { message_id: options?.quotedMessageID }
     }
 
-    if (content.fileBuffer || content.fileName || content.filePath) {
+    if (content.fileBuffer || content.filePath) {
       const form = new FormData()
       if (content.fileBuffer) {
         form.append('file', content.fileBuffer, {
@@ -205,26 +201,30 @@ export default class DiscordNetworkAPI {
       }
     }
 
-    const requestData = { url, method, headers: requestContent.headers, json: requestContent.json, body: requestContent.body }
-    const res = await this.fetch(requestData)
-    return res?.statusCode === 200
+    const res = await this.fetch({
+      url: `channels/${threadID}/messages`,
+      method: 'POST',
+      headers: requestContent.headers,
+      json: requestContent.json,
+      body: requestContent.body,
+    })
+
+    if (res?.statusCode !== 200) throw Error(res?.json?.message || `invalid response: ${res?.statusCode}`)
+
+    return true
   }
 
   editMessage = async (threadID: string, messageID: string, content: MessageContent, options?: MessageSendOptions): Promise<boolean> => {
     await this.waitUntilReady()
 
-    const method = 'PATCH'
-    const url = `channels/${threadID}/messages/${messageID}`
-
-    // @ts-expect-error
+    // @ts-expect-error replaceAll
     const text = content.text?.replaceAll(/@([^#@]{3,32}#[0-9]{4})/gi, (_, username) => {
       const user = Array.from(this.userMappings).find(u => u[1] === username)
       if (user) return `<@!${user[0]}>`
       return username
     })
 
-    const requestData = { url, method, json: { content: text } }
-    const res = await this.fetch(requestData)
+    const res = await this.fetch({ url: `channels/${threadID}/messages/${messageID}`, method: 'PATCH', json: { content: text } })
     return res?.statusCode === 200
   }
 
@@ -268,8 +268,8 @@ export default class DiscordNetworkAPI {
 
   private getUserFriends = async () => {
     const res = await this.fetch({ method: 'GET', url: 'users/@me/relationships' })
-    if (!res?.body) throw new Error('No response')
-    this.userFriends = JSON.parse(res?.body).filter(f => f.type === 1) // Only friends
+    if (!res?.json) throw new Error('No response')
+    this.userFriends = res?.json.filter(f => f.type === 1) // Only friends
       .map(f => mapUser(f.user))
   }
 
@@ -455,23 +455,31 @@ export default class DiscordNetworkAPI {
     while (!this.ready && WAIT_TILL_READY) await sleep(100)
   }
 
-  private fetch = async ({ headers = {}, ...rest }) => {
+  private fetch = async ({ url, headers = {}, json, ...rest }: FetchOptions & { url: string, json?: any }) => {
     try {
-      const res = await got({
-        throwHttpErrors: false,
-        prefixUrl: API_ENDPOINT,
-        timeout: 10000,
+      const opts: FetchOptions = {
+        // todo timeout: 10000,
+        ...rest,
+        body: json ? JSON.stringify(json) : rest.body,
         headers: {
           'User-Agent': texts.constants.USER_AGENT,
-          'Accept-Encoding': 'gzip, deflate, br',
           Authorization: this.token,
           ...headers,
         },
-        ...rest,
-      })
+      }
+      if (json) {
+        opts.headers['Content-Type'] = 'application/json'
+      }
+      const res = await texts.fetch(API_ENDPOINT + url, opts)
 
-      if (res?.body && JSON.parse(res?.body)) this.handleErrors(JSON.parse(res?.body), res.statusCode)
-      return res
+      const responseJSON = res.body.length ? JSON.parse(res.body.toString('utf-8')) : undefined
+      if (res.body) {
+        if (responseJSON) this.handleErrors(responseJSON, res.statusCode)
+      }
+      return {
+        statusCode: res.statusCode,
+        json: responseJSON,
+      }
     } catch (err) {
       if (err.code === 'ECONNREFUSED' && (err.message.endsWith('0.0.0.0:443') || err.message.endsWith('127.0.0.1:443'))) {
         texts.error('Discord is blocked')
