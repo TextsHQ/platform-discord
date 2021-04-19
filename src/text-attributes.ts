@@ -7,7 +7,14 @@ import type { TextEntity } from '@textshq/platform-sdk'
 
 const getClosingToken = (token: string): string => (token === '<' ? '>' : token)
 
-const USER_REGEX = /^@!(\d+)$/
+// A mention can be
+//   - <@!1234> or <@1234> for user mention
+//   - <@&1234> for role mention
+//   - <#1234> for channel mention
+// See https://discordjs.guide/miscellaneous/parsing-mention-arguments.html#how-discord-mentions-work.
+// const MENTION_REGEX = /^(?:@!?|@&|#)(\d+)$/
+// We are only handling user mention here.
+const USER_REGEX = /^@!?(\d+)$/
 const EMOTE_REGEX = /^(a?):([A-Za-z0-9_]+):(\d+)$/
 
 const isDiscordEntity = (input: string): boolean => {
