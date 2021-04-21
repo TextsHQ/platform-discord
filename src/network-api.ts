@@ -371,10 +371,20 @@ export default class DiscordNetworkAPI {
           }])
           break
 
+        case GatewayMessageType.MESSAGE_DELETE:
+          // payload = { channel_id: '790193575429799966', id: '834478990861402195' }
+          this.eventCallback?.([{
+            type: ServerEventType.STATE_SYNC,
+            mutationType: 'delete',
+            objectName: 'message',
+            objectIDs: { threadID: payload.channel_id },
+            entries: [payload.id],
+          }])
+          break
+
         case GatewayMessageType.CHANNEL_PINS_UPDATE:
         case GatewayMessageType.CHANNEL_UPDATE:
         case GatewayMessageType.MESSAGE_CREATE:
-        case GatewayMessageType.MESSAGE_DELETE:
         case GatewayMessageType.MESSAGE_UPDATE:
           if (payload.guild_id) return
           this.eventCallback?.([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: payload.channel_id }])
