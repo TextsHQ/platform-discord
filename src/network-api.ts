@@ -228,6 +228,11 @@ export default class DiscordNetworkAPI {
     return res?.statusCode === 200
   }
 
+  patchChannel = async (channelID: string, patches: { name?: string, icon?: string }) => {
+    const res = await this.fetch({ url: `channels/${channelID}`, method: 'PATCH', json: patches })
+    return res?.statusCode === 200
+  }
+
   deleteMessage = async (threadID: string, messageID: string, forEveryone?: boolean): Promise<boolean> => {
     if (!forEveryone) return true
 

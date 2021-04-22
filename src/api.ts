@@ -1,5 +1,8 @@
-import { PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Message, InboxName, MessageContent, PaginationArg, ActivityType, MessageSendOptions, texts, LoginCreds } from '@textshq/platform-sdk'
+import { PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Message, InboxName, MessageContent, PaginationArg, ActivityType, MessageSendOptions, texts, LoginCreds, Thread } from '@textshq/platform-sdk'
 import DiscordNetworkAPI from './network-api'
+
+export const getDataURI = (buffer: Buffer, mimeType: string = '') =>
+  `data:${mimeType};base64,${buffer.toString('base64')}`
 
 export default class Discord implements PlatformAPI {
   private api = new DiscordNetworkAPI()
@@ -95,4 +98,12 @@ export default class Discord implements PlatformAPI {
 
   sendReadReceipt = (threadID: string, messageID: string) =>
     this.api.sendReadReceipt(threadID, messageID)
+
+  updateThread = (threadID: string, updates: Partial<Thread>) => {
+    if ('title' in updates) return this.api.patchChannel(threadID, { name: updates.title })
+  }
+
+  changeThreadImage = async (threadID: string, imageBuffer: Buffer, mimeType: string) => {
+    await this.api.patchChannel(threadID, { icon: getDataURI(imageBuffer, mimeType) })
+  }
 }
