@@ -14,6 +14,9 @@ const getThreadIcon = (threadID: string, iconID: string) =>
 const getEmojiURL = (emojiID: string, animated: boolean) =>
   `https://cdn.discordapp.com/emojis/${emojiID}.${animated ? 'gif' : 'png'}`
 
+const getStickerURL = (id: string, asset: string, ext: string) =>
+  `https://discord.com/stickers/${id}/${asset}.${ext}`
+
 const DISCORD_EPOCH = 1420070400000
 function getTimestampFromSnowflake(snowflake: string) {
   if (!snowflake) return
@@ -83,7 +86,10 @@ export function mapThread(thread: any, lastReadMessageID: string, currentUser?: 
 export function mapMessage(message: any, currentUserID: string, reactionsDetails?: any[], userMappings?: Map<string, string>): Message | null {
   if (!SUPPORTED_MESSAGE_TYPES.includes(message.type)) return null
 
-  const attachments = message.attachments.map(mapAttachment)
+  const attachments = [
+    ...(message.attachments?.map(mapAttachment) || []),
+    ...(message.stickers?.map(mapSticker) || []),
+  ].filter(Boolean)
 
   const links: MessageLink[] = message.embeds
     .filter(e => e.type === 'article' || e.type === 'link' || e.type === 'video' || e.type === 'rich')
@@ -113,7 +119,7 @@ export function mapMessage(message: any, currentUserID: string, reactionsDetails
     editedTimestamp: message.edited_timestamp ? new Date(message.edited_timestamp) : undefined,
     senderID: message.author.id,
     text: message.content,
-    attachments,
+    attachments: attachments.length > 0 ? attachments : undefined,
     links,
     reactions,
     isSender: currentUserID === message.author.id,
@@ -168,6 +174,31 @@ function mapAttachment(a): MessageAttachment {
     posterImg: a.proxyURL,
     fileName: a.name || undefined,
     fileSize: a.size || undefined,
+  }
+}
+
+// https://discord.com/developers/docs/resources/channel#message-object-message-sticker-format-types
+enum StickerFormat {
+  PNG = 1,
+  APNG = 2,
+  LOTTIE = 3,
+}
+
+function mapSticker(sticker: any): MessageAttachment {
+  // non-lottie stickers are untested
+  const ext = {
+    [StickerFormat.PNG]: 'png',
+    [StickerFormat.APNG]: 'apng',
+    [StickerFormat.LOTTIE]: 'json',
+  }[sticker.format_type]
+  return {
+    id: sticker.id,
+    type: MessageAttachmentType.IMG,
+    mimeType: ext === 'json' ? 'image/lottie' : `image/${ext}`,
+    isSticker: true,
+    srcURL: getStickerURL(sticker.id, sticker.asset, ext),
+    fileName: sticker.name,
+    size: { width: 160, height: 160 },
   }
 }
 

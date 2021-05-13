@@ -1,0 +1,43 @@
+{
+  "id": "842450586368606218",
+  "type": 0,
+  "content": "<@!550905327705391144>",
+  "channel_id": "834692683553177600",
+  "author": {
+    "id": "510479576259100672",
+    "username": "Kunal Bagaria",
+    "avatar": "fad32fc400d8fc6005dadc0638377048",
+    "discriminator": "5455",
+    "public_flags": 64
+  },
+  "attachments": [],
+  "embeds": [],
+  "mentions": [
+    {
+      "id": "550905327705391144",
+      "username": "Kishan Bagaria",
+      "avatar": "78f8d35bb3ce2a58f82f07cb72fc7d2e",
+      "discriminator": "6239",
+      "public_flags": 0
+    }
+  ],
+  "mention_roles": [],
+  "pinned": false,
+  "mention_everyone": false,
+  "tts": false,
+  "timestamp": "2021-05-13T17:17:51.765000+00:00",
+  "edited_timestamp": null,
+  "flags": 0,
+  "components": [],
+  "stickers": [
+    {
+      "id": "749049128012742676",
+      "name": "On My Way",
+      "description": "Wumpus zipping by on a monowheel",
+      "pack_id": "749043879713701898",
+      "asset": "2bdc1e6172c2f102a3ee750d596ef97f",
+      "format_type": 3,
+      "tags": "wumpus, on my way, omw, brt, be right there, coming, :omw, 🏃‍♀️, 🏃🏻‍♀️, 🏃🏼‍♀️, 🏃🏽‍♀️, 🏃🏾‍♀️, 🏃🏿‍♀️, 🏃‍♂️, 🏃🏻‍♂️, 🏃🏼‍♂️, 🏃🏽‍♂️, 🏃🏾‍♂️, 🏃🏿‍♂️, driving, 🚗, 🚙, 🚕, 🏍"
+    }
+  ]
+}
