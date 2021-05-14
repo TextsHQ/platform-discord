@@ -42,7 +42,7 @@ const info: PlatformInfo = {
     Attribute.SUPPORTS_STOP_TYPING_INDICATOR,
     Attribute.SUPPORTS_QUOTED_MESSAGES,
     Attribute.SUPPORTS_GROUP_IMAGE_CHANGE,
-    Attribute.SUPPORTS_ARCHIVE,
+    // Attribute.SUPPORTS_ARCHIVE,
     Attribute.SUBSCRIBE_TO_CONN_STATE_CHANGE,
   ]),
   attachments: {

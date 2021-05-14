@@ -113,6 +113,7 @@ export default class DiscordNetworkAPI {
     return mapThread(res?.json, '', this.currentUser, this.userMappings)
   }
 
+  /** https://discord.com/developers/docs/resources/channel#deleteclose-channel */
   archiveThread = async (threadID: string) => {
     await this.fetch({ method: 'DELETE', url: `channels/${threadID}` })
   }
