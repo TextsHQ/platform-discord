@@ -19,15 +19,16 @@ const info: PlatformInfo = {
     runJSOnClose: 'token',
     runJSOnLaunch: `
       let token = ""
-      const iframe = document.createElement('iframe');
-      document.head.append(iframe);
+      const iframe = document.createElement('iframe')
+      document.head.append(iframe)
       const i = setInterval(() => {
-        if (iframe.contentWindow.localStorage.token) {
-          token = iframe.contentWindow.localStorage.token.slice(1, -1);
-          clearInterval(i);
-          setTimeout(() => window.close(), 100)
+        const t = iframe.contentWindow.localStorage.token
+        if (t) {
+          token = t.slice(1, -1)
+          clearInterval(i)
+          setTimeout(() => window.close(), 500)
         }
-      }, 100)
+      }, 200)
     `,
   },
   deletionMode: MessageDeletionMode.DELETE_FOR_EVERYONE,

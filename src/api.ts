@@ -20,7 +20,7 @@ export default class Discord implements PlatformAPI {
   dispose = () => this.api.dispose()
 
   login = async ({ jsCodeResult }: LoginCreds): Promise<LoginResult> => {
-    if (!jsCodeResult) return { type: 'error' }
+    if (!jsCodeResult) return { type: 'error', errorMessage: 'Token was empty' }
     await this.api.login(jsCodeResult)
     return { type: 'success' }
   }
