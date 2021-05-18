@@ -67,7 +67,7 @@ export function mapThread(thread: any, lastReadMessageID: string, currentUser?: 
     id: thread.id,
     title: thread.name,
     isUnread: timestamp > lastMessageTimestamp,
-    isReadOnly: thread.system,
+    isReadOnly: thread.recipients[0]?.system,
     type,
     imgURL: thread.icon ? getThreadIcon(thread.id, thread.icon) : undefined,
     description: thread.topic,
