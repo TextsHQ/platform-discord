@@ -118,9 +118,21 @@ export default class DiscordNetworkAPI {
     await this.fetch({ method: 'DELETE', url: `channels/${threadID}` })
   }
 
-  getMessages = async (threadID: string, pagination?: PaginationArg): Promise<TextsMessage[]> => {
+  getMessage = async (message: any, threadID: string) => {
+    const reactionsDetails = message.reactions
+      ? await Promise.all(message.reactions.map(async r => {
+        const emojiQuery = encodeURIComponent(r.emoji.id ? `${r.emoji.name}:${r.emoji.id}` : r.emoji.name)
+        const reactedRes = await this.fetch({ method: 'GET', url: `channels/${threadID}/messages/${message.id}/reactions/${emojiQuery}` })
+        const parsed = reactedRes?.json
+        if (parsed) return { emoji: r.emoji, users: parsed }
+        return null
+      }))
+      : undefined
+    return mapMessage(message, this.currentUser.id, reactionsDetails, this.userMappings)
+  }
+
+  getMessages = async (threadID: string, pagination?: PaginationArg) => {
     if (!this.currentUser) throw new Error('No current user')
-    const currentUser = this.currentUser
 
     await this.waitUntilReady()
 
@@ -133,23 +145,8 @@ export default class DiscordNetworkAPI {
     const res = await this.fetch({ method: 'GET', url: `channels/${threadID}/messages?limit=50&${paginationQuery}` })
     if (!res?.json) throw new Error('No response')
 
-    const messages: TextsMessage[] = await Promise.all(res?.json
-      .map(async m => {
-        let reactionsDetails
-        if (m.reactions) {
-          reactionsDetails = await Promise.all(m.reactions.map(async r => {
-            const emojiQuery = encodeURIComponent(r.emoji.id ? `${r.emoji.name}:${r.emoji.id}` : r.emoji.name)
-            const reactedRes = await this.fetch({ method: 'GET', url: `channels/${threadID}/messages/${m.id}/reactions/${emojiQuery}` })
-            const parsed = reactedRes?.json
-            if (parsed) return { emoji: r.emoji, users: parsed }
-            return null
-          }))
-        }
-
-        return mapMessage(m, currentUser.id, reactionsDetails, this.userMappings)
-      }))
-
-    return messages.filter(m => m).sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
+    const messages = await Promise.all((res?.json as any[]).map(m => this.getMessage(m, threadID)))
+    return messages.filter(Boolean).sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
   }
 
   mapMentions = (text: string) => {
