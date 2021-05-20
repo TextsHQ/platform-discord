@@ -152,15 +152,19 @@ export default class DiscordNetworkAPI {
     return messages.filter(m => m).sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
   }
 
-  sendMessage = async (threadID: string, content: MessageContent, options?: MessageSendOptions): Promise<boolean> => {
-    await this.waitUntilReady()
-
+  mapMentions = (text: string) => {
     // @ts-expect-error replaceAll
-    const text = content.text?.replaceAll(/@([^#@]{3,32}#[0-9]{4})/gi, (_, username) => {
+    return text?.replaceAll(/@([^#@]{3,32}#[0-9]{4})/gi, (_, username) => {
       const user = Array.from(this.userMappings).find(u => u[1] === username)
       if (user) return `<@!${user[0]}>`
       return username
     })
+  }
+
+  sendMessage = async (threadID: string, content: MessageContent, options?: MessageSendOptions): Promise<boolean> => {
+    await this.waitUntilReady()
+
+    const text = this.mapMentions(content.text)
 
     const requestContent = {
       headers: {},
@@ -218,12 +222,7 @@ export default class DiscordNetworkAPI {
   editMessage = async (threadID: string, messageID: string, content: MessageContent, options?: MessageSendOptions): Promise<boolean> => {
     await this.waitUntilReady()
 
-    // @ts-expect-error replaceAll
-    const text = content.text?.replaceAll(/@([^#@]{3,32}#[0-9]{4})/gi, (_, username) => {
-      const user = Array.from(this.userMappings).find(u => u[1] === username)
-      if (user) return `<@!${user[0]}>`
-      return username
-    })
+    const text = this.mapMentions(content.text)
 
     const res = await this.fetch({ url: `channels/${threadID}/messages/${messageID}`, method: 'PATCH', json: { content: text } })
     return res?.statusCode === 200
