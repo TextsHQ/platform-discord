@@ -390,9 +390,18 @@ export default class DiscordNetworkAPI {
         case GatewayMessageType.CHANNEL_PINS_UPDATE:
         case GatewayMessageType.CHANNEL_UPDATE:
         case GatewayMessageType.MESSAGE_CREATE:
-        case GatewayMessageType.MESSAGE_UPDATE:
           if (payload.guild_id) return
           this.eventCallback?.([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: payload.channel_id }])
+          break
+
+        case GatewayMessageType.MESSAGE_UPDATE:
+          this.eventCallback?.([{
+            type: ServerEventType.STATE_SYNC,
+            mutationType: 'update',
+            objectName: 'message',
+            objectIDs: { threadID: payload.channel_id },
+            entries: [mapMessage(payload, this.currentUser.id, undefined, this.userMappings)],
+          }])
           break
 
         case GatewayMessageType.MESSAGE_ACK:

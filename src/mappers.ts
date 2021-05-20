@@ -110,7 +110,7 @@ export function mapMessage(message: any, currentUserID: string, reactionsDetails
       reactionKey: r.emoji.id ? getEmojiURL(r.emoji.id, r.emoji.animated) : r.emoji.name,
       participantID: u.id,
       emoji: true,
-    }))) || []
+    })))
 
   const mapped: Message = {
     _original: JSON.stringify(message),
@@ -121,13 +121,14 @@ export function mapMessage(message: any, currentUserID: string, reactionsDetails
     text: message.content,
     attachments: attachments.length > 0 ? attachments : undefined,
     links,
-    reactions,
     isSender: currentUserID === message.author.id,
     linkedMessageID: message.referenced_message?.id,
     isDeleted: message.deleted,
     cursor: message.id,
     threadID: message.channel_id,
   }
+  // reactions property should only be present if they exist, or state sync message update event will remove the reactions
+  if (reactions) mapped.reactions = reactions
 
   Object.assign(mapped, mapMessageType(message))
 
