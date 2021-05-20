@@ -1,5 +1,3 @@
-import type { SupportedReaction } from '@textshq/platform-sdk'
-
 export enum MessageType {
   DEFAULT = 0,
   RECIPIENT_ADD = 1,
@@ -20,7 +18,16 @@ export enum MessageType {
   APPLICATION_COMMAND = 20,
 }
 
-export const tempSupportedReactions: Record<string, SupportedReaction> = {
-  '❤️': { title: 'Heart', render: '❤️' },
-  'chocoAYAYA:503343473349361675': { title: 'chocoAYAYA', render: 'https://cdn.discordapp.com/emojis/503343473349361675.png' },
+export enum ChannelType {
+  GUILD_TEXT = 0, // a text channel within a server
+  DM = 1, // a direct message between users
+  GUILD_VOICE = 2, // a voice channel within a server
+  GROUP_DM = 3, // a direct message between multiple users
+  GUILD_CATEGORY = 4, // an organizational category that contains up to 50 channels
+  GUILD_NEWS = 5, // a channel that users can follow and crosspost into their own server
+  GUILD_STORE = 6, // a channel in which game developers can sell their game on Discord
+  GUILD_NEWS_THREAD = 10, // a temporary sub-channel within a GUILD_NEWS channel
+  GUILD_PUBLIC_THREAD = 11, // a temporary sub-channel within a GUILD_TEXT channel
+  GUILD_PRIVATE_THREAD = 12, // a temporary sub-channel within a GUILD_TEXT channel that is only viewable by those invited  and those with the MANAGE_THREADS permission
+  GUILD_STAGE_VOICE = 13, // a voice channel for hosting events with an audience
 }

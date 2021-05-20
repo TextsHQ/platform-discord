@@ -2,7 +2,7 @@ import fs from 'fs'
 import FormData from 'form-data'
 import { texts, CurrentUser, MessageContent, PaginationArg, Thread, Message as TextsMessage, ServerEventType, OnServerEventCallback, ActivityType, User, InboxName, MessageSendOptions, ReAuthError, PresenceMap, Paginated, FetchOptions } from '@textshq/platform-sdk'
 
-import { mapCurrentUser, mapMessage, mapThread, mapUser } from './mappers'
+import { mapChannel, mapCurrentUser, mapMessage, mapThread, mapUser } from './mappers'
 import WSClient from './websocket/wsclient'
 import { GatewayCloseCode, GatewayMessageType } from './websocket/constants'
 import { defaultPacker } from './packers'
@@ -12,6 +12,7 @@ const WAIT_TILL_READY = true
 const RESTART_ON_FAIL = true
 const LIMIT_COUNT = 25
 const ACT_AS_USER = false
+const ENABLE_GUILDS = true
 
 async function sleep(time: number) {
   return new Promise(resolve => setTimeout(resolve, time))
@@ -24,6 +25,8 @@ export default class DiscordNetworkAPI {
   private userMappings: Map<string, string> = new Map()
 
   private readStateMap: Map<string, string> = new Map()
+
+  private channelsMap?: Map<string, any>
 
   private usersPresence: PresenceMap = {}
 
@@ -42,6 +45,12 @@ export default class DiscordNetworkAPI {
   currentUser?: CurrentUser
 
   userFriends: User[] = []
+
+  constructor() {
+    if (ENABLE_GUILDS) {
+      this.channelsMap = new Map()
+    }
+  }
 
   login = async (token: string) => {
     if (!token) throw new Error('No token found.')
@@ -93,7 +102,7 @@ export default class DiscordNetworkAPI {
     const threads: Thread[] = await Promise.all(res?.json
       .sort((a, b) => a.last_message_id - b.last_message_id)
       .reverse()
-      .map(thread => mapThread(thread, this.readStateMap.get(thread.id), this.currentUser, this.userMappings)))
+      .map(thread => mapThread(thread, this.readStateMap.get(thread.id), this.currentUser)))
 
     return { items: threads, hasMore: false }
   }
@@ -110,7 +119,7 @@ export default class DiscordNetworkAPI {
     })
 
     if (!res?.json) throw new Error('No response')
-    return mapThread(res?.json, '', this.currentUser, this.userMappings)
+    return mapThread(res?.json, '', this.currentUser)
   }
 
   /** https://discord.com/developers/docs/resources/channel#deleteclose-channel */
@@ -300,6 +309,7 @@ export default class DiscordNetworkAPI {
           break
         case GatewayCloseCode.AUTHENTICATION_FAILED:
           this.client = null
+          // eslint-disable-next-line @typescript-eslint/no-throw-literal
           throw new ReAuthError('Access token invalid')
         case GatewayCloseCode.SESSION_TIMED_OUT:
           texts.log('Gateway session timed out.')
@@ -319,6 +329,7 @@ export default class DiscordNetworkAPI {
           break
 
         case GatewayMessageType.INVALID_SESSION:
+          this.ready = false
           break
 
         case GatewayMessageType.READY:
@@ -337,6 +348,21 @@ export default class DiscordNetworkAPI {
             })
           }
 
+          if (ENABLE_GUILDS) {
+            payload.guilds.forEach(guild => {
+              const guildID: string = guild.id
+              const guildName: string = guild.name
+              const guildJoinDate: Date = new Date(guild.joined_at)
+              const guildIconID: string | undefined = guild.icon
+
+              const channels = guild.channels.map(c => mapChannel(c, guildID, guildName, guildJoinDate, guildIconID))
+              this.channelsMap.set(guild.id, channels)
+            })
+
+            payload.guilds.forEach(g => this.channelsMap?.set(g.id, g.channels.map(mapChannel)))
+            console.log(payload)
+          }
+
           this.gotInitialUserData = true
           break
 
@@ -344,10 +370,11 @@ export default class DiscordNetworkAPI {
           break
 
         case GatewayMessageType.RESUMED:
+          this.ready = true
           break
 
         case GatewayMessageType.CHANNEL_CREATE:
-          if (payload.guild_id) return
+          if (payload.guild_id && !ENABLE_GUILDS) return
           this.eventCallback?.([{
             type: ServerEventType.STATE_SYNC,
             mutationType: 'update',
@@ -365,7 +392,7 @@ export default class DiscordNetworkAPI {
           break
 
         case GatewayMessageType.CHANNEL_DELETE:
-          if (payload.guild_id) return
+          if (payload.guild_id && !ENABLE_GUILDS) return
           this.eventCallback?.([{
             type: ServerEventType.STATE_SYNC,
             mutationType: 'delete',
@@ -392,7 +419,7 @@ export default class DiscordNetworkAPI {
         case GatewayMessageType.CHANNEL_UPDATE:
         case GatewayMessageType.MESSAGE_CREATE:
         case GatewayMessageType.MESSAGE_UPDATE:
-          if (payload.guild_id) return
+          if (payload.guild_id && !ENABLE_GUILDS) return
           this.eventCallback?.([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: payload.channel_id }])
           break
 
@@ -413,17 +440,17 @@ export default class DiscordNetworkAPI {
           }])
           break
 
-        case GatewayMessageType.MESSAGE_DELETE_BULK: {
-          const messages = ACT_AS_USER ? payload.filter(m => !m.guild_id) : payload
+        case GatewayMessageType.MESSAGE_DELETE_BULK:
+          // eslint-disable-next-line no-case-declarations
+          const messages = payload.filter(m => !m.guild_id)
           this.eventCallback?.(messages.map(m => ({ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: m.channel_id })))
           break
-        }
 
         case GatewayMessageType.MESSAGE_REACTION_ADD:
         case GatewayMessageType.MESSAGE_REACTION_REMOVE:
         case GatewayMessageType.MESSAGE_REACTION_REMOVE_ALL:
         case GatewayMessageType.MESSAGE_REACTION_REMOVE_EMOJI:
-          if (payload.guild_id) return
+          if (payload.guild_id && !ENABLE_GUILDS) return
           this.eventCallback?.([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: payload.channel_id }])
           break
 
@@ -432,7 +459,7 @@ export default class DiscordNetworkAPI {
           break
 
         case GatewayMessageType.PRESENCE_UPDATE:
-          if (payload.guild_id) return
+          if (payload.guild_id && !ENABLE_GUILDS) return
           this.usersPresence[payload.user.id] = { userID: payload.user.id, isActive: payload.status === 'online', lastActive: new Date(+payload.last_modified) }
           this.eventCallback?.([{
             type: ServerEventType.USER_PRESENCE_UPDATED,
@@ -459,6 +486,7 @@ export default class DiscordNetworkAPI {
   }
 
   private handleErrors = (json: any, statusCode: number) => {
+    // eslint-disable-next-line @typescript-eslint/no-throw-literal
     if (statusCode === 401) throw new ReAuthError('Unauthorized')
     if (json.message && json.code) texts.error(json)
   }

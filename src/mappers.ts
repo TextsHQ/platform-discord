@@ -5,11 +5,26 @@ import { mapTextAttributes } from './text-attributes'
 // https://discord.com/developers/docs/resources/channel#message-object-message-types
 const SUPPORTED_MESSAGE_TYPES = [0, 1, 2, 3, 4, 5, 6, 19]
 
+const MAP_THREAD_TYPE: ThreadType[] = [
+  'group', // GUILD_TEXT
+  'single', // DM
+  'group', // GUILD_VOICE
+  'group', // GROUP_DM
+  'group', // GUILD_CATEGORY
+  'single', // GUILD_NEWS
+  'single', // GUILD_STORE
+]
+
+const DISCORD_EPOCH = 1420070400000
+
 const getUserAvatar = (userID: string, avatarID: string) =>
   `https://cdn.discordapp.com/avatars/${userID}/${avatarID}.${avatarID.startsWith('a_') ? 'gif' : 'png'}?size=256`
 
 const getThreadIcon = (threadID: string, iconID: string) =>
   `https://cdn.discordapp.com/channel-icons/${threadID}/${iconID}.png`
+
+const getGuildIcon = (guildID: string, iconID: string) =>
+  `https://cdn.discordapp.com/icons/${guildID}/${iconID}.png`
 
 const getEmojiURL = (emojiID: string, animated: boolean) =>
   `https://cdn.discordapp.com/emojis/${emojiID}.${animated ? 'gif' : 'png'}`
@@ -17,7 +32,6 @@ const getEmojiURL = (emojiID: string, animated: boolean) =>
 const getStickerURL = (id: string, asset: string, ext: string) =>
   `https://discord.com/stickers/${id}/${asset}.${ext}`
 
-const DISCORD_EPOCH = 1420070400000
 function getTimestampFromSnowflake(snowflake: string) {
   if (!snowflake) return
   const int = BigInt.asUintN(64, BigInt(snowflake))
@@ -43,17 +57,31 @@ export function mapCurrentUser(user: any): CurrentUser {
   }
 }
 
-const MAP_THREAD_TYPE: ThreadType[] = [
-  'group', // GUILD_TEXT
-  'single', // DM
-  'group', // GUILD_VOICE
-  'group', // GROUP_DM
-  'group', // GUILD_CATEGORY
-  'single', // GUILD_NEWS
-  'single', // GUILD_STORE
-]
+export function mapChannel(channel: any, guildID: string, guildName: string, guildJoinDate: Date, guildIconID?: string): Thread {
+  return {
+    _original: JSON.stringify(channel),
+    folderName: guildName,
+    id: channel.id,
+    title: channel.name,
+    isUnread: false, // check it somehow
+    isReadOnly: false, // check permissions
+    mutedUntil: null, // muted ? 'forever' : undefined
+    type: 'channel', // 'channel' | 'broadcast'
+    imgURL: guildIconID ? getGuildIcon(guildID, guildIconID) : undefined,
+    createdAt: guildJoinDate,
+    description: channel.topic,
+    messages: {
+      items: [],
+      hasMore: true,
+    },
+    participants: {
+      items: [],
+      hasMore: true,
+    },
+  }
+}
 
-export function mapThread(thread: any, lastReadMessageID: string, currentUser?: User, userMappings?: Map<string, string>): Thread {
+export function mapThread(thread: any, lastReadMessageID: string, currentUser?: User): Thread {
   const type: ThreadType = MAP_THREAD_TYPE[thread.type]
 
   const participants: User[] = thread.recipients?.map(mapUser)
