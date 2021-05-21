@@ -6,13 +6,13 @@ import { mapTextAttributes } from './text-attributes'
 const SUPPORTED_MESSAGE_TYPES = [0, 1, 2, 3, 4, 5, 6, 19]
 
 const MAP_THREAD_TYPE: ThreadType[] = [
-  'group', // GUILD_TEXT
+  'channel', // GUILD_TEXT
   'single', // DM
-  'group', // GUILD_VOICE
+  'channel', // GUILD_VOICE
   'group', // GROUP_DM
-  'group', // GUILD_CATEGORY
-  'single', // GUILD_NEWS
-  'single', // GUILD_STORE
+  'channel', // GUILD_CATEGORY
+  'broadcast', // GUILD_NEWS
+  'broadcast', // GUILD_STORE
 ]
 
 const DISCORD_EPOCH = 1420070400000

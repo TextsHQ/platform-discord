@@ -11,7 +11,7 @@ const API_ENDPOINT = 'https://discord.com/api/v8/'
 const WAIT_TILL_READY = true
 const RESTART_ON_FAIL = true
 const LIMIT_COUNT = 25
-const ACT_AS_USER = false
+const ACT_AS_USER = true
 const ENABLE_GUILDS = true
 
 async function sleep(time: number) {
@@ -358,15 +358,17 @@ export default class DiscordNetworkAPI {
               const channels = guild.channels.map(c => mapChannel(c, guildID, guildName, guildJoinDate, guildIconID))
               this.channelsMap.set(guild.id, channels)
             })
-
-            payload.guilds.forEach(g => this.channelsMap?.set(g.id, g.channels.map(mapChannel)))
-            console.log(payload)
           }
 
           this.gotInitialUserData = true
           break
 
+        case GatewayMessageType.READY_SUPPLEMENTAL:
+          console.log('READY_SUPPLEMENTAL')
+          break
+
         case GatewayMessageType.RECONNECT:
+          console.log('RECONNECT')
           break
 
         case GatewayMessageType.RESUMED:
@@ -405,7 +407,6 @@ export default class DiscordNetworkAPI {
           break
 
         case GatewayMessageType.MESSAGE_DELETE:
-          // payload = { channel_id: '790193575429799966', id: '834478990861402195' }
           this.eventCallback?.([{
             type: ServerEventType.STATE_SYNC,
             mutationType: 'delete',
@@ -423,7 +424,19 @@ export default class DiscordNetworkAPI {
           this.eventCallback?.([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: payload.channel_id }])
           break
 
+        case GatewayMessageType.MESSAGE_DELETE_BULK: {
+          if (ACT_AS_USER) {
+            console.log('MDB', payload)
+          } else {
+            console.log('MDB', payload)
+          }
+
+          // this.eventCallback?.(messages.map(m => ({ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: m.channel_id })))
+          break
+        }
+
         case GatewayMessageType.MESSAGE_ACK:
+        case GatewayMessageType.CHANNEL_UNREAD_UPDATE:
           this.eventCallback?.([{
             type: ServerEventType.STATE_SYNC,
             mutationType: 'update',
@@ -438,12 +451,6 @@ export default class DiscordNetworkAPI {
               },
             ],
           }])
-          break
-
-        case GatewayMessageType.MESSAGE_DELETE_BULK:
-          // eslint-disable-next-line no-case-declarations
-          const messages = payload.filter(m => !m.guild_id)
-          this.eventCallback?.(messages.map(m => ({ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: m.channel_id })))
           break
 
         case GatewayMessageType.MESSAGE_REACTION_ADD:
@@ -472,6 +479,8 @@ export default class DiscordNetworkAPI {
           break
 
         case GatewayMessageType.USER_UPDATE:
+        case GatewayMessageType.USER_SETTINGS_UPDATE:
+          console.log('USER_*', opcode, type, payload)
           break
 
         case GatewayMessageType.RELATIONSHIP_ADD:
@@ -479,7 +488,55 @@ export default class DiscordNetworkAPI {
           this.getUserFriends()
           break
 
+        case GatewayMessageType.GUILD_CREATE: {
+          if (!ENABLE_GUILDS) return
+
+          const guildID = payload.id
+          /* this.eventCallback?.([{
+            type: ServerEventType.STATE_SYNC,
+            mutationType: 'update',
+            objectName: 'thread',
+            objectIDs: {
+              threadID: payload.id,
+            },
+            entries: [
+              {
+                id: payload.id,
+                isUnread: true,
+              },
+            ],
+          }]) */
+          break
+        }
+
+        case GatewayMessageType.GUILD_UPDATE:
+          if (!ENABLE_GUILDS) return
+
+          console.log('GUILD_UPDATE', payload)
+          break
+
+        case GatewayMessageType.GUILD_DELETE: {
+          if (!ENABLE_GUILDS) return
+          const guildID = payload.id
+
+          console.log('GUILD_DELETE', payload)
+          break
+        }
+
+        case GatewayMessageType.GUILD_MEMBER_UPDATE: {
+          if (!ENABLE_GUILDS) return
+          const guildID = payload.guild_id
+
+          console.log('GUILD_MEMBER_UPDATE', payload)
+          break
+        }
+
+        case GatewayMessageType.GUILD_BAN_ADD:
+        case GatewayMessageType.VOICE_STATE_UPDATE:
+          break
+
         default:
+          console.log('DEFAULT', opcode, type, payload)
           break
       }
     }
