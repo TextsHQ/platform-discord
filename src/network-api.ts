@@ -1,6 +1,6 @@
 import fs from 'fs'
 import FormData from 'form-data'
-import { texts, CurrentUser, MessageContent, PaginationArg, Thread, Message as TextsMessage, ServerEventType, OnServerEventCallback, ActivityType, User, InboxName, MessageSendOptions, ReAuthError, PresenceMap, Paginated, FetchOptions } from '@textshq/platform-sdk'
+import { texts, CurrentUser, MessageContent, PaginationArg, Thread, Message as TextsMessage, ServerEventType, OnServerEventCallback, ActivityType, User, InboxName, MessageSendOptions, ReAuthError, PresenceMap, Paginated, FetchOptions, ServerEvent } from '@textshq/platform-sdk'
 
 import { mapChannel, mapCurrentUser, mapMessage, mapThread, mapUser } from './mappers'
 import WSClient from './websocket/wsclient'
@@ -356,7 +356,7 @@ export default class DiscordNetworkAPI {
               const guildIconID: string | undefined = guild.icon
 
               const channels = guild.channels.map(c => mapChannel(c, guildID, guildName, guildJoinDate, guildIconID))
-              this.channelsMap.set(guild.id, channels)
+              this.channelsMap.set(guildID, channels)
             })
           }
 
@@ -488,38 +488,63 @@ export default class DiscordNetworkAPI {
           this.getUserFriends()
           break
 
-        case GatewayMessageType.GUILD_CREATE: {
+        case GatewayMessageType.GUILD_CREATE:
+        case GatewayMessageType.GUILD_UPDATE: {
           if (!ENABLE_GUILDS) return
 
-          const guildID = payload.id
-          /* this.eventCallback?.([{
+          const guildID: string = payload.id
+          const guildName: string = payload.name
+          const guildJoinDate: Date = new Date(payload.joined_at)
+          const guildIconID: string | undefined = payload.icon
+
+          const channels = payload.channels.map(c => mapChannel(c, guildID, guildName, guildJoinDate, guildIconID))
+          this.channelsMap.set(guildID, channels)
+
+          this.eventCallback?.([{
             type: ServerEventType.STATE_SYNC,
-            mutationType: 'update',
+            mutationType: 'upsert',
             objectName: 'thread',
             objectIDs: {
-              threadID: payload.id,
+              threadID: guildID,
             },
             entries: [
               {
-                id: payload.id,
+                id: guildID,
                 isUnread: true,
               },
             ],
-          }]) */
+          }])
+
+          const events: ServerEvent[] = channels.map(c => ({
+            type: ServerEventType.STATE_SYNC,
+            objectIDs: {
+              threadID: c.id,
+            },
+            mutationType: 'upsert',
+            objectName: 'thread',
+            entries: [{ id: c.id, isUnread: true }],
+          }))
+          this.eventCallback?.(events)
           break
         }
-
-        case GatewayMessageType.GUILD_UPDATE:
-          if (!ENABLE_GUILDS) return
-
-          console.log('GUILD_UPDATE', payload)
-          break
 
         case GatewayMessageType.GUILD_DELETE: {
           if (!ENABLE_GUILDS) return
           const guildID = payload.id
+          this.channelsMap.delete(guildID)
 
-          console.log('GUILD_DELETE', payload)
+          const channelIDs = payload.channels.map(c => c.id);
+          const events: ServerEvent[] = channelIDs.map(id => ({
+            type: ServerEventType.STATE_SYNC,
+            objectIDs: {
+              threadID: id,
+            },
+            mutationType: 'delete',
+            objectName: 'thread',
+            entries: [{ id }],
+          }))
+          this.eventCallback?.(events)
+
           break
         }
 
