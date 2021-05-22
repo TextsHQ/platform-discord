@@ -26,7 +26,7 @@ export default class DiscordNetworkAPI {
 
   private readStateMap: Map<string, string> = new Map()
 
-  private channelsMap?: Map<string, any>
+  private channelsMap?: Map<string, Thread[]>
 
   private usersPresence: PresenceMap = {}
 
@@ -104,7 +104,8 @@ export default class DiscordNetworkAPI {
       .reverse()
       .map(thread => mapThread(thread, this.readStateMap.get(thread.id), this.currentUser)))
 
-    return { items: threads, hasMore: false }
+    const items = ENABLE_GUILDS ? threads.concat([...this.channelsMap?.values()].flat()) : threads
+    return { items, hasMore: false }
   }
 
   createThread = async (userIDs: string[], title?: string): Promise<boolean | Thread> => {
@@ -363,10 +364,6 @@ export default class DiscordNetworkAPI {
           this.gotInitialUserData = true
           break
 
-        case GatewayMessageType.READY_SUPPLEMENTAL:
-          console.log('READY_SUPPLEMENTAL')
-          break
-
         case GatewayMessageType.RECONNECT:
           console.log('RECONNECT')
           break
@@ -556,12 +553,14 @@ export default class DiscordNetworkAPI {
           break
         }
 
+        case GatewayMessageType.READY_SUPPLEMENTAL:
         case GatewayMessageType.GUILD_BAN_ADD:
         case GatewayMessageType.VOICE_STATE_UPDATE:
+          // we're ignoring these ones, but we want to catch unhandled/private messages in the `default` handler
           break
 
         default:
-          console.log('DEFAULT', opcode, type, payload)
+          console.log('[UNHANDLED GATEWAY MESSAGE]', opcode, type, payload)
           break
       }
     }
