@@ -31,3 +31,5 @@ export enum ChannelType {
   GUILD_PRIVATE_THREAD = 12, // a temporary sub-channel within a GUILD_TEXT channel that is only viewable by those invited  and those with the MANAGE_THREADS permission
   GUILD_STAGE_VOICE = 13, // a voice channel for hosting events with an audience
 }
+
+export const IGNORED_CHANNEL_TYPES = [2, 4, 13]

@@ -57,7 +57,7 @@ export function mapCurrentUser(user: any): CurrentUser {
   }
 }
 
-export function mapChannel(channel: any, guildID: string, guildName: string, guildJoinDate: Date, guildIconID?: string): Thread {
+export function mapChannel(channel: any, guildID: string, guildJoinDate?: Date, guildName?: string, guildIconID?: string): Thread {
   return {
     _original: JSON.stringify(channel),
     folderName: guildName,
