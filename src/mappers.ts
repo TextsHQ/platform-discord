@@ -2,8 +2,12 @@ import { CurrentUser, Message, MessageActionType, MessageAttachment, MessageAtta
 import { MessageType } from './constants'
 import { mapTextAttributes } from './text-attributes'
 
-// https://discord.com/developers/docs/resources/channel#message-object-message-types
-const SUPPORTED_MESSAGE_TYPES = [0, 1, 2, 3, 4, 5, 6, 19]
+// https://discord.com/developers/docs/resources/channel#message-object-message-sticker-format-types
+enum StickerFormat {
+  PNG = 1,
+  APNG = 2,
+  LOTTIE = 3,
+}
 
 const MAP_THREAD_TYPE: ThreadType[] = [
   'channel', // GUILD_TEXT
@@ -31,14 +35,6 @@ const getEmojiURL = (emojiID: string, animated: boolean) =>
 
 const getStickerURL = (id: string, asset: string, ext: string) =>
   `https://discord.com/stickers/${id}/${asset}.${ext}`
-
-function getTimestampFromSnowflake(snowflake: string) {
-  if (!snowflake) return
-  const int = BigInt.asUintN(64, BigInt(snowflake))
-  // @ts-expect-error
-  const dateBits = Number(int >> 22n)
-  return new Date(dateBits + DISCORD_EPOCH)
-}
 
 export function mapUser(user: any): User {
   return {
@@ -111,9 +107,7 @@ export function mapThread(thread: any, lastReadMessageID: string, currentUser?: 
   }
 }
 
-export function mapMessage(message: any, currentUserID: string, reactionsDetails?: any[], userMappings?: Map<string, string>): Message | null {
-  if (!SUPPORTED_MESSAGE_TYPES.includes(message.type)) return null
-
+export function mapMessage(message: any, currentUserID?: string, reactionsDetails?: any[], userMappings?: Map<string, string>): Message | null {
   const attachments = [
     ...(message.attachments?.map(mapAttachment) || []),
     ...(message.stickers?.map(mapSticker) || []),
@@ -205,13 +199,6 @@ function mapAttachment(a): MessageAttachment {
   }
 }
 
-// https://discord.com/developers/docs/resources/channel#message-object-message-sticker-format-types
-enum StickerFormat {
-  PNG = 1,
-  APNG = 2,
-  LOTTIE = 3,
-}
-
 function mapSticker(sticker: any): MessageAttachment {
   // non-lottie stickers are untested
   const ext = {
@@ -232,7 +219,7 @@ function mapSticker(sticker: any): MessageAttachment {
 
 function mapMessageType(message: any): Partial<Message> {
   switch (message.type) {
-    case MessageType.RECIPIENT_ADD:
+    case MessageType.RECIPIENT_ADD: {
       return {
         isAction: true,
         parseTemplate: true,
@@ -243,7 +230,9 @@ function mapMessageType(message: any): Partial<Message> {
           actorParticipantID: null,
         },
       }
-    case MessageType.RECIPIENT_REMOVE:
+    }
+
+    case MessageType.RECIPIENT_REMOVE: {
       return {
         isAction: true,
         parseTemplate: true,
@@ -254,6 +243,8 @@ function mapMessageType(message: any): Partial<Message> {
           actorParticipantID: null,
         },
       }
+    }
+
     case MessageType.CALL: {
       let text = message.content
       if (message.call?.ended_timestamp) {
@@ -273,7 +264,8 @@ function mapMessageType(message: any): Partial<Message> {
       }
       return { isAction: true, parseTemplate: true, text }
     }
-    case MessageType.CHANNEL_NAME_CHANGE:
+
+    case MessageType.CHANNEL_NAME_CHANGE: {
       return {
         isAction: true,
         parseTemplate: true,
@@ -284,7 +276,9 @@ function mapMessageType(message: any): Partial<Message> {
           actorParticipantID: null,
         },
       }
-    case MessageType.CHANNEL_ICON_CHANGE:
+    }
+
+    case MessageType.CHANNEL_ICON_CHANGE: {
       return {
         isAction: true,
         parseTemplate: true,
@@ -294,14 +288,40 @@ function mapMessageType(message: any): Partial<Message> {
           actorParticipantID: null,
         },
       }
-    case MessageType.CHANNEL_PINNED_MESSAGE:
+    }
+
+    case MessageType.CHANNEL_PINNED_MESSAGE: {
       return {
         isAction: true,
         parseTemplate: true,
         linkedMessageID: message.message_reference.message_id,
         text: `{{${message.author.id}}} pinned a message`,
       }
-    default:
+    }
+
+    case MessageType.GUILD_MEMBER_JOIN: {
+      return {
+        isAction: true,
+        parseTemplate: true,
+        text: `{{${message.author.id}}} joined`,
+        action: {
+          type: MessageActionType.THREAD_PARTICIPANTS_ADDED,
+          participantIDs: [message.author.id],
+          actorParticipantID: null,
+        },
+      }
+    }
+
+    default: {
       return { text: message.content }
+    }
   }
+}
+
+function getTimestampFromSnowflake(snowflake: string) {
+  if (!snowflake) return
+  const int = BigInt.asUintN(64, BigInt(snowflake))
+  // @ts-expect-error
+  const dateBits = Number(int >> 22n)
+  return new Date(dateBits + DISCORD_EPOCH)
 }

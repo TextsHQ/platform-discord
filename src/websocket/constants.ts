@@ -67,8 +67,8 @@ export enum GatewayMessageType {
   MESSAGE_DELETE_BULK = 'MESSAGE_DELETE_BULK', // multiple messages were deleted at once
   MESSAGE_REACTION_ADD = 'MESSAGE_REACTION_ADD', // user reacted to a message
   MESSAGE_REACTION_REMOVE = 'MESSAGE_REACTION_REMOVE', // user removed a reaction from a message
-  MESSAGE_REACTION_REMOVE_ALL = 'MESSAGE_REACTION REMOVE ALL', // all reactions were explicitly removed from a message
-  MESSAGE_REACTION_REMOVE_EMOJI = 'MESSAGE_REACTION REMOVE EMOJI', // all reactions for a given emoji were explicitly removed from a message
+  MESSAGE_REACTION_REMOVE_ALL = 'MESSAGE_REACTION_REMOVE_ALL', // all reactions were explicitly removed from a message
+  MESSAGE_REACTION_REMOVE_EMOJI = 'MESSAGE_REACTION_REMOVE_EMOJI', // all reactions for a given emoji were explicitly removed from a message
   PRESENCE_UPDATE = 'PRESENCE_UPDATE', // user was updated
   TYPING_START = 'TYPING_START', // user started typing in a channel
   USER_UPDATE = 'USER_UPDATE', // properties about the user changed
@@ -77,9 +77,13 @@ export enum GatewayMessageType {
   WEBHOOKS_UPDATE = 'WEBHOOKS_UPDATE', // guild channel webhook was created, update, or deleted
 
   // Undocumented
+  CHANNEL_PINS_ACK = 'CHANNEL_PINS_ACK', // channel pins update has been read
   CHANNEL_UNREAD_UPDATE = 'CHANNEL_UNREAD_UPDATE', // ???
-  SESSIONS_REPLACE = 'SESSIONS_REPLACE', // dispatched when connected to gateway on top of another session (i.e. in Discord app)
+  MESSAGE_ACK = 'MESSAGE_ACK', // message has been read
   READY_SUPPLEMENTAL = 'READY_SUPPLEMENTAL', // ???
+  RELATIONSHIP_ADD = 'RELATIONSHIP_ADD', // friend invite was sent/accepted
+  RELATIONSHIP_REMOVE = 'RELATIONSHIP_REMOVE', // friend was removed
+  SESSIONS_REPLACE = 'SESSIONS_REPLACE', // dispatched when connected to gateway on top of another session (i.e. in Discord app)
 }
 
 export enum GatewayCloseCode {

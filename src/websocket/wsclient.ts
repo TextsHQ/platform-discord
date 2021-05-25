@@ -183,13 +183,13 @@ export default class WSClient {
         },
         presence: {
           status: DiscordPresenceStatus.ONLINE,
-          since: 0,
+          since: Date.now(),
           activites: [],
           afk: false,
         },
         compress: this.packer.encoding === 'etf',
         capabilities: this.actAsUser ? 61 : undefined,
-        intents: this.actAsUser ? undefined : 28672,
+        intents: this.actAsUser ? undefined : 32555,
         client_state: this.actAsUser ? {
           guild_hashes: {},
           highest_last_message_id: '0',

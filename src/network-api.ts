@@ -8,10 +8,9 @@ import { GatewayCloseCode, GatewayMessageType } from './websocket/constants'
 import { defaultPacker } from './packers'
 import { IGNORED_CHANNEL_TYPES } from './constants'
 
-const API_ENDPOINT = 'https://discord.com/api/v8/'
+const API_ENDPOINT = 'https://discord.com/api/v9'
 const WAIT_TILL_READY = true
 const RESTART_ON_FAIL = true
-const LIMIT_COUNT = 25
 const ACT_AS_USER = true
 const ENABLE_GUILDS = true
 
@@ -329,7 +328,7 @@ export default class DiscordNetworkAPI {
   }
 
   private handleGatewayMessage = (opcode, payload, type) => {
-    console.log('[DISCORD GATEWAY]', opcode, type)
+    texts.log('[DISCORD GATEWAY]', opcode, type)
 
     switch (type) {
       // * Documented
@@ -363,6 +362,7 @@ export default class DiscordNetworkAPI {
             const channels = guild.channels
               .filter(c => !IGNORED_CHANNEL_TYPES.includes(c.type))
               .map(c => mapChannel(c, guildID, guildJoinDate, guildName, guildIconID))
+
             this.channelsMap.set(guildID, channels)
           })
         }
@@ -371,10 +371,6 @@ export default class DiscordNetworkAPI {
         this.ready = true
         break
       }
-
-      case GatewayMessageType.READY_SUPPLEMENTAL:
-        // i have no idea what to do with this data
-        break
 
       case GatewayMessageType.RESUMED:
         // TODO: RESUMED
@@ -394,48 +390,23 @@ export default class DiscordNetworkAPI {
         console.log(payload)
         break
 
-      case GatewayMessageType.APPLICATION_COMMAND_CREATE:
-        // TODO: APPLICATION_COMMAND_CREATE
-
-        console.log(payload)
+      case GatewayMessageType.APPLICATION_COMMAND_CREATE: {
+        // this doesn't do anything we should care about
         break
+      }
 
-      case GatewayMessageType.APPLICATION_COMMAND_UPDATE:
-        // TODO: APPLICATION_COMMAND_UPDATE
-
-        console.log(payload)
+      case GatewayMessageType.APPLICATION_COMMAND_UPDATE: {
+        // this doesn't do anything we should care about
         break
+      }
 
-      case GatewayMessageType.APPLICATION_COMMAND_DELETE:
-        // TODO: APPLICATION_COMMAND_DELETE
-
-        console.log(payload)
+      case GatewayMessageType.APPLICATION_COMMAND_DELETE: {
+        // this doesn't do anything we should care about
         break
+      }
 
       case GatewayMessageType.CHANNEL_CREATE: {
         if (!ENABLE_GUILDS && payload.guild_id) return
-
-        /*
-          {
-            type: 0,
-            topic: null,
-            rate_limit_per_user: 0,
-            position: 1,
-            permission_overwrites: [],
-            parent_id: '846010144299024396',
-            nsfw: false,
-            name: 'asd',
-            last_message_id: null,
-            id: '846010168026464256',
-            guild_id: '846010144299024395',
-            guild_hashes: {
-              version: 1,
-              roles: { hash: 'T36/tzcv2PY' },
-              metadata: { hash: 'dbew2sEfJ9Y' },
-              channels: { hash: 'NRogvtkVWSg' }
-            }
-          }
-        */
 
         const channel = mapChannel(payload, payload.guild_id, new Date())
         const channels = this.channelsMap?.get(payload.guild_id).concat([channel])
@@ -456,28 +427,6 @@ export default class DiscordNetworkAPI {
 
       case GatewayMessageType.CHANNEL_UPDATE: {
         if (!ENABLE_GUILDS && payload.guild_id) return
-
-        /*
-          {
-            type: 0,
-            topic: null,
-            rate_limit_per_user: 0,
-            position: 1,
-            permission_overwrites: [],
-            parent_id: '846010144299024396',
-            nsfw: false,
-            name: 'asdd',
-            last_message_id: null,
-            id: '846010168026464256',
-            guild_id: '846010144299024395',
-            guild_hashes: {
-              version: 1,
-              roles: { hash: 'T36/tzcv2PY' },
-              metadata: { hash: 'dbew2sEfJ9Y' },
-              channels: { hash: 'BbuB9bS7tJQ' }
-            }
-          }
-        */
 
         const channels = this.channelsMap?.get(payload.guild_id)
         const index = channels.findIndex(c => c.id === payload.id)
@@ -505,28 +454,6 @@ export default class DiscordNetworkAPI {
       case GatewayMessageType.CHANNEL_DELETE: {
         if (!ENABLE_GUILDS && payload.guild_id) return
 
-        /*
-          {
-            type: 0,
-            topic: null,
-            rate_limit_per_user: 0,
-            position: 1,
-            permission_overwrites: [],
-            parent_id: '846010144299024396',
-            nsfw: false,
-            name: 'asdd',
-            last_message_id: null,
-            id: '846010168026464256',
-            guild_id: '846010144299024395',
-            guild_hashes: {
-              version: 1,
-              roles: { hash: 'T36/tzcv2PY' },
-              metadata: { hash: 'dbew2sEfJ9Y' },
-              channels: { hash: 'oGxb2hSgxiA' }
-            }
-          }
-        */
-
         this.eventCallback?.([{
           type: ServerEventType.STATE_SYNC,
           mutationType: 'delete',
@@ -540,239 +467,88 @@ export default class DiscordNetworkAPI {
         break
       }
 
-      case GatewayMessageType.CHANNEL_PINS_UPDATE:
-        // TODO: CHANNEL_PINS_UPDATE
-
-        console.log(payload)
+      case GatewayMessageType.CHANNEL_PINS_UPDATE: {
+        // this doesn't do anything we should care about
         break
+      }
 
-      case GatewayMessageType.THREAD_CREATE:
+      case GatewayMessageType.THREAD_CREATE: {
         // TODO: THREAD_CREATE
 
         console.log(payload)
         break
+      }
 
-      case GatewayMessageType.THREAD_UPDATE:
+      case GatewayMessageType.THREAD_UPDATE: {
         // TODO: THREAD_UPDATE
 
         console.log(payload)
         break
+      }
 
-      case GatewayMessageType.THREAD_DELETE:
+      case GatewayMessageType.THREAD_DELETE: {
         // TODO: THREAD_DELETE
 
         console.log(payload)
         break
+      }
 
-      case GatewayMessageType.THREAD_LIST_SYNC:
+      case GatewayMessageType.THREAD_LIST_SYNC: {
         // TODO: THREAD_LIST_SYNC
 
         console.log(payload)
         break
+      }
 
-      case GatewayMessageType.THREAD_MEMBER_UPDATE:
+      case GatewayMessageType.THREAD_MEMBER_UPDATE: {
         // TODO: THREAD_MEMBER_UPDATE
 
         console.log(payload)
         break
+      }
 
-      case GatewayMessageType.THREAD_MEMBERS_UPDATE:
+      case GatewayMessageType.THREAD_MEMBERS_UPDATE: {
         // TODO: THREAD_MEMBERS_UPDATE
 
         console.log(payload)
         break
+      }
 
       case GatewayMessageType.GUILD_CREATE: {
         if (!ENABLE_GUILDS) return
 
-        // TODO: GUILD_CREATE
-        /*
-          {
-            verification_level: 0,
-            nsfw_level: 0,
-            discovery_splash: null,
-            rules_channel_id: null,
-            mfa_level: 0,
-            nsfw: false,
-            public_updates_channel_id: null,
-            lazy: true,
-            system_channel_flags: 0,
-            presences: [],
-            stage_instances: [],
-            system_channel_id: '846009119311659031',
-            afk_channel_id: null,
-            emojis: [],
-            large: false,
-            vanity_url_code: null,
-            roles: [
-              {
-                position: 0,
-                permissions: '6546771521',
-                name: '@everyone',
-                mentionable: false,
-                managed: false,
-                id: '846009119311659028',
-                hoist: false,
-                color: 0
-              }
-            ],
-            splash: null,
-            name: 'gang',
-            joined_at: '2021-05-23T12:58:12.139000+00:00',
-            voice_states: [],
-            explicit_content_filter: 0,
-            max_video_channel_users: 25,
-            members: [
-              {
-                user: [Object],
-                roles: [],
-                mute: false,
-                joined_at: '2021-05-23T12:58:12.139000+00:00',
-                hoisted_role: null,
-                deaf: false
-              }
-            ],
-            description: null,
-            member_count: 1,
-            owner_id: '807998429140615219',
-            premium_subscription_count: 0,
-            premium_tier: 0,
-            preferred_locale: 'en-US',
-            banner: null,
-            features: [],
-            region: 'europe',
-            max_members: 100000,
-            channels: [
-              {
-                type: 4,
-                position: 0,
-                permission_overwrites: [],
-                name: 'Kanały tekstowe',
-                id: '846009119311659029'
-              },
-              {
-                type: 4,
-                position: 0,
-                permission_overwrites: [],
-                name: 'Kanały głosowe',
-                id: '846009119311659030'
-              },
-              {
-                type: 0,
-                topic: null,
-                rate_limit_per_user: 0,
-                position: 0,
-                permission_overwrites: [],
-                parent_id: '846009119311659029',
-                name: 'ogólny',
-                last_message_id: null,
-                id: '846009119311659031'
-              },
-              {
-                user_limit: 0,
-                type: 2,
-                rtc_region: null,
-                position: 0,
-                permission_overwrites: [],
-                parent_id: '846009119311659030',
-                name: 'Ogólne',
-                id: '846009119311659032',
-                bitrate: 64000
-              }
-            ],
-            default_message_notifications: 0,
-            application_command_count: 0,
-            icon: null,
-            threads: [],
-            id: '846009119311659028',
-            afk_timeout: 300,
-            application_id: null,
-            guild_hashes: {
-              version: 1,
-              roles: { omitted: false, hash: 'YeJhasBQwFY' },
-              metadata: { omitted: false, hash: 'JIuJwZC1nA8' },
-              channels: { omitted: false, hash: 'eeopBz88N54' }
-            }
-          }
-        */
+        const guildID: string = payload.id
+        const guildName: string = payload.name
+        const guildJoinDate: Date = new Date(payload.joined_at)
+        const guildIconID: string | undefined = payload.icon
 
-        console.log(payload)
+        const channels = payload.channels
+          .filter(c => !IGNORED_CHANNEL_TYPES.includes(c.type))
+          .map(c => mapChannel(c, guildID, guildJoinDate, guildName, guildIconID))
+
+        this.channelsMap?.set(guildID, channels)
+
+        const events: ServerEvent[] = channels.map(c => ({
+          type: ServerEventType.STATE_SYNC,
+          mutationType: 'upsert',
+          objectName: 'thread',
+          objectIDs: {
+            threadID: c.id,
+          },
+          entries: [c],
+        }))
+        this.eventCallback?.(events)
 
         break
       }
 
       case GatewayMessageType.GUILD_UPDATE: {
-        if (!ENABLE_GUILDS) return
-
-        // TODO: GUILD_UPDATE
-        /*
-          {
-            widget_channel_id: null,
-            system_channel_id: '846009119311659031',
-            premium_tier: 0,
-            system_channel_flags: 0,
-            discovery_splash: null,
-            application_id: null,
-            guild_hashes: {
-              version: 1,
-              roles: { hash: 'YeJhasBQwFY' },
-              metadata: { hash: 'GCl3Vn1Hjy8' },
-              channels: { hash: 'eeopBz88N54' }
-            },
-            owner_id: '807998429140615219',
-            banner: null,
-            features: [],
-            id: '846009119311659028',
-            public_updates_channel_id: null,
-            nsfw_level: 0,
-            verification_level: 0,
-            roles: [
-              {
-                position: 0,
-                permissions: '6546771521',
-                name: '@everyone',
-                mentionable: false,
-                managed: false,
-                id: '846009119311659028',
-                hoist: false,
-                color: 0
-              }
-            ],
-            splash: null,
-            afk_timeout: 300,
-            vanity_url_code: null,
-            icon: null,
-            guild_id: '846009119311659028',
-            emojis: [],
-            max_video_channel_users: 25,
-            preferred_locale: 'en-US',
-            region: 'europe',
-            explicit_content_filter: 0,
-            rules_channel_id: null,
-            default_message_notifications: 0,
-            name: 'renamed',
-            nsfw: false,
-            max_members: 100000,
-            widget_enabled: false,
-            description: null,
-            premium_subscription_count: 0,
-            mfa_level: 0,
-            afk_channel_id: null,
-            max_presences: null
-          }
-        */
-
-        console.log(payload)
-
+        // this doesn't do anything we should care about
         break
       }
 
       case GatewayMessageType.GUILD_DELETE: {
         if (!ENABLE_GUILDS) return
-
-        /*
-          { id: '846009119311659028' }
-        */
 
         const channelIDs = this.channelsMap.get(payload.id).map(c => c.id)
         const events: ServerEvent[] = channelIDs.map(id => ({
@@ -790,112 +566,105 @@ export default class DiscordNetworkAPI {
         break
       }
 
-      case GatewayMessageType.GUILD_BAN_ADD:
-        // TODO: GUILD_BAN_ADD
-
-        console.log(payload)
+      case GatewayMessageType.GUILD_BAN_ADD: {
+        // this doesn't do anything we should care about
         break
+      }
 
-      case GatewayMessageType.GUILD_BAN_REMOVE:
-        // TODO: GUILD_BAN_REMOVE
-
-        console.log(payload)
+      case GatewayMessageType.GUILD_BAN_REMOVE: {
+        // this doesn't do anything we should care about
         break
+      }
 
-      case GatewayMessageType.GUILD_EMOJIS_UPDATE:
+      case GatewayMessageType.GUILD_EMOJIS_UPDATE: {
         // TODO: GUILD_EMOJIS_UPDATE
 
         console.log(payload)
         break
+      }
 
-      case GatewayMessageType.GUILD_INTEGRATIONS_UPDATE:
-        // TODO: GUILD_INTEGRATIONS_UPDATE
-
-        console.log(payload)
+      case GatewayMessageType.GUILD_INTEGRATIONS_UPDATE: {
+        // this doesn't do anything we should care about
         break
+      }
 
-      case GatewayMessageType.GUILD_MEMBER_ADD:
+      case GatewayMessageType.GUILD_MEMBER_ADD: {
         // TODO: GUILD_MEMBER_ADD
 
         console.log(payload)
         break
+      }
 
-      case GatewayMessageType.GUILD_MEMBER_REMOVE:
+      case GatewayMessageType.GUILD_MEMBER_REMOVE: {
         // TODO: GUILD_MEMBER_REMOVE
 
         console.log(payload)
         break
+      }
 
-      case GatewayMessageType.GUILD_MEMBER_UPDATE:
+      case GatewayMessageType.GUILD_MEMBER_UPDATE: {
         // TODO: GUILD_MEMBER_UPDATE
 
         console.log(payload)
         break
+      }
 
-      case GatewayMessageType.GUILD_MEMBERS_CHUNK:
+      case GatewayMessageType.GUILD_MEMBERS_CHUNK: {
         // TODO: GUILD_MEMBERS_CHUNK
 
         console.log(payload)
         break
+      }
 
-      case GatewayMessageType.GUILD_ROLE_CREATE:
-        // TODO: GUILD_ROLE_CREATE
-
-        console.log(payload)
+      case GatewayMessageType.GUILD_ROLE_CREATE: {
+        // this doesn't do anything we should care about
         break
+      }
 
-      case GatewayMessageType.GUILD_ROLE_UPDATE:
-        // TODO: GUILD_ROLE_UPDATE
-
-        console.log(payload)
+      case GatewayMessageType.GUILD_ROLE_UPDATE: {
+        // this doesn't do anything we should care about
         break
+      }
 
-      case GatewayMessageType.GUILD_ROLE_DELETE:
-        // TODO: GUILD_ROLE_DELETE
-
-        console.log(payload)
+      case GatewayMessageType.GUILD_ROLE_DELETE: {
+        // this doesn't do anything we should care about
         break
+      }
 
-      case GatewayMessageType.INTEGRATION_CREATE:
-        // TODO: INTEGRATION_CREATE
-
-        console.log(payload)
+      case GatewayMessageType.INTEGRATION_CREATE: {
+        // this doesn't do anything we should care about
         break
+      }
 
-      case GatewayMessageType.INTEGRATION_UPDATE:
-        // TODO: INTEGRATION_UPDATE
-
-        console.log(payload)
+      case GatewayMessageType.INTEGRATION_UPDATE: {
+        // this doesn't do anything we should care about
         break
+      }
 
-      case GatewayMessageType.INTEGRATION_DELETE:
-        // TODO: INTEGRATION_DELETE
-
-        console.log(payload)
+      case GatewayMessageType.INTEGRATION_DELETE: {
+        // this doesn't do anything we should care about
         break
+      }
 
-      case GatewayMessageType.INTERACTION_CREATE:
-        // TODO: INTERACTION_CREATE
-
-        console.log(payload)
+      case GatewayMessageType.INTERACTION_CREATE: {
+        // this doesn't do anything we should care about
         break
+      }
 
-      case GatewayMessageType.INVITE_CREATE:
-        // TODO: INVITE_CREATE
-
-        console.log(payload)
+      case GatewayMessageType.INVITE_CREATE: {
+        // this doesn't do anything we should care about
         break
+      }
 
-      case GatewayMessageType.INVITE_DELETE:
-        // TODO: INVITE_DELETE
-
-        console.log(payload)
+      case GatewayMessageType.INVITE_DELETE: {
+        // this doesn't do anything we should care about
         break
+      }
 
       case GatewayMessageType.MESSAGE_CREATE: {
         if (!ENABLE_GUILDS && payload.guild_id) return
 
-        const message = mapMessage(payload, this.currentUser.id, null, this.userMappings)
+        const message = mapMessage(payload, this.currentUser?.id, null, this.userMappings)
         this.eventCallback?.([{
           type: ServerEventType.STATE_SYNC,
           mutationType: 'upsert',
@@ -906,28 +675,24 @@ export default class DiscordNetworkAPI {
           },
           entries: [message],
         }])
+
         break
       }
 
       case GatewayMessageType.MESSAGE_UPDATE: {
         if (!ENABLE_GUILDS && payload.guild_id) return
 
-        if (payload.guild_id) {
-          // TODO: Guild message updates
-          console.log(payload)
-        } else {
-          const message = mapMessage(payload, this.currentUser.id, null, this.userMappings)
-          this.eventCallback?.([{
-            type: ServerEventType.STATE_SYNC,
-            mutationType: 'update',
-            objectName: 'message',
-            objectIDs: {
-              threadID: payload.channel_id,
-              messageID: payload.id,
-            },
-            entries: [message],
-          }])
-        }
+        const message = mapMessage(payload, this.currentUser?.id, null, this.userMappings)
+        this.eventCallback?.([{
+          type: ServerEventType.STATE_SYNC,
+          mutationType: 'update',
+          objectName: 'message',
+          objectIDs: {
+            threadID: payload.channel_id,
+            messageID: payload.id,
+          },
+          entries: [message],
+        }])
         break
       }
 
@@ -947,16 +712,24 @@ export default class DiscordNetworkAPI {
         break
       }
 
-      case GatewayMessageType.MESSAGE_DELETE_BULK:
-        // TODO: MESSAGE_DELETE_BULK
+      case GatewayMessageType.MESSAGE_DELETE_BULK: {
+        if (!ENABLE_GUILDS && payload.guild_id) return
 
-        console.log(payload)
+        this.eventCallback?.([{
+          type: ServerEventType.STATE_SYNC,
+          mutationType: 'delete',
+          objectName: 'message',
+          objectIDs: {
+            threadID: payload.channel_id,
+          },
+          entries: payload.ids,
+        }])
         break
+      }
 
       case GatewayMessageType.MESSAGE_REACTION_ADD: {
         if (!ENABLE_GUILDS && payload.guild_id) return
 
-        // TODO: Get URL and emoji bool
         const reaction = {
           id: payload.emoji.id,
           reactionKey: payload.emoji.name,
@@ -976,11 +749,21 @@ export default class DiscordNetworkAPI {
         break
       }
 
-      case GatewayMessageType.MESSAGE_REACTION_REMOVE:
-        // TODO: MESSAGE_REACTION_REMOVE
+      case GatewayMessageType.MESSAGE_REACTION_REMOVE: {
+        if (!ENABLE_GUILDS && payload.guild_id) return
 
-        console.log(payload)
+        this.eventCallback?.([{
+          type: ServerEventType.STATE_SYNC,
+          mutationType: 'update',
+          objectName: 'message',
+          objectIDs: {
+            threadID: payload.channel_id,
+            messageID: payload.message_id,
+          },
+          entries: [{ reactions: [] }],
+        }])
         break
+      }
 
       case GatewayMessageType.MESSAGE_REACTION_REMOVE_ALL: {
         if (!ENABLE_GUILDS && payload.guild_id) return
@@ -998,72 +781,48 @@ export default class DiscordNetworkAPI {
         break
       }
 
-      case GatewayMessageType.MESSAGE_REACTION_REMOVE_EMOJI:
-        // TODO: MESSAGE_REACTION_REMOVE_EMOJI
+      case GatewayMessageType.MESSAGE_REACTION_REMOVE_EMOJI: {
+        if (!ENABLE_GUILDS && payload.guild_id) return
 
-        console.log(payload)
+        this.eventCallback?.([{
+          type: ServerEventType.STATE_SYNC,
+          mutationType: 'update',
+          objectName: 'message',
+          objectIDs: {
+            threadID: payload.channel_id,
+            messageID: payload.message_id,
+          },
+          entries: [{ reactions: [] }],
+        }])
         break
+      }
 
-      case GatewayMessageType.PRESENCE_UPDATE:
-        // TODO: PRESENCE_UPDATE
-        /*
-          {
-            user: {
-              username: 'Herek',
-              id: '360858589252026378',
-              discriminator: '7640',
-              avatar: 'ebae53cef3bfb3fdac5cec12355e5860'
+      case GatewayMessageType.PRESENCE_UPDATE: {
+        if (!ENABLE_GUILDS && payload.guild_id) return
+
+        if (payload.guild_id) {
+          // TODO: Guild updates
+        } else {
+          this.usersPresence[payload.user.id] = { userID: payload.user.id, isActive: payload.status === 'online', lastActive: new Date(+payload.last_modified) }
+          this.eventCallback?.([{
+            type: ServerEventType.USER_PRESENCE_UPDATED,
+            presence: {
+              userID: payload.user.id,
+              isActive: payload.status === 'online',
+              lastActive: new Date(),
             },
-            status: 'online',
-            last_modified: 1621772973059,
-            client_status: { desktop: 'online' },
-            activities: []
-          }
+          }])
+        }
 
-          {
-            user: {
-              username: 'playmod',
-              public_flags: 256,
-              id: '204957132636946433',
-              discriminator: '6357',
-              avatar: '352f8ef85a5054e30231a2ec7d4ed05b'
-            },
-            status: 'online',
-            last_modified: 1621773172307,
-            client_status: { desktop: 'online' },
-            activities: [
-              {
-                type: 4,
-                state: 'im happy',
-                name: 'Custom Status',
-                id: 'custom',
-                emoji: [Object],
-                created_at: 1621773172305
-              },
-              {
-                type: 0,
-                timestamps: [Object],
-                state: 'W oddziale',
-                session_id: 'c35d7747e01202e0ed138239c5496516',
-                party: [Object],
-                name: 'Fortnite',
-                id: 'cf466f770840d5cd',
-                flags: 194,
-                details: 'Battle Royale – pozostało 72',
-                created_at: 1621773172306,
-                assets: [Object],
-                application_id: '432980957394370572'
-              }
-            ]
-          }
-        */
-
-        console.log(payload)
         break
+      }
 
-      case GatewayMessageType.TYPING_START:
+      case GatewayMessageType.TYPING_START: {
+        if (!ENABLE_GUILDS && payload.guild_id) return
+
         this.eventCallback?.([{ type: ServerEventType.PARTICIPANT_TYPING, typing: true, participantID: payload.user_id, threadID: payload.channel_id }])
         break
+      }
 
       case GatewayMessageType.USER_UPDATE:
         // TODO: USER_UPDATE
@@ -1071,24 +830,28 @@ export default class DiscordNetworkAPI {
         console.log(payload)
         break
 
-      case GatewayMessageType.VOICE_STATE_UPDATE:
+      case GatewayMessageType.VOICE_STATE_UPDATE: {
         // we're ignoring voice states
         break
+      }
 
-      case GatewayMessageType.VOICE_SERVER_UPDATE:
-        // TODO: VOICE_SERVER_UPDATE
-
-        console.log(payload)
+      case GatewayMessageType.VOICE_SERVER_UPDATE: {
+        // we're ignoring voice states
         break
+      }
 
-      case GatewayMessageType.WEBHOOKS_UPDATE:
-        // TODO: WEBHOOKS_UPDATE
-
-        console.log(payload)
+      case GatewayMessageType.WEBHOOKS_UPDATE: {
+        // this doesn't do anything we should care about
         break
+      }
 
       // * Undocumented
-      case GatewayMessageType.CHANNEL_UNREAD_UPDATE:
+      case GatewayMessageType.CHANNEL_PINS_ACK: {
+        // this doesn't do anything we should care about
+        break
+      }
+
+      case GatewayMessageType.CHANNEL_UNREAD_UPDATE: {
         // TODO: CHANNEL_UNREAD_UPDATE
         /*
           {
@@ -1201,20 +964,60 @@ export default class DiscordNetworkAPI {
 
         console.log(payload)
         break
+      }
 
-      case GatewayMessageType.SESSIONS_REPLACE:
-        // TODO: SESSIONS_REPLACE
+      case GatewayMessageType.MESSAGE_ACK: {
+        if (!ENABLE_GUILDS && payload.guild_id) return
 
-        console.log(payload)
+        this.eventCallback?.([{
+          type: ServerEventType.STATE_SYNC,
+          mutationType: 'update',
+          objectName: 'thread',
+          objectIDs: {
+            threadID: payload.channel_id,
+          },
+          entries: [{ isUnread: false }],
+        }])
         break
+      }
+
+      case GatewayMessageType.READY_SUPPLEMENTAL: {
+        // i have no idea what to do with this data
+        break
+      }
+
+      case GatewayMessageType.RELATIONSHIP_ADD: {
+        const user = mapUser(payload.user)
+        if (!this.userFriends.includes(user)) {
+          this.userFriends.push(user)
+        }
+
+        break
+      }
+
+      case GatewayMessageType.RELATIONSHIP_REMOVE: {
+        const index = this.userFriends.findIndex(f => f.id === payload.id)
+        if (index > 0) {
+          this.userFriends.splice(index, 1)
+        }
+
+        break
+      }
+
+      case GatewayMessageType.SESSIONS_REPLACE: {
+        // this doesn't do anything we should care about
+        break
+      }
 
       // * Defaults
-      case null:
+      case null: {
         break
+      }
 
-      default:
-        console.log('[DISCORD GATEWAY] Unhandled', opcode, type, payload)
+      default: {
+        texts.log('[DISCORD GATEWAY] Unhandled', opcode, type, payload)
         break
+      }
     }
   }
 
@@ -1493,7 +1296,7 @@ export default class DiscordNetworkAPI {
   private fetch = async ({ url, headers = {}, json, ...rest }: FetchOptions & { url: string, json?: any }) => {
     try {
       const opts: FetchOptions = {
-        // todo timeout: 10000,
+        // TODO: timeout: 10000,
         ...rest,
         body: json ? JSON.stringify(json) : rest.body,
         headers: {
@@ -1502,10 +1305,12 @@ export default class DiscordNetworkAPI {
           ...headers,
         },
       }
+
       if (json) {
         opts.headers['Content-Type'] = 'application/json'
       }
-      const res = await texts.fetch(API_ENDPOINT + url, opts)
+
+      const res = await texts.fetch(`${API_ENDPOINT}/${url}`, opts)
 
       const responseJSON = res.body.length ? JSON.parse(res.body.toString('utf-8')) : undefined
       if (res.body) {
