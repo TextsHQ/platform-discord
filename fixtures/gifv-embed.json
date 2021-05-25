@@ -1,0 +1,45 @@
+{
+  "id": "846294980016209921",
+  "type": 0,
+  "content": "https://tenor.com/view/dj-khaled-another-one-one-more-time-gif-4816107",
+  "channel_id": "790193575429799966",
+  "author": {
+    "id": "510479576259100672",
+    "username": "Kunal Bagaria",
+    "avatar": "47cecea5f804adcbc4915cebad31df46",
+    "discriminator": "5455",
+    "public_flags": 64
+  },
+  "attachments": [],
+  "embeds": [
+    {
+      "type": "gifv",
+      "url": "https://tenor.com/view/dj-khaled-another-one-one-more-time-gif-4816107",
+      "title": "another one",
+      "provider": {
+        "name": "Tenor",
+        "url": "https://tenor.co"
+      },
+      "thumbnail": {
+        "url": "https://media.tenor.co/images/6a7ee17753b89b431f86b2a486e0d3d4/raw",
+        "proxy_url": "https://images-ext-2.discordapp.net/external/26ghAonxfO6930JowkNW_CGk8skLabXjXCAakYFTbFo/https/media.tenor.co/images/6a7ee17753b89b431f86b2a486e0d3d4/raw",
+        "width": 498,
+        "height": 280
+      },
+      "video": {
+        "url": "https://media.tenor.co/videos/12703285be609e38bc4bb217f038cda0/mp4",
+        "width": 498,
+        "height": 280
+      }
+    }
+  ],
+  "mentions": [],
+  "mention_roles": [],
+  "pinned": false,
+  "mention_everyone": false,
+  "tts": false,
+  "timestamp": "2021-05-24T07:54:06.636000+00:00",
+  "edited_timestamp": null,
+  "flags": 0,
+  "components": []
+}
