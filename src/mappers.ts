@@ -37,15 +37,6 @@ const getEmojiURL = (emojiID: string, animated: boolean) =>
 const getStickerURL = (id: string, asset: string, ext: string) =>
   `https://discord.com/stickers/${id}/${asset}.${ext}`
 
-const DISCORD_EPOCH = 1420070400000
-function getTimestampFromSnowflake(snowflake: string) {
-  if (!snowflake) return
-  const int = BigInt.asUintN(64, BigInt(snowflake))
-  // @ts-expect-error
-  const dateBits = Number(int >> 22n)
-  return new Date(dateBits + DISCORD_EPOCH)
-}
-
 export function mapUser(user: DiscordUser): User {
   return {
     id: user.id,
@@ -117,30 +108,7 @@ export function mapThread(thread: DiscordThread, lastReadMessageID: string, curr
   }
 }
 
-function mapAttachments(message: DiscordMessage) {
-  const mapEmbed = (embed: DiscordMessageEmbed): MessageAttachment => {
-    // todo handle more types
-    if (embed.type !== 'gifv') return
-    message.content = message.content.replace(embed.url, '')
-    return {
-      id: embed.id,
-      type: MessageAttachmentType.VIDEO,
-      mimeType: 'video/mp4',
-      isGif: true,
-      srcURL: embed.video.url,
-      size: { width: embed.video.width, height: embed.video.height },
-    }
-  }
-  return [
-    ...(message.attachments?.map(mapAttachment) || []),
-    ...(message.stickers?.map(mapSticker) || []),
-    ...(message.embeds?.map(mapEmbed) || []),
-  ].filter(Boolean)
-}
-
-export function mapMessage(message: DiscordMessage, currentUserID: string, reactionsDetails?: any[], userMappings?: Map<string, string>): Message | null {
-  if (!SUPPORTED_MESSAGE_TYPES.includes(message.type)) return null
-
+export function mapMessage(message: DiscordMessage, currentUserID: string, reactionsDetails?: any[], userMappings?: Map<string, string>): Message {
   const attachments = mapAttachments(message)
 
   const links: MessageLink[] = message.embeds
@@ -171,9 +139,6 @@ export function mapMessage(message: DiscordMessage, currentUserID: string, react
     editedTimestamp: message.edited_timestamp ? new Date(message.edited_timestamp) : undefined,
     senderID: message.author?.id,
     text: message.content,
-    attachments: attachments.length > 0 ? attachments : undefined,
-    links: links.length > 0 ? links : undefined,
-    reactions: reactions.length > 0 ? reactions : undefined,
     isSender: message.author ? currentUserID === message.author?.id : undefined,
     linkedMessageID: message.referenced_message?.id,
     isDeleted: message.deleted,
@@ -182,6 +147,8 @@ export function mapMessage(message: DiscordMessage, currentUserID: string, react
   }
   // reactions property should only be present if they exist, or state sync message update event will remove the reactions
   if (reactions) mapped.reactions = reactions
+  if (attachments && attachments.length > 0) mapped.attachments = attachments
+  if (links && links.length > 0) mapped.links = links
 
   Object.assign(mapped, mapMessageType(message))
 
@@ -195,6 +162,27 @@ export function mapMessage(message: DiscordMessage, currentUserID: string, react
   }
 
   return mapped
+}
+
+function mapAttachments(message: DiscordMessage) {
+  const mapEmbed = (embed: DiscordMessageEmbed): MessageAttachment => {
+    // todo handle more types
+    if (embed.type !== 'gifv') return
+    message.content = message.content.replace(embed.url, '')
+    return {
+      id: embed.id,
+      type: MessageAttachmentType.VIDEO,
+      mimeType: 'video/mp4',
+      isGif: true,
+      srcURL: embed.video.url,
+      size: { width: embed.video.width, height: embed.video.height },
+    }
+  }
+  return [
+    ...(message.attachments?.map(mapAttachment) || []),
+    ...(message.stickers?.map(mapSticker) || []),
+    ...(message.embeds?.map(mapEmbed) || []),
+  ].filter(Boolean)
 }
 
 function mapAttachment(a): MessageAttachment {
