@@ -1,6 +1,6 @@
 import fs from 'fs'
 import FormData from 'form-data'
-import { texts, CurrentUser, MessageContent, PaginationArg, Thread, Message as TextsMessage, ServerEventType, OnServerEventCallback, ActivityType, User, InboxName, MessageSendOptions, ReAuthError, PresenceMap, Paginated, FetchOptions, ServerEvent } from '@textshq/platform-sdk'
+import { texts, CurrentUser, MessageContent, PaginationArg, Thread, Message, ServerEventType, OnServerEventCallback, ActivityType, User, InboxName, MessageSendOptions, ReAuthError, PresenceMap, Paginated, FetchOptions, ServerEvent } from '@textshq/platform-sdk'
 
 import { mapChannel, mapCurrentUser, mapMessage, mapThread, mapUser } from './mappers'
 import WSClient from './websocket/wsclient'
@@ -72,7 +72,7 @@ export default class DiscordNetworkAPI {
   setupWebsocket = async () => {
     const gatewayRes = await texts.fetch(`${API_ENDPOINT}/gateway`, { headers: { 'User-Agent': texts.constants.USER_AGENT } })
     const gatewayHost = JSON.parse(gatewayRes?.body.toString('utf-8'))?.url as string ?? 'wss://gateway.discord.gg'
-    const gatewayFullURL = `${gatewayHost}/?v=8&encoding=${defaultPacker.encoding}`
+    const gatewayFullURL = `${gatewayHost}/?v=9&encoding=${defaultPacker.encoding}`
 
     this.client = new WSClient(gatewayFullURL, this.token, ACT_AS_USER, defaultPacker)
     texts.log('[DISCORD GATEWAY] URL:', gatewayFullURL)
@@ -129,7 +129,7 @@ export default class DiscordNetworkAPI {
     await this.fetch({ method: 'DELETE', url: `channels/${threadID}` })
   }
 
-  getMessages = async (threadID: string, pagination?: PaginationArg): Promise<TextsMessage[]> => {
+  getMessages = async (threadID: string, pagination?: PaginationArg): Promise<Message[]> => {
     if (!this.currentUser) throw new Error('No current user')
     const currentUser = this.currentUser
 
@@ -144,7 +144,7 @@ export default class DiscordNetworkAPI {
     const res = await this.fetch({ method: 'GET', url: `channels/${threadID}/messages?limit=50&${paginationQuery}` })
     if (!res?.json) throw new Error('No response')
 
-    const messages: TextsMessage[] = await Promise.all(res?.json
+    const objects: { message: Message, author: User }[] = await Promise.all(res?.json
       .map(async m => {
         let reactionsDetails
         if (m.reactions) {
@@ -157,10 +157,19 @@ export default class DiscordNetworkAPI {
           }))
         }
 
-        return mapMessage(m, currentUser.id, reactionsDetails, this.userMappings)
+        return { message: mapMessage(m, currentUser.id, reactionsDetails, this.userMappings), author: mapUser(m.author) }
       }))
 
-    return messages.filter(m => m).sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
+    const authorEvents: ServerEvent[] = objects.map(o => o.author).map(a => ({
+      type: ServerEventType.STATE_SYNC,
+      mutationType: 'upsert',
+      objectName: 'participant',
+      objectIDs: { threadID },
+      entries: [a],
+    }))
+    this.eventCallback?.(authorEvents)
+
+    return objects.map(o => o.message).filter(m => m).sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
   }
 
   sendMessage = async (threadID: string, content: MessageContent, options?: MessageSendOptions): Promise<boolean> => {
@@ -409,18 +418,20 @@ export default class DiscordNetworkAPI {
         if (!ENABLE_GUILDS && payload.guild_id) return
 
         const channel = mapChannel(payload, payload.guild_id, new Date())
-        const channels = this.channelsMap?.get(payload.guild_id).concat([channel])
-        this.channelsMap?.set(payload.guild_id, channels)
+        const channels = this.channelsMap?.get(payload.guild_id)?.concat([channel])
+        if (channels) {
+          this.channelsMap?.set(payload.guild_id, channels)
 
-        this.eventCallback?.([{
-          type: ServerEventType.STATE_SYNC,
-          mutationType: 'upsert',
-          objectName: 'thread',
-          objectIDs: {
-            threadID: payload.id,
-          },
-          entries: [channel],
-        }])
+          this.eventCallback?.([{
+            type: ServerEventType.STATE_SYNC,
+            mutationType: 'upsert',
+            objectName: 'thread',
+            objectIDs: {
+              threadID: payload.id,
+            },
+            entries: [channel],
+          }])
+        }
 
         break
       }
@@ -664,6 +675,21 @@ export default class DiscordNetworkAPI {
       case GatewayMessageType.MESSAGE_CREATE: {
         if (!ENABLE_GUILDS && payload.guild_id) return
 
+        if (payload.author) {
+          // upsert sender
+          const sender = mapUser(payload.author)
+          this.eventCallback?.([{
+            type: ServerEventType.STATE_SYNC,
+            mutationType: 'upsert',
+            objectName: 'participant',
+            objectIDs: {
+              threadID: payload.channel_id,
+            },
+            entries: [sender],
+          }])
+        }
+
+        // upsert message
         const message = mapMessage(payload, this.currentUser?.id, null, this.userMappings)
         this.eventCallback?.([{
           type: ServerEventType.STATE_SYNC,
@@ -802,6 +828,7 @@ export default class DiscordNetworkAPI {
 
         if (payload.guild_id) {
           // TODO: Guild updates
+          console.log(payload)
         } else {
           this.usersPresence[payload.user.id] = { userID: payload.user.id, isActive: payload.status === 'online', lastActive: new Date(+payload.last_modified) }
           this.eventCallback?.([{

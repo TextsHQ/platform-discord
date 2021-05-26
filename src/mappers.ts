@@ -107,7 +107,7 @@ export function mapThread(thread: any, lastReadMessageID: string, currentUser?: 
   }
 }
 
-export function mapMessage(message: any, currentUserID?: string, reactionsDetails?: any[], userMappings?: Map<string, string>): Message | null {
+export function mapMessage(message: any, currentUserID?: string, reactionsDetails?: any[], userMappings?: Map<string, string>): Message {
   const attachments = [
     ...(message.attachments?.map(mapAttachment) || []),
     ...(message.stickers?.map(mapSticker) || []),
@@ -137,14 +137,14 @@ export function mapMessage(message: any, currentUserID?: string, reactionsDetail
   const mapped: Message = {
     _original: JSON.stringify(message),
     id: message.id,
-    timestamp: new Date(message.timestamp),
+    timestamp: message.timestamp ? new Date(message.timestamp) : undefined,
     editedTimestamp: message.edited_timestamp ? new Date(message.edited_timestamp) : undefined,
-    senderID: message.author.id,
+    senderID: message.author?.id,
     text: message.content,
     attachments: attachments.length > 0 ? attachments : undefined,
-    links,
-    reactions,
-    isSender: currentUserID === message.author.id,
+    links: links.length > 0 ? links : undefined,
+    reactions: reactions.length > 0 ? reactions : undefined,
+    isSender: message.author ? currentUserID === message.author?.id : undefined,
     linkedMessageID: message.referenced_message?.id,
     isDeleted: message.deleted,
     cursor: message.id,
