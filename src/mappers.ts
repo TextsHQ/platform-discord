@@ -1,6 +1,7 @@
 import { CurrentUser, Message, MessageActionType, MessageAttachment, MessageAttachmentType, MessageLink, MessageReaction, Thread, ThreadType, User } from '@textshq/platform-sdk'
 import { MessageType } from './constants'
 import { mapTextAttributes } from './text-attributes'
+import type { DiscordMessage, DiscordMessageEmbed, DiscordThread, DiscordUser } from './types'
 
 // https://discord.com/developers/docs/resources/channel#message-object-message-sticker-format-types
 enum StickerFormat {
@@ -36,7 +37,16 @@ const getEmojiURL = (emojiID: string, animated: boolean) =>
 const getStickerURL = (id: string, asset: string, ext: string) =>
   `https://discord.com/stickers/${id}/${asset}.${ext}`
 
-export function mapUser(user: any): User {
+const DISCORD_EPOCH = 1420070400000
+function getTimestampFromSnowflake(snowflake: string) {
+  if (!snowflake) return
+  const int = BigInt.asUintN(64, BigInt(snowflake))
+  // @ts-expect-error
+  const dateBits = Number(int >> 22n)
+  return new Date(dateBits + DISCORD_EPOCH)
+}
+
+export function mapUser(user: DiscordUser): User {
   return {
     id: user.id,
     fullName: user.username,
@@ -45,7 +55,7 @@ export function mapUser(user: any): User {
   }
 }
 
-export function mapCurrentUser(user: any): CurrentUser {
+export function mapCurrentUser(user: DiscordUser): CurrentUser {
   const mapped = mapUser(user)
   return {
     displayText: mapped.username,
@@ -77,7 +87,7 @@ export function mapChannel(channel: any, guildID: string, guildJoinDate?: Date, 
   }
 }
 
-export function mapThread(thread: any, lastReadMessageID: string, currentUser?: User): Thread {
+export function mapThread(thread: DiscordThread, lastReadMessageID: string, currentUser?: User, userMappings?: Map<string, string>): Thread {
   const type: ThreadType = MAP_THREAD_TYPE[thread.type]
 
   const participants: User[] = thread.recipients?.map(mapUser)
@@ -107,11 +117,31 @@ export function mapThread(thread: any, lastReadMessageID: string, currentUser?: 
   }
 }
 
-export function mapMessage(message: any, currentUserID?: string, reactionsDetails?: any[], userMappings?: Map<string, string>): Message {
-  const attachments = [
+function mapAttachments(message: DiscordMessage) {
+  const mapEmbed = (embed: DiscordMessageEmbed): MessageAttachment => {
+    // todo handle more types
+    if (embed.type !== 'gifv') return
+    message.content = message.content.replace(embed.url, '')
+    return {
+      id: embed.id,
+      type: MessageAttachmentType.VIDEO,
+      mimeType: 'video/mp4',
+      isGif: true,
+      srcURL: embed.video.url,
+      size: { width: embed.video.width, height: embed.video.height },
+    }
+  }
+  return [
     ...(message.attachments?.map(mapAttachment) || []),
     ...(message.stickers?.map(mapSticker) || []),
+    ...(message.embeds?.map(mapEmbed) || []),
   ].filter(Boolean)
+}
+
+export function mapMessage(message: DiscordMessage, currentUserID: string, reactionsDetails?: any[], userMappings?: Map<string, string>): Message | null {
+  if (!SUPPORTED_MESSAGE_TYPES.includes(message.type)) return null
+
+  const attachments = mapAttachments(message)
 
   const links: MessageLink[] = message.embeds
     .filter(e => e.type === 'article' || e.type === 'link' || e.type === 'video' || e.type === 'rich')
@@ -132,7 +162,7 @@ export function mapMessage(message: any, currentUserID?: string, reactionsDetail
       reactionKey: r.emoji.id ? getEmojiURL(r.emoji.id, r.emoji.animated) : r.emoji.name,
       participantID: u.id,
       emoji: true,
-    }))) || []
+    })))
 
   const mapped: Message = {
     _original: JSON.stringify(message),
@@ -150,6 +180,8 @@ export function mapMessage(message: any, currentUserID?: string, reactionsDetail
     cursor: message.id,
     threadID: message.channel_id,
   }
+  // reactions property should only be present if they exist, or state sync message update event will remove the reactions
+  if (reactions) mapped.reactions = reactions
 
   Object.assign(mapped, mapMessageType(message))
 
@@ -217,7 +249,7 @@ function mapSticker(sticker: any): MessageAttachment {
   }
 }
 
-function mapMessageType(message: any): Partial<Message> {
+function mapMessageType(message: DiscordMessage): Partial<Message> {
   switch (message.type) {
     case MessageType.RECIPIENT_ADD: {
       return {

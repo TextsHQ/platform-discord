@@ -121,7 +121,7 @@ export default class DiscordNetworkAPI {
     })
 
     if (!res?.json) throw new Error('No response')
-    return mapThread(res?.json, '', this.currentUser)
+    return mapThread(res?.json, '', this.currentUser, this.userMappings)
   }
 
   /** https://discord.com/developers/docs/resources/channel#deleteclose-channel */
@@ -129,9 +129,21 @@ export default class DiscordNetworkAPI {
     await this.fetch({ method: 'DELETE', url: `channels/${threadID}` })
   }
 
-  getMessages = async (threadID: string, pagination?: PaginationArg): Promise<Message[]> => {
+  getMessage = async (message: any, threadID: string) => {
+    const reactionsDetails = message.reactions
+      ? await Promise.all(message.reactions.map(async r => {
+        const emojiQuery = encodeURIComponent(r.emoji.id ? `${r.emoji.name}:${r.emoji.id}` : r.emoji.name)
+        const reactedRes = await this.fetch({ method: 'GET', url: `channels/${threadID}/messages/${message.id}/reactions/${emojiQuery}` })
+        const parsed = reactedRes?.json
+        if (parsed) return { emoji: r.emoji, users: parsed }
+        return null
+      }))
+      : undefined
+    return mapMessage(message, this.currentUser.id, reactionsDetails, this.userMappings)
+  }
+
+  getMessages = async (threadID: string, pagination?: PaginationArg) => {
     if (!this.currentUser) throw new Error('No current user')
-    const currentUser = this.currentUser
 
     await this.waitUntilReady()
 
@@ -144,43 +156,23 @@ export default class DiscordNetworkAPI {
     const res = await this.fetch({ method: 'GET', url: `channels/${threadID}/messages?limit=50&${paginationQuery}` })
     if (!res?.json) throw new Error('No response')
 
-    const objects: { message: Message, author: User }[] = await Promise.all(res?.json
-      .map(async m => {
-        let reactionsDetails
-        if (m.reactions) {
-          reactionsDetails = await Promise.all(m.reactions.map(async r => {
-            const emojiQuery = encodeURIComponent(r.emoji.id ? `${r.emoji.name}:${r.emoji.id}` : r.emoji.name)
-            const reactedRes = await this.fetch({ method: 'GET', url: `channels/${threadID}/messages/${m.id}/reactions/${emojiQuery}` })
-            const parsed = reactedRes?.json
-            if (parsed) return { emoji: r.emoji, users: parsed }
-            return null
-          }))
-        }
+    const messages = await Promise.all((res?.json as any[]).map(m => this.getMessage(m, threadID)))
+    return messages.filter(Boolean).sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
+  }
 
-        return { message: mapMessage(m, currentUser.id, reactionsDetails, this.userMappings), author: mapUser(m.author) }
-      }))
-
-    const authorEvents: ServerEvent[] = objects.map(o => o.author).map(a => ({
-      type: ServerEventType.STATE_SYNC,
-      mutationType: 'upsert',
-      objectName: 'participant',
-      objectIDs: { threadID },
-      entries: [a],
-    }))
-    this.eventCallback?.(authorEvents)
-
-    return objects.map(o => o.message).filter(m => m).sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
+  mapMentions = (text: string) => {
+    // @ts-expect-error replaceAll
+    return text?.replaceAll(/@([^#@]{3,32}#[0-9]{4})/gi, (_, username) => {
+      const user = Array.from(this.userMappings).find(u => u[1] === username)
+      if (user) return `<@!${user[0]}>`
+      return username
+    })
   }
 
   sendMessage = async (threadID: string, content: MessageContent, options?: MessageSendOptions): Promise<boolean> => {
     await this.waitUntilReady()
 
-    // @ts-expect-error replaceAll
-    const text = content.text?.replaceAll(/@([^#@]{3,32}#[0-9]{4})/gi, (_, username) => {
-      const user = Array.from(this.userMappings).find(u => u[1] === username)
-      if (user) return `<@!${user[0]}>`
-      return username
-    })
+    const text = this.mapMentions(content.text)
 
     const requestContent = {
       headers: {},
@@ -238,12 +230,7 @@ export default class DiscordNetworkAPI {
   editMessage = async (threadID: string, messageID: string, content: MessageContent, options?: MessageSendOptions): Promise<boolean> => {
     await this.waitUntilReady()
 
-    // @ts-expect-error replaceAll
-    const text = content.text?.replaceAll(/@([^#@]{3,32}#[0-9]{4})/gi, (_, username) => {
-      const user = Array.from(this.userMappings).find(u => u[1] === username)
-      if (user) return `<@!${user[0]}>`
-      return username
-    })
+    const text = this.mapMentions(content.text)
 
     const res = await this.fetch({ url: `channels/${threadID}/messages/${messageID}`, method: 'PATCH', json: { content: text } })
     return res?.statusCode === 200
