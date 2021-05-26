@@ -55,6 +55,8 @@ export function mapCurrentUser(user: DiscordUser): CurrentUser {
 }
 
 export function mapChannel(channel: any, guildID: string, guildJoinDate?: Date, guildName?: string, guildIconID?: string): Thread {
+  const timestamp = channel.last_message_id ? getTimestampFromSnowflake(channel.last_message_id) : undefined
+
   return {
     _original: JSON.stringify(channel),
     folderName: guildName,
@@ -67,6 +69,7 @@ export function mapChannel(channel: any, guildID: string, guildJoinDate?: Date, 
     imgURL: guildIconID ? getGuildIcon(guildID, guildIconID) : undefined,
     createdAt: guildJoinDate,
     description: channel.topic,
+    timestamp,
     messages: {
       items: [],
       hasMore: true,
@@ -78,15 +81,15 @@ export function mapChannel(channel: any, guildID: string, guildJoinDate?: Date, 
   }
 }
 
-export function mapThread(thread: DiscordThread, lastReadMessageID: string, currentUser?: User, userMappings?: Map<string, string>): Thread {
+export function mapThread(thread: DiscordThread, lastReadMessageID?: string, currentUser?: User, userMappings?: Map<string, string>): Thread {
   const type: ThreadType = MAP_THREAD_TYPE[thread.type]
 
   const participants: User[] = thread.recipients?.map(mapUser)
   participants.sort((a, b) => ((a.username ?? '') < (b.username ?? '') ? 1 : -1))
   if (currentUser) participants.push(currentUser)
 
-  const timestamp = getTimestampFromSnowflake(thread.last_message_id)
-  const lastMessageTimestamp = getTimestampFromSnowflake(lastReadMessageID)
+  const timestamp = thread.last_message_id ? getTimestampFromSnowflake(thread.last_message_id) : undefined
+  const lastMessageTimestamp = lastReadMessageID ? getTimestampFromSnowflake(lastReadMessageID) : undefined
   return {
     _original: JSON.stringify(thread),
     id: thread.id,
@@ -168,7 +171,7 @@ function mapAttachments(message: DiscordMessage) {
   const mapEmbed = (embed: DiscordMessageEmbed): MessageAttachment => {
     // todo handle more types
     if (embed.type !== 'gifv') return
-    message.content = message.content.replace(embed.url, '')
+    message.content = message.content?.replace(embed.url, '')
     return {
       id: embed.id,
       type: MessageAttachmentType.VIDEO,
