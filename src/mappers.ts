@@ -54,7 +54,7 @@ export function mapCurrentUser(user: DiscordUser): CurrentUser {
   }
 }
 
-export function mapChannel(channel: any, guildID: string, guildJoinDate?: Date, guildName?: string, guildIconID?: string): Thread {
+export function mapChannel(channel: any, guildID: string, guildJoinDate?: Date, guildName?: string): Thread {
   const timestamp = channel.last_message_id ? getTimestampFromSnowflake(channel.last_message_id) : undefined
 
   return {
@@ -66,8 +66,7 @@ export function mapChannel(channel: any, guildID: string, guildJoinDate?: Date, 
     isReadOnly: false, // check permissions
     mutedUntil: null, // muted ? 'forever' : undefined
     type: 'channel', // 'channel' | 'broadcast'
-    imgURL: guildIconID ? getGuildIcon(guildID, guildIconID) : undefined,
-    createdAt: guildJoinDate,
+    // createdAt: guildJoinDate,
     description: channel.topic,
     timestamp,
     messages: {

@@ -349,13 +349,13 @@ export default class DiscordNetworkAPI {
         if (ENABLE_GUILDS) {
           payload.guilds.forEach(guild => {
             const guildID: string = guild.id
-            const guildName: string = guild.name
-            const guildJoinDate: Date = new Date(guild.joined_at)
-            const guildIconID: string | undefined = guild.icon
+            // const guildName: string = guild.name
+            // const guildJoinDate: Date = new Date(guild.joined_at)
+            // const guildIconID: string | undefined = guild.icon
 
             const channels = guild.channels
               .filter(c => !IGNORED_CHANNEL_TYPES.includes(c.type))
-              .map(c => mapChannel(c, guildID, guildJoinDate, guildName, guildIconID))
+              .map(c => mapChannel(c, guildID))
 
             this.channelsMap.set(guildID, channels)
           })
@@ -402,7 +402,7 @@ export default class DiscordNetworkAPI {
       case GatewayMessageType.CHANNEL_CREATE: {
         if (!ENABLE_GUILDS && payload.guild_id) return
 
-        const channel = mapChannel(payload, payload.guild_id, new Date())
+        const channel = mapChannel(payload, payload.guild_id)
         const channels = this.channelsMap?.get(payload.guild_id)?.concat([channel])
         if (channels) {
           this.channelsMap?.set(payload.guild_id, channels)
@@ -514,13 +514,13 @@ export default class DiscordNetworkAPI {
         if (!ENABLE_GUILDS) return
 
         const guildID: string = payload.id
-        const guildName: string = payload.name
-        const guildJoinDate: Date = new Date(payload.joined_at)
-        const guildIconID: string | undefined = payload.icon
+        // const guildName: string = payload.name
+        // const guildJoinDate: Date = new Date(payload.joined_at)
+        // const guildIconID: string | undefined = payload.icon
 
         const channels = payload.channels
           .filter(c => !IGNORED_CHANNEL_TYPES.includes(c.type))
-          .map(c => mapChannel(c, guildID, guildJoinDate, guildName, guildIconID))
+          .map(c => mapChannel(c, guildID))
 
         this.channelsMap?.set(guildID, channels)
 
@@ -574,8 +574,6 @@ export default class DiscordNetworkAPI {
 
       case GatewayMessageType.GUILD_EMOJIS_UPDATE: {
         // TODO: GUILD_EMOJIS_UPDATE
-
-        console.log(payload)
         break
       }
 
