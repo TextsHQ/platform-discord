@@ -25,6 +25,8 @@ export default class DiscordNetworkAPI {
 
   private channelsMap?: Map<string, Thread[]>
 
+  private mutedChannels: string[] = []
+
   private usersPresence: PresenceMap = {}
 
   private gotInitialUserData = false
@@ -84,7 +86,7 @@ export default class DiscordNetworkAPI {
 
     const currentUser = mapCurrentUser(res?.json)
     this.currentUser = currentUser
-    this.userMappings.set(currentUser.id, currentUser.displayText)
+    if (currentUser.id && currentUser.displayText) this.userMappings.set(currentUser.id, currentUser.displayText)
 
     this.getUserFriends()
 
@@ -136,7 +138,7 @@ export default class DiscordNetworkAPI {
         return null
       }))
       : undefined
-    return mapMessage(message, this.currentUser.id, reactionsDetails, this.userMappings)
+    return mapMessage(message, this.currentUser.id, reactionsDetails)
   }
 
   getMessages = async (threadID: string, pagination?: PaginationArg) => {
@@ -335,11 +337,11 @@ export default class DiscordNetworkAPI {
         // const user_settings = payload.user_settings
 
         if (ACT_AS_USER) {
-          payload.relationships?.forEach(r => this.userMappings.set(r.id, (r.username + '#' + r.discriminator)))
+          payload.relationships?.filter(Boolean).forEach(r => this.userMappings.set(r.id, (r.username + '#' + r.discriminator)))
           payload.read_state?.entries?.forEach(p => this.readStateMap.set(p.id, p.last_message_id))
           // apparently there's no presences when acting as a user
         } else {
-          payload.relationships?.forEach(r => this.userMappings.set(r.id, (r.user.username + '#' + r.user.discriminator)))
+          payload.relationships?.filter(Boolean).forEach(r => this.userMappings.set(r.id, (r.user.username + '#' + r.user.discriminator)))
           payload.read_state?.forEach(p => this.readStateMap.set(p.id, p.last_message_id))
           payload.presences?.forEach(p => {
             this.usersPresence[p.user.id] = { userID: p.user.id, isActive: p.status === 'online', lastActive: new Date(+p.last_modified) }
@@ -347,15 +349,17 @@ export default class DiscordNetworkAPI {
         }
 
         if (ENABLE_GUILDS) {
+          this.mutedChannels = payload.user_guild_settings.entries?.flatMap(g => g.channel_overrides).filter(g => g.muted).map(g => g.channel_id)
+
           payload.guilds.forEach(guild => {
             const guildID: string = guild.id
-            // const guildName: string = guild.name
+            const guildName: string = guild.name
             // const guildJoinDate: Date = new Date(guild.joined_at)
             // const guildIconID: string | undefined = guild.icon
 
             const channels = guild.channels
               .filter(c => !IGNORED_CHANNEL_TYPES.includes(c.type))
-              .map(c => mapChannel(c, guildID))
+              .map(c => mapChannel(c, this.mutedChannels.includes(c.id), guildName))
 
             this.channelsMap.set(guildID, channels)
           })
@@ -402,7 +406,7 @@ export default class DiscordNetworkAPI {
       case GatewayMessageType.CHANNEL_CREATE: {
         if (!ENABLE_GUILDS && payload.guild_id) return
 
-        const channel = mapChannel(payload, payload.guild_id)
+        const channel = mapChannel(payload, this.mutedChannels.includes(payload.id))
         const channels = this.channelsMap?.get(payload.guild_id)?.concat([channel])
         if (channels) {
           this.channelsMap?.set(payload.guild_id, channels)
@@ -429,7 +433,7 @@ export default class DiscordNetworkAPI {
         if (index < 0) return
 
         const channel = channels[index]
-        const newChannel = mapChannel(payload, payload.guild_id)
+        const newChannel = mapChannel(payload, this.mutedChannels.includes(payload.id))
         Object.assign(channel, newChannel)
         channels[index] = channel
         this.channelsMap?.set(payload.guild_id, channels)
@@ -514,13 +518,13 @@ export default class DiscordNetworkAPI {
         if (!ENABLE_GUILDS) return
 
         const guildID: string = payload.id
-        // const guildName: string = payload.name
+        const guildName: string = payload.name
         // const guildJoinDate: Date = new Date(payload.joined_at)
         // const guildIconID: string | undefined = payload.icon
 
         const channels = payload.channels
           .filter(c => !IGNORED_CHANNEL_TYPES.includes(c.type))
-          .map(c => mapChannel(c, guildID))
+          .map(c => mapChannel(c, this.mutedChannels.includes(c.id)), guildName)
 
         this.channelsMap?.set(guildID, channels)
 
@@ -651,6 +655,7 @@ export default class DiscordNetworkAPI {
         if (!ENABLE_GUILDS && payload.guild_id) return
 
         // kinda broken with ACT_AS_USER = false
+        payload.mentions.filter(Boolean).forEach(m => this.userMappings.set(m.id, (m.username + '#' + m.discriminator)))
 
         if (payload.author) {
           // upsert sender
@@ -667,7 +672,7 @@ export default class DiscordNetworkAPI {
         }
 
         // upsert message
-        const message = mapMessage(payload, this.currentUser?.id, null, this.userMappings)
+        const message = mapMessage(payload, this.currentUser?.id)
         this.eventCallback?.([{
           type: ServerEventType.STATE_SYNC,
           mutationType: 'upsert',
@@ -685,7 +690,7 @@ export default class DiscordNetworkAPI {
       case GatewayMessageType.MESSAGE_UPDATE: {
         if (!ENABLE_GUILDS && payload.guild_id) return
 
-        const message = mapMessage(payload, this.currentUser?.id, null, this.userMappings)
+        const message = mapMessage(payload, this.currentUser?.id)
         this.eventCallback?.([{
           type: ServerEventType.STATE_SYNC,
           mutationType: 'update',
@@ -914,6 +919,7 @@ export default class DiscordNetworkAPI {
   }
 
   private mapMentions = (text: string) => {
+    // TODO: Test guilds
     // @ts-expect-error replaceAll
     return text?.replaceAll(/@([^#@]{3,32}#[0-9]{4})/gi, (_, username) => {
       const user = Array.from(this.userMappings).find(u => u[1] === username)

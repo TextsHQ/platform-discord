@@ -54,7 +54,7 @@ export function mapCurrentUser(user: DiscordUser): CurrentUser {
   }
 }
 
-export function mapChannel(channel: any, guildID: string, guildJoinDate?: Date, guildName?: string): Thread {
+export function mapChannel(channel: any, isMuted: Boolean, guildName?: string): Thread {
   const timestamp = channel.last_message_id ? getTimestampFromSnowflake(channel.last_message_id) : undefined
 
   return {
@@ -64,7 +64,7 @@ export function mapChannel(channel: any, guildID: string, guildJoinDate?: Date, 
     title: channel.name,
     isUnread: false, // check it somehow
     isReadOnly: false, // check permissions
-    mutedUntil: null, // muted ? 'forever' : undefined
+    mutedUntil: isMuted ? 'forever' : undefined,
     type: 'channel', // 'channel' | 'broadcast'
     // createdAt: guildJoinDate,
     description: channel.topic,
@@ -110,7 +110,7 @@ export function mapThread(thread: DiscordThread, lastReadMessageID?: string, cur
   }
 }
 
-export function mapMessage(message: DiscordMessage, currentUserID: string, reactionsDetails?: any[], userMappings?: Map<string, string>): Message {
+export function mapMessage(message: DiscordMessage, currentUserID: string, reactionsDetails?: any[]): Message {
   const attachments = mapAttachments(message)
 
   const links: MessageLink[] = message.embeds
@@ -155,7 +155,7 @@ export function mapMessage(message: DiscordMessage, currentUserID: string, react
   Object.assign(mapped, mapMessageType(message))
 
   if (mapped.text) {
-    const getUserName = (id: string): string => (userMappings.get(id) || '').slice(0, -5)
+    const getUserName = (id: string): string => message.mentions.find(m => m.id === id)?.username || id
     const { text: transformedMessageText, textAttributes } = mapTextAttributes(mapped.text, getUserName)
     if (transformedMessageText && textAttributes) {
       mapped.text = transformedMessageText
