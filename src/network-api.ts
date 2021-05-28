@@ -337,11 +337,11 @@ export default class DiscordNetworkAPI {
         // const user_settings = payload.user_settings
 
         if (ACT_AS_USER) {
-          payload.relationships?.filter(Boolean).forEach(r => this.userMappings.set(r.id, (r.username + '#' + r.discriminator)))
+          payload.relationships?.forEach(r => this.userMappings.set(r.id, (r.username + '#' + r.discriminator)))
           payload.read_state?.entries?.forEach(p => this.readStateMap.set(p.id, p.last_message_id))
           // apparently there's no presences when acting as a user
         } else {
-          payload.relationships?.filter(Boolean).forEach(r => this.userMappings.set(r.id, (r.user.username + '#' + r.user.discriminator)))
+          payload.relationships?.forEach(r => this.userMappings.set(r.id, (r.user.username + '#' + r.user.discriminator)))
           payload.read_state?.forEach(p => this.readStateMap.set(p.id, p.last_message_id))
           payload.presences?.forEach(p => {
             this.usersPresence[p.user.id] = { userID: p.user.id, isActive: p.status === 'online', lastActive: new Date(+p.last_modified) }
@@ -655,7 +655,7 @@ export default class DiscordNetworkAPI {
         if (!ENABLE_GUILDS && payload.guild_id) return
 
         // kinda broken with ACT_AS_USER = false
-        payload.mentions.filter(Boolean).forEach(m => this.userMappings.set(m.id, (m.username + '#' + m.discriminator)))
+        payload.mentions.forEach(m => this.userMappings.set(m.id, (m.username + '#' + m.discriminator)))
 
         if (payload.author) {
           // upsert sender
