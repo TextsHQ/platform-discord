@@ -13,7 +13,7 @@ const API_ENDPOINT = 'https://discord.com/api/v9'
 const WAIT_TILL_READY = true
 const RESTART_ON_FAIL = true
 const ACT_AS_USER = true
-const ENABLE_GUILDS = true
+const ENABLE_GUILDS = false
 
 export default class DiscordNetworkAPI {
   private client?: WSClient
@@ -28,6 +28,8 @@ export default class DiscordNetworkAPI {
   private mutedChannels: string[] = []
 
   private usersPresence: PresenceMap = {}
+
+  private lastAckToken?: string = null
 
   private gotInitialUserData = false
 
@@ -251,7 +253,9 @@ export default class DiscordNetworkAPI {
   sendReadReceipt = async (threadID: string, messageID: string) => {
     await this.waitUntilReady()
     // TODO: Get token
-    const res = await this.fetch({ method: 'POST', url: `channels/${threadID}/messages/${messageID}/ack`, json: { token: null } })
+    const res = await this.fetch({ method: 'POST', url: `channels/${threadID}/messages/${messageID}/ack`, json: { token: this.lastAckToken } })
+    this.lastAckToken = res.json.token
+
     if (res?.statusCode === 204) this.readStateMap.set(threadID, messageID)
   }
 
