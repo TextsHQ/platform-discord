@@ -43,6 +43,8 @@ export default class DiscordNetworkAPI {
 
   userFriends: User[] = []
 
+  httpClient = texts.createHttpClient()
+
   login = async (token: string) => {
     if (!token) throw new Error('No token found.')
     this.token = token
@@ -61,8 +63,8 @@ export default class DiscordNetworkAPI {
   }
 
   setupWebsocket = async () => {
-    const gatewayRes = await texts.fetch(`${API_ENDPOINT}/gateway`, { headers: { 'User-Agent': texts.constants.USER_AGENT } })
-    const gatewayHost = JSON.parse(gatewayRes?.body.toString('utf-8'))?.url as string ?? 'wss://gateway.discord.gg'
+    const gatewayRes = await this.httpClient.requestAsString(`${API_ENDPOINT}/gateway`, { headers: { 'User-Agent': texts.constants.USER_AGENT } })
+    const gatewayHost = JSON.parse(gatewayRes?.body)?.url as string ?? 'wss://gateway.discord.gg'
     const gatewayFullURL = `${gatewayHost}/?v=8&encoding=${defaultPacker.encoding}`
 
     this.client = new WSClient(gatewayFullURL, this.token, ACT_AS_USER, defaultPacker)
@@ -508,9 +510,9 @@ export default class DiscordNetworkAPI {
       if (json) {
         opts.headers['Content-Type'] = 'application/json'
       }
-      const res = await texts.fetch(API_ENDPOINT + url, opts)
+      const res = await this.httpClient.requestAsString(API_ENDPOINT + url, opts)
 
-      const responseJSON = res.body.length ? JSON.parse(res.body.toString('utf-8')) : undefined
+      const responseJSON = res.body?.length ? JSON.parse(res.body) : undefined
       if (res.body) {
         if (responseJSON) this.handleErrors(responseJSON, res.statusCode)
       }
