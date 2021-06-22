@@ -9,7 +9,9 @@ import { defaultPacker } from './packers'
 import { IGNORED_CHANNEL_TYPES } from './constants'
 import { sleep } from './util'
 
-const API_ENDPOINT = 'https://discord.com/api/v9'
+const API_VERSION = 9
+const API_ENDPOINT = `https://discord.com/api/v${API_VERSION}`
+const DEFAULT_GATEWAY = 'wss://gateway.discord.gg'
 const WAIT_TILL_READY = true
 const RESTART_ON_FAIL = true
 const ACT_AS_USER = true
@@ -74,8 +76,8 @@ export default class DiscordNetworkAPI {
 
   setupWebsocket = async () => {
     const gatewayRes = await this.httpClient.requestAsString(`${API_ENDPOINT}/gateway`, { headers: { 'User-Agent': texts.constants.USER_AGENT } })
-    const gatewayHost = JSON.parse(gatewayRes?.body)?.url as string ?? 'wss://gateway.discord.gg'
-    const gatewayFullURL = `${gatewayHost}/?v=9&encoding=${defaultPacker.encoding}`
+    const gatewayHost = JSON.parse(gatewayRes?.body)?.url as string ?? DEFAULT_GATEWAY
+    const gatewayFullURL = `${gatewayHost}/?v=${API_VERSION}&encoding=${defaultPacker.encoding}`
 
     this.client = new WSClient(gatewayFullURL, this.token, ACT_AS_USER, defaultPacker)
     texts.log('[DISCORD GATEWAY] URL:', gatewayFullURL)
