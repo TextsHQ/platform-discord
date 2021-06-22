@@ -13,6 +13,9 @@
       "pre-commit": "yarn lint --fix || true; git add ."
     }
   },
+  "nativeDeps": {
+    "erlpack": "^0.1.3"
+  },
   "dependencies": {
     "@textshq/platform-sdk": "link:../platform-sdk",
     "erlpack": "^0.1.3",

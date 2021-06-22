@@ -35,7 +35,7 @@ const getEmojiURL = (emojiID: string, animated: boolean) =>
   `https://cdn.discordapp.com/emojis/${emojiID}.${animated ? 'gif' : 'png'}`
 
 const getStickerURL = (id: string, asset: string, ext: string) =>
-  `https://discord.com/stickers/${id}/${asset}.${ext}`
+  (asset ? `https://discord.com/stickers/${id}/${asset}.${ext}` : `https://discord.com/stickers/${id}.${ext}`)
 
 export function mapUser(user: DiscordUser): User {
   return {
