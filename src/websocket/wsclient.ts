@@ -4,8 +4,15 @@ import { texts } from '@textshq/platform-sdk'
 import { DiscordPresenceStatus, OPCode, GatewayMessageType, GatewayCloseCode } from './constants'
 import type { GatewayMessage } from './types'
 import type { Packer } from '../packers'
+import { sleep } from '../util'
 
-const promiseDelay = (timeout: number) => new Promise(resolve => setTimeout(resolve, timeout))
+const constants = {
+  browser: 'Chrome',
+  releaseChannel: 'stable',
+  buildNumber: 76771,
+  capabilities: 61, // sniffed
+  intents: 32523, // https://discord.com/developers/docs/topics/gateway#gateway-intents
+}
 
 export default class WSClient {
   private ws?: WebSocket
@@ -125,7 +132,7 @@ export default class WSClient {
 
   private waitAndSend = async (payload: GatewayMessage) => {
     while (this.ws.readyState === this.ws.CONNECTING) {
-      await promiseDelay(25)
+      await sleep(25)
     }
     this.send(payload)
   }
@@ -167,7 +174,7 @@ export default class WSClient {
         token: this.token,
         properties: {
           os: os.platform(),
-          browser: 'Chrome',
+          browser: constants.browser,
           device: '',
           system_locale: '',
           browser_user_agent: texts.constants.USER_AGENT,
@@ -177,8 +184,8 @@ export default class WSClient {
           referring_domain: '',
           referrer_current: '',
           referring_domain_current: '',
-          release_channel: 'stable',
-          client_build_number: 76771,
+          release_channel: constants.releaseChannel,
+          client_build_number: constants.buildNumber,
           client_event_source: null,
         },
         presence: {
@@ -188,8 +195,8 @@ export default class WSClient {
           afk: false,
         },
         compress: this.packer.encoding === 'etf',
-        capabilities: this.actAsUser ? 61 : undefined,
-        intents: this.actAsUser ? undefined : 32555,
+        capabilities: this.actAsUser ? constants.capabilities : undefined,
+        intents: this.actAsUser ? undefined : constants.intents,
         client_state: this.actAsUser ? {
           guild_hashes: {},
           highest_last_message_id: '0',

@@ -14,7 +14,7 @@ const API_ENDPOINT = `https://discord.com/api/v${API_VERSION}`
 const DEFAULT_GATEWAY = 'wss://gateway.discord.gg'
 const WAIT_TILL_READY = true
 const RESTART_ON_FAIL = true
-const ACT_AS_USER = true
+const ACT_AS_USER = false
 const ENABLE_GUILDS = false
 
 export default class DiscordNetworkAPI {
@@ -25,7 +25,7 @@ export default class DiscordNetworkAPI {
 
   private readStateMap: Map<string, string> = new Map()
 
-  private channelsMap?: Map<string, Thread[]>
+  private channelsMap = ENABLE_GUILDS ? new Map<string, Thread[]>() : undefined
 
   private mutedChannels: string[] = []
 
@@ -50,12 +50,6 @@ export default class DiscordNetworkAPI {
   userFriends: User[] = []
 
   httpClient = texts.createHttpClient()
-
-  constructor() {
-    if (ENABLE_GUILDS) {
-      this.channelsMap = new Map()
-    }
-  }
 
   login = async (token: string) => {
     if (!token) throw new Error('No token found.')
@@ -163,12 +157,12 @@ export default class DiscordNetworkAPI {
 
     const objects: { message: Message, author: User }[] = await Promise.all(res?.json.map(async m => ({ message: await this.getMessage(m, threadID), author: mapUser(m.author) })))
 
-    const authorEvents: ServerEvent[] = objects.map(o => o.author).map(a => ({
+    const authorEvents = objects.map<ServerEvent>(o => ({
       type: ServerEventType.STATE_SYNC,
       mutationType: 'upsert',
       objectName: 'participant',
       objectIDs: { threadID },
-      entries: [a],
+      entries: [o.author],
     }))
     this.eventCallback?.(authorEvents)
 
@@ -256,7 +250,6 @@ export default class DiscordNetworkAPI {
 
   sendReadReceipt = async (threadID: string, messageID: string) => {
     await this.waitUntilReady()
-    // TODO: Get token
     const res = await this.fetch({ method: 'POST', url: `channels/${threadID}/messages/${messageID}/ack`, json: { token: this.lastAckToken } })
     this.lastAckToken = res.json.token
 
