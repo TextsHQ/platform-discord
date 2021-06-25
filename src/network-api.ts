@@ -1,4 +1,5 @@
-import fs from 'fs'
+import { promises as fs } from 'fs'
+import path from 'path'
 import FormData from 'form-data'
 import { texts, CurrentUser, MessageContent, PaginationArg, Thread, Message, ServerEventType, OnServerEventCallback, ActivityType, User, InboxName, MessageSendOptions, ReAuthError, PresenceMap, Paginated, FetchOptions, ServerEvent } from '@textshq/platform-sdk'
 
@@ -193,7 +194,9 @@ export default class DiscordNetworkAPI {
           knownLength: content.fileBuffer?.length,
         })
       } else if (content.filePath) {
-        form.append('file', fs.createReadStream(content.filePath))
+        form.append('file', await fs.readFile(content.filePath), {
+          filename: content.fileName || path.basename(content.filePath),
+        })
       }
 
       const payload_json = {
