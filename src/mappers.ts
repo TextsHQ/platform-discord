@@ -101,6 +101,7 @@ function mapAttachments(message: DiscordMessage) {
   return [
     ...(message.attachments?.map(mapAttachment) || []),
     ...(message.stickers?.map(mapSticker) || []),
+    ...(message.sticker_items?.map(mapSticker) || []),
     ...(message.embeds?.map(mapEmbed) || []),
   ].filter(Boolean)
 }
