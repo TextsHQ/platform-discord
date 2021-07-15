@@ -143,7 +143,7 @@ export default class WSClient {
       const unpacked = this.packer.unpack(event.data)
       if (unpacked) this.processMessage(unpacked as GatewayMessage)
     } catch (e) {
-      texts.error('Error unpacking:', e, event)
+      texts.error('[discord ws] error unpacking:', e, event)
       this.onError?.(e)
     }
   }

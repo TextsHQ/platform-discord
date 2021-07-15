@@ -311,7 +311,7 @@ export default class DiscordNetworkAPI {
     }
 
     this.client.onError = error => {
-      throw error
+      texts.Sentry.captureException(error)
     }
 
     this.client.onMessage = (opcode, payload, type) => {
