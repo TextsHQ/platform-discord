@@ -28,6 +28,8 @@ export default class DiscordNetworkAPI {
 
   private usersPresence: PresenceMap = {}
 
+  private lastAckToken?: string = null
+
   private gotInitialUserData = false
 
   token?: string
@@ -246,7 +248,9 @@ export default class DiscordNetworkAPI {
 
   sendReadReceipt = async (threadID: string, messageID: string) => {
     await this.waitUntilReady()
-    const res = await this.fetch({ method: 'POST', url: `channels/${threadID}/messages/${messageID}/ack`, json: { token: null } })
+    const res = await this.fetch({ method: 'POST', url: `channels/${threadID}/messages/${messageID}/ack`, json: { token: this.lastAckToken } })
+    this.lastAckToken = res.json.token
+
     if (res?.statusCode === 204) this.readStateMap.set(threadID, messageID)
   }
 
