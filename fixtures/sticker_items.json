@@ -1,0 +1,31 @@
+{
+  "id": "861180898162769940",
+  "type": 0,
+  "content": "",
+  "channel_id": "790193575429799966",
+  "author": {
+    "id": "510479576259100672",
+    "username": "Kunal Bagaria",
+    "avatar": "a_3b50080023968c265d3e3bdb29e2aa1d",
+    "discriminator": "0001",
+    "public_flags": 64
+  },
+  "attachments": [],
+  "embeds": [],
+  "mentions": [],
+  "mention_roles": [],
+  "pinned": false,
+  "mention_everyone": false,
+  "tts": false,
+  "timestamp": "2021-07-04T09:45:26.089000+00:00",
+  "edited_timestamp": null,
+  "flags": 0,
+  "components": [],
+  "sticker_items": [
+    {
+      "id": "859760738914795540",
+      "format_type": 3,
+      "name": "nyan cat"
+    }
+  ]
+}

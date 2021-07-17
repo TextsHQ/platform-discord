@@ -33,8 +33,12 @@ const getGuildIcon = (guildID: string, iconID: string) =>
 const getEmojiURL = (emojiID: string, animated: boolean) =>
   `https://cdn.discordapp.com/emojis/${emojiID}.${animated ? 'gif' : 'png'}`
 
-const getStickerURL = (id: string, asset: string, ext: string) =>
-  (asset ? `https://discord.com/stickers/${id}/${asset}.${ext}` : `https://discord.com/stickers/${id}.${ext}`)
+const getLottieStickerURL = (id: string, asset: string) =>
+  (asset ? `https://discord.com/stickers/${id}/${asset}.json` : `https://discord.com/stickers/${id}.json`)
+
+// adding &passthrough=false makes it a regular png instead of apng
+const getPNGStickerURL = (id: string) =>
+  `https://media.discordapp.net/stickers/${id}.png?size=512`
 
 export function mapUser(user: DiscordUser): User {
   return {
@@ -159,6 +163,7 @@ function mapAttachments(message: DiscordMessage) {
   return [
     ...(message.attachments?.map(mapAttachment) || []),
     ...(message.stickers?.map(mapSticker) || []),
+    ...(message.sticker_items?.map(mapSticker) || []),
     ...(message.embeds?.map(mapEmbed) || []),
   ].filter(Boolean)
 }
@@ -220,10 +225,9 @@ export function mapMessage(message: DiscordMessage, currentUserID: string, react
 }
 
 function mapSticker(sticker: any): MessageAttachment {
-  // non-lottie stickers are untested
   const ext = {
     [StickerFormat.PNG]: 'png',
-    [StickerFormat.APNG]: 'apng',
+    [StickerFormat.APNG]: 'png',
     [StickerFormat.LOTTIE]: 'json',
   }[sticker.format_type]
   return {
@@ -231,7 +235,7 @@ function mapSticker(sticker: any): MessageAttachment {
     type: MessageAttachmentType.IMG,
     mimeType: ext === 'json' ? 'image/lottie' : `image/${ext}`,
     isSticker: true,
-    srcURL: getStickerURL(sticker.id, sticker.asset, ext),
+    srcURL: ext === 'json' ? getLottieStickerURL(sticker.id, sticker.asset) : getPNGStickerURL(sticker.id),
     fileName: sticker.name,
     size: { width: 160, height: 160 },
   }
