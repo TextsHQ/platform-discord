@@ -319,6 +319,8 @@ export default class DiscordNetworkAPI {
     }
 
     this.client.onMessage = (opcode, payload, type) => {
+      texts.log('[DISCORD GATEWAY]', opcode, type)
+
       switch (type) {
         case GatewayMessageType.HELLO:
           break
@@ -418,13 +420,16 @@ export default class DiscordNetworkAPI {
 
         // https://discord.com/developers/docs/topics/gateway#message-update
         case GatewayMessageType.MESSAGE_UPDATE:
-          this.eventCallback?.([{
-            type: ServerEventType.STATE_SYNC,
-            mutationType: 'update',
-            objectName: 'message',
-            objectIDs: { threadID: payload.channel_id },
-            entries: [mapMessage(payload, this.currentUser.id, undefined, this.userMappings)],
-          }])
+          // for some reason, discord has started sending this event with payload.content === ''
+          // so we're now sending the refresh event instead
+          // this.eventCallback?.([{
+          //   type: ServerEventType.STATE_SYNC,
+          //   mutationType: 'update',
+          //   objectName: 'message',
+          //   objectIDs: { threadID: payload.channel_id },
+          //   entries: [mapMessage(payload, this.currentUser.id, undefined, this.userMappings)],
+          // }])
+          this.eventCallback?.([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: payload.channel_id }])
           break
 
         case GatewayMessageType.MESSAGE_ACK:
