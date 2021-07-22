@@ -13,10 +13,11 @@ import { sleep } from './util'
 const API_VERSION = 9
 const API_ENDPOINT = `https://discord.com/api/v${API_VERSION}`
 const DEFAULT_GATEWAY = 'wss://gateway.discord.gg'
-const WAIT_TILL_READY = true
-const RESTART_ON_FAIL = true
-const ACT_AS_USER = false
-const ENABLE_GUILDS = false
+
+const WAIT_TILL_READY = true // wait until received initial data?
+const RESTART_ON_FAIL = true // restart platform when failed?
+const ACT_AS_USER = false // subtle internal changes
+const ENABLE_GUILDS = false // enable guilds support?
 
 export default class DiscordNetworkAPI {
   private client?: WSClient
@@ -74,7 +75,7 @@ export default class DiscordNetworkAPI {
     const gatewayHost = JSON.parse(gatewayRes?.body)?.url as string ?? DEFAULT_GATEWAY
     const gatewayFullURL = `${gatewayHost}/?v=${API_VERSION}&encoding=${defaultPacker.encoding}`
 
-    this.client = new WSClient(gatewayFullURL, this.token, ACT_AS_USER, defaultPacker)
+    this.client = new WSClient(gatewayFullURL, this.token, ENABLE_GUILDS, ACT_AS_USER, defaultPacker)
     texts.log('[DISCORD GATEWAY] URL:', gatewayFullURL)
     this.client.restartOnFail = RESTART_ON_FAIL
 
@@ -135,8 +136,8 @@ export default class DiscordNetworkAPI {
         const emojiQuery = encodeURIComponent(r.emoji.id ? `${r.emoji.name}:${r.emoji.id}` : r.emoji.name)
         const reactedRes = await this.fetch({ method: 'GET', url: `channels/${threadID}/messages/${message.id}/reactions/${emojiQuery}` })
         const parsed = reactedRes?.json
-        if (parsed) return { emoji: r.emoji, users: parsed }
-        return null
+        if (!parsed) return null
+        return { emoji: r.emoji, users: parsed }
       }))
       : undefined
     return mapMessage(message, this.currentUser.id, reactionsDetails)
@@ -154,20 +155,24 @@ export default class DiscordNetworkAPI {
 
     const paginationQuery = options.before ? `before=${options.before}` : options.after ? `after=${options.after}` : ''
     const res = await this.fetch({ method: 'GET', url: `channels/${threadID}/messages?limit=50&${paginationQuery}` })
-    if (!res?.json) throw new Error('No response')
+    if (!res.json?.length) throw new Error(res.json?.message || 'No response')
 
-    const objects: { message: Message, author: User }[] = await Promise.all(res?.json.map(async m => ({ message: await this.getMessage(m, threadID), author: mapUser(m.author) })))
+    const messages: Message[] = await Promise.all(res.json?.map(async m => this.getMessage(m, threadID)))
 
-    const authorEvents = objects.map<ServerEvent>(o => ({
-      type: ServerEventType.STATE_SYNC,
-      mutationType: 'upsert',
-      objectName: 'participant',
-      objectIDs: { threadID },
-      entries: [o.author],
-    }))
-    this.eventCallback?.(authorEvents)
+    if (ENABLE_GUILDS) {
+      // Guilds don't return all users, so we need to keep it updated using message authors
+      const entries: User[] = [...new Set<User>(res.json.map(m => mapUser(m.author)))]
+      const authorEvents: ServerEvent[] = [{
+        type: ServerEventType.STATE_SYNC,
+        mutationType: 'upsert',
+        objectName: 'participant',
+        objectIDs: { threadID },
+        entries,
+      }]
+      this.eventCallback?.(authorEvents)
+    }
 
-    return objects.map(o => o.message).filter(Boolean).sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
+    return messages.filter(Boolean).sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
   }
 
   sendMessage = async (threadID: string, content: MessageContent, options?: MessageSendOptions): Promise<boolean> => {
@@ -353,7 +358,7 @@ export default class DiscordNetworkAPI {
         }
 
         if (ENABLE_GUILDS) {
-          this.mutedChannels = payload.user_guild_settings.entries?.flatMap(g => g.channel_overrides).filter(g => g.muted).map(g => g.channel_id)
+          this.mutedChannels = (ACT_AS_USER ? payload.user_guild_settings.entries : payload.user_guild_settings)?.flatMap(g => g.channel_overrides).filter(g => g.muted).map(g => g.channel_id)
 
           payload.guilds.forEach(guild => {
             const guildID: string = guild.id
@@ -943,7 +948,7 @@ export default class DiscordNetworkAPI {
   private handleErrors = (json: any, statusCode: number) => {
     // eslint-disable-next-line @typescript-eslint/no-throw-literal
     if (statusCode === 401) throw new ReAuthError('Unauthorized')
-    if (json.message && json.code) texts.error(json)
+    if (json.message && json.code) throw new Error(json.message)
   }
 
   private fetch = async ({ url, headers = {}, json, ...rest }: FetchOptions & { url: string, json?: any }) => {

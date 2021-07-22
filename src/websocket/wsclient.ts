@@ -6,14 +6,6 @@ import type { GatewayMessage } from './types'
 import type { Packer } from '../packers'
 import { sleep } from '../util'
 
-const constants = {
-  browser: 'Chrome',
-  releaseChannel: 'stable',
-  buildNumber: 76771,
-  capabilities: 61, // sniffed
-  intents: 32523, // https://discord.com/developers/docs/topics/gateway#gateway-intents
-}
-
 export default class WSClient {
   private ws?: WebSocket
 
@@ -24,6 +16,14 @@ export default class WSClient {
   private resumeConnectionOnConnect = false
 
   private heartbeatInterval?: NodeJS.Timeout
+
+  private constants = {
+    browser: 'Chrome',
+    releaseChannel: 'stable',
+    buildNumber: 76771,
+    capabilities: 61, // sniffed
+    intents: this.enableGuilds ? 32515 : 28672, // https://discord.com/developers/docs/topics/gateway#gateway-intents
+  }
 
   ready = false
 
@@ -40,6 +40,7 @@ export default class WSClient {
   constructor(
     public gateway: string,
     private token: string,
+    private enableGuilds = false,
     private actAsUser = false,
     private packer: Packer,
   ) {
@@ -174,7 +175,7 @@ export default class WSClient {
         token: this.token,
         properties: {
           os: os.platform(),
-          browser: constants.browser,
+          browser: this.constants.browser,
           device: '',
           system_locale: '',
           browser_user_agent: texts.constants.USER_AGENT,
@@ -184,8 +185,8 @@ export default class WSClient {
           referring_domain: '',
           referrer_current: '',
           referring_domain_current: '',
-          release_channel: constants.releaseChannel,
-          client_build_number: constants.buildNumber,
+          release_channel: this.constants.releaseChannel,
+          client_build_number: this.constants.buildNumber,
           client_event_source: null,
         },
         presence: {
@@ -195,8 +196,8 @@ export default class WSClient {
           afk: false,
         },
         compress: this.packer.encoding === 'etf',
-        capabilities: this.actAsUser ? constants.capabilities : undefined,
-        intents: this.actAsUser ? undefined : constants.intents,
+        capabilities: this.actAsUser ? this.constants.capabilities : undefined,
+        intents: this.actAsUser ? undefined : this.constants.intents,
         client_state: this.actAsUser ? {
           guild_hashes: {},
           highest_last_message_id: '0',
