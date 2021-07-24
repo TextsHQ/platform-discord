@@ -655,16 +655,8 @@ export default class DiscordNetworkAPI {
       case GatewayMessageType.MESSAGE_REACTION_REMOVE_ALL: {
         if (!ENABLE_GUILDS && payload.guild_id) return
 
-        this.eventCallback?.([{
-          type: ServerEventType.STATE_SYNC,
-          mutationType: 'update',
-          objectName: 'message',
-          objectIDs: {
-            threadID: payload.channel_id,
-            messageID: payload.message_id,
-          },
-          entries: [{ reactions: [] }],
-        }])
+        // TODO: Optimize it
+        this.eventCallback?.([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: payload.channel_id }])
         break
       }
 
