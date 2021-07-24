@@ -76,7 +76,7 @@ export default class DiscordNetworkAPI {
     const gatewayFullURL = `${gatewayHost}/?v=${API_VERSION}&encoding=${defaultPacker.encoding}`
 
     this.client = new WSClient(gatewayFullURL, this.token, ENABLE_GUILDS, ACT_AS_USER, defaultPacker)
-    texts.log('[DISCORD GATEWAY] URL:', gatewayFullURL)
+    texts.log('[discord ws] URL:', gatewayFullURL)
     this.client.restartOnFail = RESTART_ON_FAIL
 
     this.setupGatewayListeners()
@@ -298,12 +298,12 @@ export default class DiscordNetworkAPI {
     if (!this.client) throw new Error('WSClient not initialized!')
 
     this.client.onChangedReadyState = ready => {
-      texts.log('[DISCORD GATEWAY] Connection state: ' + ready)
+      texts.log('[discord ws] Connection state: ' + ready)
       this.ready = ready
     }
 
     this.client.onConnectionClosed = (code, reason) => {
-      texts.log('[DISCORD GATEWAY] Connection to websocket closed with code', code + '. Reason:', reason)
+      texts.log('[discord ws] Connection to websocket closed with code', code + '. Reason:', reason)
       this.ready = false
 
       switch (code) {
@@ -311,14 +311,14 @@ export default class DiscordNetworkAPI {
           this.startPolling?.()
           break
         case GatewayCloseCode.RECONNECT_REQUESTED:
-          texts.log('[DISCORD GATEWAY] Gateway requested client reconnect.')
+          texts.log('[discord ws] Gateway requested client reconnect.')
           break
         case GatewayCloseCode.AUTHENTICATION_FAILED:
           this.client = null
           // eslint-disable-next-line @typescript-eslint/no-throw-literal
           throw new ReAuthError('Access token invalid')
         case GatewayCloseCode.SESSION_TIMED_OUT:
-          texts.log('[DISCORD GATEWAY] Gateway session timed out.')
+          texts.log('[discord ws] Gateway session timed out.')
           break
         default:
           break
@@ -337,9 +337,11 @@ export default class DiscordNetworkAPI {
 
     switch (type) {
       // * Documented
-      case GatewayMessageType.HELLO:
+
+      case GatewayMessageType.HELLO: {
         // handled by WSClient
         break
+      }
 
       case GatewayMessageType.READY: {
         // const notes = payload.notes
@@ -379,36 +381,21 @@ export default class DiscordNetworkAPI {
         break
       }
 
-      case GatewayMessageType.RESUMED:
+      case GatewayMessageType.RESUMED: {
         // TODO: RESUMED
-
         console.log(payload)
         break
+      }
 
-      case GatewayMessageType.RECONNECT:
+      case GatewayMessageType.RECONNECT: {
         // TODO: RECONNECT
-
         console.log(payload)
         break
+      }
 
-      case GatewayMessageType.INVALID_SESSION:
+      case GatewayMessageType.INVALID_SESSION: {
         // TODO: INVALID_SESSION
-
         console.log(payload)
-        break
-
-      case GatewayMessageType.APPLICATION_COMMAND_CREATE: {
-        // this doesn't do anything we should care about
-        break
-      }
-
-      case GatewayMessageType.APPLICATION_COMMAND_UPDATE: {
-        // this doesn't do anything we should care about
-        break
-      }
-
-      case GatewayMessageType.APPLICATION_COMMAND_DELETE: {
-        // this doesn't do anything we should care about
         break
       }
 
@@ -430,7 +417,6 @@ export default class DiscordNetworkAPI {
             entries: [channel],
           }])
         }
-
         break
       }
 
@@ -456,7 +442,6 @@ export default class DiscordNetworkAPI {
           },
           entries: [channel],
         }])
-
         break
       }
 
@@ -472,53 +457,47 @@ export default class DiscordNetworkAPI {
           },
           entries: [payload.id],
         }])
-
         break
       }
 
       case GatewayMessageType.CHANNEL_PINS_UPDATE: {
-        // this doesn't do anything we should care about
+        // TODO: CHANNEL_PINS_UPDATE
+        console.log(payload)
         break
       }
 
       case GatewayMessageType.THREAD_CREATE: {
         // TODO: THREAD_CREATE
-
         console.log(payload)
         break
       }
 
       case GatewayMessageType.THREAD_UPDATE: {
         // TODO: THREAD_UPDATE
-
         console.log(payload)
         break
       }
 
       case GatewayMessageType.THREAD_DELETE: {
         // TODO: THREAD_DELETE
-
         console.log(payload)
         break
       }
 
       case GatewayMessageType.THREAD_LIST_SYNC: {
         // TODO: THREAD_LIST_SYNC
-
         console.log(payload)
         break
       }
 
       case GatewayMessageType.THREAD_MEMBER_UPDATE: {
         // TODO: THREAD_MEMBER_UPDATE
-
         console.log(payload)
         break
       }
 
       case GatewayMessageType.THREAD_MEMBERS_UPDATE: {
         // TODO: THREAD_MEMBERS_UPDATE
-
         console.log(payload)
         break
       }
@@ -547,12 +526,6 @@ export default class DiscordNetworkAPI {
           entries: [c],
         }))
         this.eventCallback?.(events)
-
-        break
-      }
-
-      case GatewayMessageType.GUILD_UPDATE: {
-        // this doesn't do anything we should care about
         break
       }
 
@@ -575,95 +548,15 @@ export default class DiscordNetworkAPI {
         break
       }
 
-      case GatewayMessageType.GUILD_BAN_ADD: {
-        // this doesn't do anything we should care about
-        break
-      }
-
-      case GatewayMessageType.GUILD_BAN_REMOVE: {
-        // this doesn't do anything we should care about
-        break
-      }
-
       case GatewayMessageType.GUILD_EMOJIS_UPDATE: {
         // TODO: GUILD_EMOJIS_UPDATE
-        break
-      }
-
-      case GatewayMessageType.GUILD_INTEGRATIONS_UPDATE: {
-        // this doesn't do anything we should care about
-        break
-      }
-
-      case GatewayMessageType.GUILD_MEMBER_ADD: {
-        // this doesn't do anything we should care about
-        break
-      }
-
-      case GatewayMessageType.GUILD_MEMBER_REMOVE: {
-        // this doesn't do anything we should care about
-        break
-      }
-
-      case GatewayMessageType.GUILD_MEMBER_UPDATE: {
-        // this doesn't do anything we should care about
-        break
-      }
-
-      case GatewayMessageType.GUILD_MEMBERS_CHUNK: {
-        // this doesn't do anything we should care about
-        break
-      }
-
-      case GatewayMessageType.GUILD_ROLE_CREATE: {
-        // this doesn't do anything we should care about
-        break
-      }
-
-      case GatewayMessageType.GUILD_ROLE_UPDATE: {
-        // this doesn't do anything we should care about
-        break
-      }
-
-      case GatewayMessageType.GUILD_ROLE_DELETE: {
-        // this doesn't do anything we should care about
-        break
-      }
-
-      case GatewayMessageType.INTEGRATION_CREATE: {
-        // this doesn't do anything we should care about
-        break
-      }
-
-      case GatewayMessageType.INTEGRATION_UPDATE: {
-        // this doesn't do anything we should care about
-        break
-      }
-
-      case GatewayMessageType.INTEGRATION_DELETE: {
-        // this doesn't do anything we should care about
-        break
-      }
-
-      case GatewayMessageType.INTERACTION_CREATE: {
-        // this doesn't do anything we should care about
-        break
-      }
-
-      case GatewayMessageType.INVITE_CREATE: {
-        // this doesn't do anything we should care about
-        break
-      }
-
-      case GatewayMessageType.INVITE_DELETE: {
-        // this doesn't do anything we should care about
+        console.log(payload)
         break
       }
 
       case GatewayMessageType.MESSAGE_CREATE: {
         if (!ENABLE_GUILDS && payload.guild_id) return
 
-        // kinda broken with ACT_AS_USER = false
         payload.mentions.forEach(m => this.userMappings.set(m.id, (m.username + '#' + m.discriminator)))
 
         if (payload.author) {
@@ -680,25 +573,25 @@ export default class DiscordNetworkAPI {
           }])
         }
 
-        // upsert message
-        const message = mapMessage(payload, this.currentUser?.id)
-        this.eventCallback?.([{
-          type: ServerEventType.STATE_SYNC,
-          mutationType: 'upsert',
-          objectName: 'message',
-          objectIDs: {
-            threadID: payload.channel_id,
-            messageID: payload.id,
-          },
-          entries: [message],
-        }])
-
+        // for some reason, discord has started sending this event with payload.content === ''
+        // so we're now sending the refresh event instead
+        // this.eventCallback?.([{
+        //   type: ServerEventType.STATE_SYNC,
+        //   mutationType: 'upsert',
+        //   objectName: 'message',
+        //   objectIDs: {
+        //     threadID: payload.channel_id,
+        //     messageID: payload.id,
+        //   },
+        //   entries: [mapMessage(payload, this.currentUser?.id)],
+        // }])
+        this.eventCallback?.([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: payload.channel_id }])
         break
       }
 
       case GatewayMessageType.MESSAGE_UPDATE: {
         if (!ENABLE_GUILDS && payload.guild_id) return
-        
+
         // for some reason, discord has started sending this event with payload.content === ''
         // so we're now sending the refresh event instead
         // this.eventCallback?.([{
@@ -746,38 +639,16 @@ export default class DiscordNetworkAPI {
       case GatewayMessageType.MESSAGE_REACTION_ADD: {
         if (!ENABLE_GUILDS && payload.guild_id) return
 
-        const reaction = {
-          id: payload.emoji.id,
-          reactionKey: payload.emoji.name,
-          participantID: payload.user_id,
-          emoji: true,
-        }
-        this.eventCallback?.([{
-          type: ServerEventType.STATE_SYNC,
-          mutationType: 'update',
-          objectName: 'message',
-          objectIDs: {
-            threadID: payload.channel_id,
-            messageID: payload.message_id,
-          },
-          entries: [{ reactions: [reaction] }],
-        }])
+        // TODO: Optimize it
+        this.eventCallback?.([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: payload.channel_id }])
         break
       }
 
       case GatewayMessageType.MESSAGE_REACTION_REMOVE: {
         if (!ENABLE_GUILDS && payload.guild_id) return
 
-        this.eventCallback?.([{
-          type: ServerEventType.STATE_SYNC,
-          mutationType: 'update',
-          objectName: 'message',
-          objectIDs: {
-            threadID: payload.channel_id,
-            messageID: payload.message_id,
-          },
-          entries: [{ reactions: [] }],
-        }])
+        // TODO: Optimize it
+        this.eventCallback?.([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: payload.channel_id }])
         break
       }
 
@@ -800,16 +671,8 @@ export default class DiscordNetworkAPI {
       case GatewayMessageType.MESSAGE_REACTION_REMOVE_EMOJI: {
         if (!ENABLE_GUILDS && payload.guild_id) return
 
-        this.eventCallback?.([{
-          type: ServerEventType.STATE_SYNC,
-          mutationType: 'update',
-          objectName: 'message',
-          objectIDs: {
-            threadID: payload.channel_id,
-            messageID: payload.message_id,
-          },
-          entries: [{ reactions: [] }],
-        }])
+        // TODO: Optimize it
+        this.eventCallback?.([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: payload.channel_id }])
         break
       }
 
@@ -826,7 +689,6 @@ export default class DiscordNetworkAPI {
             lastActive: new Date(),
           },
         }])
-
         break
       }
 
@@ -837,36 +699,16 @@ export default class DiscordNetworkAPI {
         break
       }
 
-      case GatewayMessageType.USER_UPDATE:
+      case GatewayMessageType.USER_UPDATE: {
         // TODO: USER_UPDATE
-
         console.log(payload)
-        break
-
-      case GatewayMessageType.VOICE_STATE_UPDATE: {
-        // we're ignoring voice states
-        break
-      }
-
-      case GatewayMessageType.VOICE_SERVER_UPDATE: {
-        // we're ignoring voice states
-        break
-      }
-
-      case GatewayMessageType.WEBHOOKS_UPDATE: {
-        // this doesn't do anything we should care about
         break
       }
 
       // * Undocumented
-      case GatewayMessageType.CHANNEL_PINS_ACK: {
-        // this doesn't do anything we should care about
-        break
-      }
 
       case GatewayMessageType.CHANNEL_UNREAD_UPDATE: {
         // TODO: CHANNEL_UNREAD_UPDATE
-
         console.log(payload)
         break
       }
@@ -886,17 +728,11 @@ export default class DiscordNetworkAPI {
         break
       }
 
-      case GatewayMessageType.READY_SUPPLEMENTAL: {
-        // i have no idea what to do with this data
-        break
-      }
-
       case GatewayMessageType.RELATIONSHIP_ADD: {
         const user = mapUser(payload.user)
         if (!this.userFriends.includes(user)) {
           this.userFriends.push(user)
         }
-
         break
       }
 
@@ -905,29 +741,49 @@ export default class DiscordNetworkAPI {
         if (index > 0) {
           this.userFriends.splice(index, 1)
         }
-
-        break
-      }
-
-      case GatewayMessageType.SESSIONS_REPLACE: {
-        // this doesn't do anything we should care about
         break
       }
 
       // * Defaults
+
+      case GatewayMessageType.APPLICATION_COMMAND_CREATE:
+      case GatewayMessageType.APPLICATION_COMMAND_UPDATE:
+      case GatewayMessageType.APPLICATION_COMMAND_DELETE:
+      case GatewayMessageType.GUILD_UPDATE:
+      case GatewayMessageType.GUILD_BAN_ADD:
+      case GatewayMessageType.GUILD_BAN_REMOVE:
+      case GatewayMessageType.GUILD_INTEGRATIONS_UPDATE:
+      case GatewayMessageType.GUILD_MEMBER_ADD:
+      case GatewayMessageType.GUILD_MEMBER_REMOVE:
+      case GatewayMessageType.GUILD_MEMBER_UPDATE:
+      case GatewayMessageType.GUILD_MEMBERS_CHUNK:
+      case GatewayMessageType.GUILD_ROLE_CREATE:
+      case GatewayMessageType.GUILD_ROLE_UPDATE:
+      case GatewayMessageType.GUILD_ROLE_DELETE:
+      case GatewayMessageType.INTEGRATION_CREATE:
+      case GatewayMessageType.INTEGRATION_UPDATE:
+      case GatewayMessageType.INTEGRATION_DELETE:
+      case GatewayMessageType.INTERACTION_CREATE:
+      case GatewayMessageType.INVITE_CREATE:
+      case GatewayMessageType.INVITE_DELETE:
+      case GatewayMessageType.VOICE_STATE_UPDATE:
+      case GatewayMessageType.VOICE_SERVER_UPDATE:
+      case GatewayMessageType.WEBHOOKS_UPDATE:
+      case GatewayMessageType.CHANNEL_PINS_ACK:
+      case GatewayMessageType.READY_SUPPLEMENTAL:
+      case GatewayMessageType.SESSIONS_REPLACE:
       case null: {
         break
       }
 
       default: {
-        texts.log('[DISCORD GATEWAY] Unhandled', opcode, type, payload)
+        texts.log('[discord ws] Unhandled', opcode, type, payload)
         break
       }
     }
   }
 
   private mapMentions = (text: string) => {
-    // TODO: Test guilds
     // @ts-expect-error replaceAll
     return text?.replaceAll(/@([^#@]{3,32}#[0-9]{4})/gi, (_, username) => {
       const user = Array.from(this.userMappings).find(u => u[1] === username)

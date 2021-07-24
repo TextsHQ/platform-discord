@@ -48,7 +48,7 @@ export default class WSClient {
   }
 
   connect = () => {
-    texts.log('[DISCORD GATEWAY] Opening gateway connection...')
+    texts.log('[discord ws] Opening gateway connection...')
     this.ws = new WebSocket(this.gateway)
     this.setupHandlers()
   }
@@ -99,7 +99,7 @@ export default class WSClient {
     this.ws?.on('error', error => this.onError?.(error))
 
     this.ws?.on('unexpected-response', (request, response) => {
-      texts.log('[DISCORD GATEWAY] Unexpected response: ' + request, response)
+      texts.log('[discord ws] Unexpected response: ' + request, response)
     })
 
     this.ws.onmessage = this.wsOnMessage
@@ -157,14 +157,14 @@ export default class WSClient {
   }
 
   private sendHeartbeat = () => {
-    // texts.log('[DISCORD GATEWAY] Sending heartbeat')
+    // texts.log('[discord ws] Sending heartbeat')
     if (this.ws.readyState === this.ws.CONNECTING) return
     const payload: GatewayMessage = { op: OPCode.HEARTBEAT, d: this.lastSequenceNumber }
     this.send(payload)
   }
 
   private setHeartbeatInterval = (interval: number) => {
-    texts.log('[DISCORD GATEWAY] Heartbeat interval set to', interval)
+    texts.log('[discord ws] Heartbeat interval set to', interval)
     this.heartbeatInterval = setInterval(this.sendHeartbeat, interval)
   }
 
