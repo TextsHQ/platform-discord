@@ -333,7 +333,7 @@ export default class DiscordNetworkAPI {
   }
 
   private handleGatewayMessage = (opcode, payload, type) => {
-    texts.log('[DISCORD GATEWAY]', opcode, type)
+    // texts.log('[discord ws]', opcode, type)
 
     switch (type) {
       // * Documented
@@ -698,18 +698,17 @@ export default class DiscordNetworkAPI {
 
       case GatewayMessageType.MESSAGE_UPDATE: {
         if (!ENABLE_GUILDS && payload.guild_id) return
-
-        const message = mapMessage(payload, this.currentUser?.id)
-        this.eventCallback?.([{
-          type: ServerEventType.STATE_SYNC,
-          mutationType: 'update',
-          objectName: 'message',
-          objectIDs: {
-            threadID: payload.channel_id,
-            messageID: payload.id,
-          },
-          entries: [message],
-        }])
+        
+        // for some reason, discord has started sending this event with payload.content === ''
+        // so we're now sending the refresh event instead
+        // this.eventCallback?.([{
+        //   type: ServerEventType.STATE_SYNC,
+        //   mutationType: 'update',
+        //   objectName: 'message',
+        //   objectIDs: { threadID: payload.channel_id },
+        //   entries: [mapMessage(payload, this.currentUser.id, undefined, this.userMappings)],
+        // }])
+        this.eventCallback?.([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: payload.channel_id }])
         break
       }
 
