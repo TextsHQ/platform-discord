@@ -464,7 +464,13 @@ export default class DiscordNetworkAPI {
           break
 
         case GatewayMessageType.TYPING_START:
-          this.eventCallback?.([{ type: ServerEventType.PARTICIPANT_TYPING, typing: true, participantID: payload.user_id, threadID: payload.channel_id }])
+          this.eventCallback?.([{
+            type: ServerEventType.USER_ACTIVITY,
+            activityType: ActivityType.TYPING,
+            durationMs: 10_000,
+            participantID: payload.user_id,
+            threadID: payload.channel_id,
+          }])
           break
 
         case GatewayMessageType.PRESENCE_UPDATE:
