@@ -48,7 +48,7 @@ export default class WSClient {
   }
 
   connect = () => {
-    texts.log('[discord ws] Opening gateway connection...')
+    // texts.log('[discord ws] Opening gateway connection...')
     this.ws = new WebSocket(this.gateway)
     this.setupHandlers()
   }

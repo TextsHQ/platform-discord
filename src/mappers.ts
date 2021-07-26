@@ -2,7 +2,7 @@ import { CurrentUser, Message, MessageActionType, MessageAttachment, MessageAtta
 import { MessageType } from './constants'
 import { mapTextAttributes } from './text-attributes'
 import type { DiscordMessage, DiscordMessageEmbed, DiscordThread, DiscordUser } from './types'
-import { getTimestampFromSnowflake } from './util'
+import { getTimestampFromSnowflake, mapMimeType } from './util'
 
 // https://discord.com/developers/docs/resources/channel#message-object-message-sticker-format-types
 enum StickerFormat {
@@ -148,16 +148,35 @@ function mapAttachment(a): MessageAttachment {
 
 function mapAttachments(message: DiscordMessage) {
   const mapEmbed = (embed: DiscordMessageEmbed): MessageAttachment => {
-    // todo handle more types
-    if (embed.type !== 'gifv') return
     message.content = message.content?.replace(embed.url, '')
-    return {
-      id: embed.id,
-      type: MessageAttachmentType.VIDEO,
-      mimeType: 'video/mp4',
-      isGif: true,
-      srcURL: embed.video.url,
-      size: { width: embed.video.width, height: embed.video.height },
+
+    switch (embed.type) {
+      case 'rich': {
+        // TODO: Rich embed
+        break
+      }
+      case 'image': {
+        const isGif = embed.thumbnail.url.toLowerCase().endsWith('.gif')
+        return {
+          id: embed.url,
+          type: isGif ? MessageAttachmentType.VIDEO : MessageAttachmentType.IMG,
+          mimeType: mapMimeType(embed.thumbnail.url),
+          isGif,
+          srcURL: embed.thumbnail.url,
+          size: { width: embed.thumbnail.width, height: embed.thumbnail.height },
+        }
+      }
+      case 'video': break
+      case 'gifv': return {
+        id: embed.url,
+        type: MessageAttachmentType.VIDEO,
+        mimeType: mapMimeType(embed.video.url),
+        isGif: true,
+        srcURL: embed.video.url,
+        size: { width: embed.video.width, height: embed.video.height },
+      }
+      case 'article': break
+      case 'link': break
     }
   }
   return [
