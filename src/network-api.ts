@@ -112,7 +112,6 @@ export default class DiscordNetworkAPI {
 
   createThread = async (userIDs: string[], title?: string): Promise<boolean | Thread> => {
     if (userIDs.length === 1 && userIDs[0] === this.currentUser?.id) return false
-
     await this.waitUntilReady()
 
     const res = await this.fetch({
@@ -145,7 +144,6 @@ export default class DiscordNetworkAPI {
 
   getMessages = async (threadID: string, pagination?: PaginationArg) => {
     if (!this.currentUser) throw new Error('No current user')
-
     await this.waitUntilReady()
 
     const options = {
@@ -252,12 +250,14 @@ export default class DiscordNetworkAPI {
   deleteMessage = async (threadID: string, messageID: string, forEveryone?: boolean): Promise<boolean> => {
     if (!forEveryone) return false
     await this.waitUntilReady()
+
     const res = await this.fetch({ method: 'DELETE', url: `channels/${threadID}/messages/${messageID}` })
     return res?.statusCode === 204
   }
 
   sendReadReceipt = async (threadID: string, messageID: string) => {
     await this.waitUntilReady()
+
     const res = await this.fetch({ method: 'POST', url: `channels/${threadID}/messages/${messageID}/ack`, json: { token: this.lastAckToken } })
     this.lastAckToken = res.json.token
 

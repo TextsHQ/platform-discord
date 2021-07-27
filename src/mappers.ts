@@ -1,5 +1,5 @@
-import { CurrentUser, Message, MessageActionType, MessageAttachment, MessageAttachmentType, MessageLink, MessageReaction, Thread, ThreadType, User } from '@textshq/platform-sdk'
-import { MessageType } from './constants'
+import { CurrentUser, Message, MessageActionType, MessageAttachment, MessageAttachmentType, MessageLink, MessageReaction, TextAttributes, TextEntity, texts, Thread, ThreadType, User } from '@textshq/platform-sdk'
+import { MessageEmbedType, MessageType } from './constants'
 import { mapTextAttributes } from './text-attributes'
 import type { DiscordMessage, DiscordMessageEmbed, DiscordThread, DiscordUser } from './types'
 import { getTimestampFromSnowflake, mapMimeType } from './util'
@@ -151,11 +151,19 @@ function mapAttachments(message: DiscordMessage) {
     message.content = message.content?.replace(embed.url, '')
 
     switch (embed.type) {
-      case 'rich': {
-        // TODO: Rich embed
+      case MessageEmbedType.ARTICLE: {
+        // haven't seen one in the wild
         break
       }
-      case 'image': {
+      case MessageEmbedType.GIFV: return {
+        id: embed.url,
+        type: MessageAttachmentType.VIDEO,
+        mimeType: mapMimeType(embed.video.url),
+        isGif: true,
+        srcURL: embed.video.url,
+        size: { width: embed.video.width, height: embed.video.height },
+      }
+      case MessageEmbedType.IMAGE: {
         const isGif = embed.thumbnail.url.toLowerCase().endsWith('.gif')
         return {
           id: embed.url,
@@ -166,17 +174,18 @@ function mapAttachments(message: DiscordMessage) {
           size: { width: embed.thumbnail.width, height: embed.thumbnail.height },
         }
       }
-      case 'video': break
-      case 'gifv': return {
-        id: embed.url,
-        type: MessageAttachmentType.VIDEO,
-        mimeType: mapMimeType(embed.video.url),
-        isGif: true,
-        srcURL: embed.video.url,
-        size: { width: embed.video.width, height: embed.video.height },
+      case MessageEmbedType.LINK: {
+        // already works ¯\_(ツ)_/¯
+        break
       }
-      case 'article': break
-      case 'link': break
+      case MessageEmbedType.RICH: {
+        // handled somewhere else
+        break
+      }
+      case MessageEmbedType.VIDEO: {
+        // haven't seen one in the wild
+        break
+      }
     }
   }
   return [
@@ -224,14 +233,16 @@ export function mapMessage(message: DiscordMessage, currentUserID: string, react
     cursor: message.id,
     threadID: message.channel_id,
   }
+
   // reactions property should only be present if they exist, or state sync message update event will remove the reactions
   if (reactions) mapped.reactions = reactions
   if (attachments && attachments.length > 0) mapped.attachments = attachments
   if (links && links.length > 0) mapped.links = links
+  if (message.embeds?.find(e => e.type === MessageEmbedType.RICH)) Object.assign(mapped, mapRichEmbeds(message))
 
   Object.assign(mapped, mapMessageType(message))
 
-  if (mapped.text) {
+  if (mapped.text && mapped.text.length > 0) {
     const getUserName = (id: string): string => message.mentions.find(m => m.id === id)?.username || id
     const { text: transformedMessageText, textAttributes } = mapTextAttributes(mapped.text, getUserName)
     if (transformedMessageText && textAttributes) {
@@ -356,7 +367,59 @@ function mapMessageType(message: DiscordMessage): Partial<Message> {
     }
 
     default: {
-      return { text: message.content }
+      break
     }
   }
+}
+
+function mapRichEmbeds(message: DiscordMessage): Partial<Message> {
+  // TODO: Test more rich embeds
+  // TODO: Fix link rich embeds
+
+  // there can be only one rich embed in a message
+  const embed = message.embeds?.find(e => e.type === MessageEmbedType.RICH)
+  if (!embed) return
+
+  const spacing = '\n\n'
+
+  const description: { entity: TextEntity, text: string } | undefined = embed.description ? {
+    entity: {
+      from: 0,
+      to: embed.description.length,
+      bold: true,
+    },
+    text: embed.description,
+  } : undefined
+
+  let offset = (description?.entity.to + spacing.length) ?? 0
+  const objects: { entity: TextEntity, text: string }[] | undefined = embed.fields ? embed.fields?.map(f => {
+    const text = f.name + '\n' + f.value
+    const entity = {
+      from: offset,
+      to: offset + f.name.length,
+      bold: true,
+    }
+    offset += text.length + spacing.length // newlines
+
+    return { text, entity }
+  }) : undefined
+
+  const final: Partial<Message> = {
+    text: [description?.text, objects?.map(o => o.text)].flat().filter(Boolean).join(spacing),
+    textAttributes: { entities: [description?.entity, objects?.map(o => o.entity)].flat().filter(Boolean) },
+    textHeading: embed.title,
+    textFooter: embed.author?.name,
+  }
+
+  if (embed.image) {
+    final.attachments = [{
+      id: embed.image.url,
+      type: MessageAttachmentType.IMG,
+      mimeType: mapMimeType(embed.image.url),
+      srcURL: embed.image.url,
+      size: { width: embed.image.width, height: embed.image.height },
+    }]
+  }
+
+  return final
 }

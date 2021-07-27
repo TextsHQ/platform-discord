@@ -18,6 +18,15 @@ export enum MessageType {
   APPLICATION_COMMAND = 20,
 }
 
+export enum MessageEmbedType {
+  ARTICLE = 'article',
+  GIFV = 'gifv',
+  IMAGE = 'image',
+  LINK = 'link',
+  RICH = 'rich',
+  VIDEO = 'video',
+}
+
 export enum ChannelType {
   GUILD_TEXT = 0, // a text channel within a server
   DM = 1, // a direct message between users
