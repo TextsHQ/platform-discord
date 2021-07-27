@@ -373,16 +373,19 @@ function mapMessageType(message: DiscordMessage): Partial<Message> {
 }
 
 function mapRichEmbeds(message: DiscordMessage): Partial<Message> {
+  type EmbedObject = { entity: TextEntity, text: string }
+
   // TODO: Test more rich embeds
-  // TODO: Fix link rich embeds
+  // TODO: Add support for `timestamp`, `color`, `footer`, `author` and `provider`
 
   // there can be only one rich embed in a message
   const embed = message.embeds?.find(e => e.type === MessageEmbedType.RICH)
   if (!embed) return
 
   const spacing = '\n\n'
+  let offset = 0
 
-  const description: { entity: TextEntity, text: string } | undefined = embed.description ? {
+  const description: EmbedObject | undefined = embed.description ? {
     entity: {
       from: 0,
       to: embed.description.length,
@@ -391,8 +394,9 @@ function mapRichEmbeds(message: DiscordMessage): Partial<Message> {
     text: embed.description,
   } : undefined
 
-  let offset = (description?.entity.to + spacing.length) ?? 0
-  const objects: { entity: TextEntity, text: string }[] | undefined = embed.fields ? embed.fields?.map(f => {
+  offset += description.entity.to + spacing.length
+
+  const fields: EmbedObject[] | undefined = embed.fields ? embed.fields?.map(f => {
     const text = f.name + '\n' + f.value
     const entity = {
       from: offset,
@@ -404,20 +408,29 @@ function mapRichEmbeds(message: DiscordMessage): Partial<Message> {
     return { text, entity }
   }) : undefined
 
+  let textFooter: string | undefined
+  if (embed.footer?.text) textFooter = embed.footer.text
+  if (embed.author?.name) textFooter = textFooter ? `${textFooter} • ${embed.author.name}` : embed.author.name
+
+  const text = [description?.text].concat(fields?.map(f => f.text)).filter(Boolean).join(spacing)
+  const entities = [description?.entity].concat(fields?.map(f => f.entity)).filter(Boolean)
+
   const final: Partial<Message> = {
-    text: [description?.text, objects?.map(o => o.text)].flat().filter(Boolean).join(spacing),
-    textAttributes: { entities: [description?.entity, objects?.map(o => o.entity)].flat().filter(Boolean) },
+    text,
+    textAttributes: { entities },
     textHeading: embed.title,
-    textFooter: embed.author?.name,
+    textFooter,
+    links: embed.url ? [embed.url] : undefined,
   }
 
-  if (embed.image) {
+  const media = embed.image ?? embed.video ?? embed.thumbnail
+  if (media) {
     final.attachments = [{
-      id: embed.image.url,
-      type: MessageAttachmentType.IMG,
-      mimeType: mapMimeType(embed.image.url),
-      srcURL: embed.image.url,
-      size: { width: embed.image.width, height: embed.image.height },
+      id: media.url,
+      type: (embed.image || embed.thumbnail) ? MessageAttachmentType.IMG : (embed.video ? MessageAttachmentType.VIDEO : MessageAttachmentType.UNKNOWN),
+      mimeType: mapMimeType(media.url),
+      srcURL: media.url,
+      size: { width: media.width, height: media.height },
     }]
   }
 
