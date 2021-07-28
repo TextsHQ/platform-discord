@@ -1,3 +1,5 @@
+import type { ThreadType } from '@textshq/platform-sdk'
+
 export enum MessageType {
   DEFAULT = 0,
   RECIPIENT_ADD = 1,
@@ -16,6 +18,7 @@ export enum MessageType {
   GUILD_DISCOVERY_REQUALIFIED = 15,
   REPLY = 19,
   APPLICATION_COMMAND = 20,
+  THREAD_STARTER_MESSAGE = 21,
 }
 
 export enum MessageEmbedType {
@@ -37,8 +40,36 @@ export enum ChannelType {
   GUILD_STORE = 6, // a channel in which game developers can sell their game on Discord
   GUILD_NEWS_THREAD = 10, // a temporary sub-channel within a GUILD_NEWS channel
   GUILD_PUBLIC_THREAD = 11, // a temporary sub-channel within a GUILD_TEXT channel
-  GUILD_PRIVATE_THREAD = 12, // a temporary sub-channel within a GUILD_TEXT channel that is only viewable by those invited  and those with the MANAGE_THREADS permission
+  GUILD_PRIVATE_THREAD = 12, // a temporary sub-channel within a GUILD_TEXT channel that is only viewable by those invited and those with the MANAGE_THREADS permission
   GUILD_STAGE_VOICE = 13, // a voice channel for hosting events with an audience
 }
 
-export const IGNORED_CHANNEL_TYPES = [2, 4, 13]
+// https://discord.com/developers/docs/resources/channel#message-object-message-sticker-format-types
+export enum StickerFormat {
+  PNG = 1,
+  APNG = 2,
+  LOTTIE = 3,
+}
+
+export const IGNORED_CHANNEL_TYPES: ChannelType[] = [
+  ChannelType.GUILD_VOICE,
+  ChannelType.GUILD_CATEGORY,
+  ChannelType.GUILD_STAGE_VOICE,
+]
+
+export const THREAD_TYPES: ThreadType[] = [
+  'channel', // GUILD_TEXT
+  'single', // DM
+  'channel', // GUILD_VOICE
+  'group', // GROUP_DM
+  'channel', // GUILD_CATEGORY
+  'broadcast', // GUILD_NEWS
+  'broadcast', // GUILD_STORE,
+  undefined,
+  undefined,
+  undefined,
+  'broadcast', // GUILD_NEWS_THREAD
+  'channel', // GUILD_PUBLIC_THREAD
+  'channel', // GUILD_PRIVATE_THREAD,
+  undefined, // GUILD_STAGE_VOICE
+]

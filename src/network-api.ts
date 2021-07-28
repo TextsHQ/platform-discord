@@ -153,7 +153,7 @@ export default class DiscordNetworkAPI {
 
     const paginationQuery = options.before ? `before=${options.before}` : options.after ? `after=${options.after}` : ''
     const res = await this.fetch({ method: 'GET', url: `channels/${threadID}/messages?limit=50&${paginationQuery}` })
-    if (!res.json?.length) throw new Error(res.json?.message || 'No response')
+    if (!res.json) throw new Error(res.json?.message || 'No response')
 
     const messages: Message[] = await Promise.all(res.json?.map(async m => this.getMessage(m, threadID)))
 
@@ -368,7 +368,7 @@ export default class DiscordNetworkAPI {
             // const guildJoinDate: Date = new Date(guild.joined_at)
             // const guildIconID: string | undefined = guild.icon
 
-            const channels = guild.channels
+            const channels = guild.channels.concat(guild.threads)
               .filter(c => !IGNORED_CHANNEL_TYPES.includes(c.type))
               .map(c => mapChannel(c, this.mutedChannels.includes(c.id), guildName))
 

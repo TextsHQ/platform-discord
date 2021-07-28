@@ -1,25 +1,8 @@
-import { CurrentUser, Message, MessageActionType, MessageAttachment, MessageAttachmentType, MessageLink, MessageReaction, TextAttributes, TextEntity, texts, Thread, ThreadType, User } from '@textshq/platform-sdk'
-import { MessageEmbedType, MessageType } from './constants'
+import { CurrentUser, Message, MessageActionType, MessageAttachment, MessageAttachmentType, MessageLink, MessageReaction, TextEntity, Thread, ThreadType, User } from '@textshq/platform-sdk'
+import { MessageEmbedType, MessageType, StickerFormat, THREAD_TYPES } from './constants'
 import { mapTextAttributes } from './text-attributes'
 import type { DiscordMessage, DiscordMessageEmbed, DiscordThread, DiscordUser } from './types'
 import { getTimestampFromSnowflake, mapMimeType } from './util'
-
-// https://discord.com/developers/docs/resources/channel#message-object-message-sticker-format-types
-enum StickerFormat {
-  PNG = 1,
-  APNG = 2,
-  LOTTIE = 3,
-}
-
-const MAP_THREAD_TYPE: ThreadType[] = [
-  'channel', // GUILD_TEXT
-  'single', // DM
-  'channel', // GUILD_VOICE
-  'group', // GROUP_DM
-  'channel', // GUILD_CATEGORY
-  'broadcast', // GUILD_NEWS
-  'broadcast', // GUILD_STORE
-]
 
 const getUserAvatar = (userID: string, avatarID: string) =>
   `https://cdn.discordapp.com/avatars/${userID}/${avatarID}.${avatarID.startsWith('a_') ? 'gif' : 'png'}?size=256`
@@ -82,7 +65,7 @@ export function mapChannel(channel: any, isMuted: Boolean, guildName?: string): 
 }
 
 export function mapThread(thread: DiscordThread, lastReadMessageID?: string, currentUser?: User, userMappings?: Map<string, string>): Thread {
-  const type: ThreadType = MAP_THREAD_TYPE[thread.type]
+  const type: ThreadType = THREAD_TYPES[thread.type]
 
   const participants: User[] = thread.recipients?.map(mapUser)
   participants.sort((a, b) => ((a.username ?? '') < (b.username ?? '') ? 1 : -1))
@@ -196,7 +179,9 @@ function mapAttachments(message: DiscordMessage) {
   ].filter(Boolean)
 }
 
-export function mapMessage(message: DiscordMessage, currentUserID: string, reactionsDetails?: any[]): Message {
+export function mapMessage(message: DiscordMessage, currentUserID: string, reactionsDetails?: any[]): Message | undefined {
+  if (message.type === MessageType.THREAD_STARTER_MESSAGE) message = message.referenced_message
+
   const attachments = mapAttachments(message)
 
   const links: MessageLink[] = message.embeds
