@@ -1,6 +1,7 @@
 import { promises as fs } from 'fs'
 import path from 'path'
 import FormData from 'form-data'
+import { uniqBy } from 'lodash'
 import { texts, CurrentUser, MessageContent, PaginationArg, Thread, Message, ServerEventType, OnServerEventCallback, ActivityType, User, InboxName, MessageSendOptions, ReAuthError, PresenceMap, Paginated, FetchOptions, ServerEvent } from '@textshq/platform-sdk'
 
 import { mapChannel, mapCurrentUser, mapMessage, mapThread, mapUser } from './mappers'
@@ -18,6 +19,7 @@ const WAIT_TILL_READY = true // wait until received initial data?
 const RESTART_ON_FAIL = true // restart platform when failed?
 const ACT_AS_USER = false // subtle internal changes
 const ENABLE_GUILDS = false // enable guilds support?
+const ENABLE_DM_GUILD_MEMBERS = false // REALLY RISKY - allow user to dm guild members?
 
 export default class DiscordNetworkAPI {
   private client?: WSClient
@@ -159,7 +161,13 @@ export default class DiscordNetworkAPI {
 
     if (ENABLE_GUILDS) {
       // Guilds don't return all users, so we need to keep it updated using message authors
-      const entries: User[] = [...new Set<User>(res.json.map(m => mapUser(m.author)))]
+      const users: User[] = res.json.map(m => {
+        const user = mapUser(m.author)
+        user.cannotMessage = !ENABLE_DM_GUILD_MEMBERS
+        return user
+      })
+      const entries = uniqBy(users, 'id')
+
       const authorEvents: ServerEvent[] = [{
         type: ServerEventType.STATE_SYNC,
         mutationType: 'upsert',
