@@ -687,7 +687,13 @@ export default class DiscordNetworkAPI {
       case GatewayMessageType.TYPING_START: {
         if (!ENABLE_GUILDS && payload.guild_id) return
 
-        this.eventCallback?.([{ type: ServerEventType.USER_ACTIVITY, activityType: ActivityType.TYPING, threadID: payload.channel_id, participantID: payload.user_id, durationMs: 10_000 }])
+        this.eventCallback?.([{
+          type: ServerEventType.USER_ACTIVITY,
+          activityType: ActivityType.TYPING,
+          durationMs: 10_000,
+          participantID: payload.user_id,
+          threadID: payload.channel_id,
+        }])
         break
       }
 
