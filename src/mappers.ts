@@ -378,20 +378,19 @@ function mapRichEmbeds(message: DiscordMessage): Partial<Message> {
     },
     text: embed.description,
   } : undefined
+  if (description) offset += description.entity.to + spacing.length
 
-  offset += description.entity.to + spacing.length
-
-  const fields: EmbedObject[] | undefined = embed.fields ? embed.fields?.map(f => {
+  const fields: EmbedObject[] | undefined = embed.fields?.map(f => {
     const text = f.name + '\n' + f.value
     const entity = {
       from: offset,
       to: offset + f.name.length,
       bold: true,
     }
-    offset += text.length + spacing.length // newlines
+    offset += text.length + spacing.length
 
     return { text, entity }
-  }) : undefined
+  })
 
   let textFooter: string | undefined
   if (embed.footer?.text) textFooter = embed.footer.text
