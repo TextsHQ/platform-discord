@@ -758,6 +758,7 @@ export default class DiscordNetworkAPI {
       case GatewayMessageType.GUILD_UPDATE:
       case GatewayMessageType.GUILD_BAN_ADD:
       case GatewayMessageType.GUILD_BAN_REMOVE:
+      case GatewayMessageType.GUILD_APPLICATION_COMMAND_COUNTS_UPDATE:
       case GatewayMessageType.GUILD_INTEGRATIONS_UPDATE:
       case GatewayMessageType.GUILD_MEMBER_ADD:
       case GatewayMessageType.GUILD_MEMBER_REMOVE:

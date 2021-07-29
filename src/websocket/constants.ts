@@ -79,6 +79,7 @@ export enum GatewayMessageType {
   // Undocumented
   CHANNEL_PINS_ACK = 'CHANNEL_PINS_ACK', // channel pins update has been read
   CHANNEL_UNREAD_UPDATE = 'CHANNEL_UNREAD_UPDATE', // ???
+  GUILD_APPLICATION_COMMAND_COUNTS_UPDATE = 'GUILD_APPLICATION_COMMAND_COUNTS_UPDATE', // ???
   MESSAGE_ACK = 'MESSAGE_ACK', // message has been read
   READY_SUPPLEMENTAL = 'READY_SUPPLEMENTAL', // ???
   RELATIONSHIP_ADD = 'RELATIONSHIP_ADD', // friend invite was sent/accepted
