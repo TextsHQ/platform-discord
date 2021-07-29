@@ -1,5 +1,5 @@
 import { CurrentUser, Message, MessageActionType, MessageAttachment, MessageAttachmentType, MessageLink, MessageReaction, TextEntity, Thread, ThreadType, User } from '@textshq/platform-sdk'
-import { MessageEmbedType, MessageType, StickerFormat, THREAD_TYPES } from './constants'
+import { IGNORED_MESSAGE_TYPES, MessageEmbedType, MessageType, StickerFormat, THREAD_TYPES } from './constants'
 import { mapTextAttributes } from './text-attributes'
 import type { DiscordMessage, DiscordMessageEmbed, DiscordThread, DiscordUser } from './types'
 import { getTimestampFromSnowflake, mapMimeType } from './util'
@@ -180,7 +180,8 @@ function mapAttachments(message: DiscordMessage) {
 }
 
 export function mapMessage(message: DiscordMessage, currentUserID: string, reactionsDetails?: any[]): Message | undefined {
-  if (message.type === MessageType.THREAD_STARTER_MESSAGE) message = message.referenced_message
+  if (IGNORED_MESSAGE_TYPES.includes(message.type)) return
+  else if (message.type === MessageType.THREAD_STARTER_MESSAGE) message = message.referenced_message
 
   const attachments = mapAttachments(message)
 

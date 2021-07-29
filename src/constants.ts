@@ -21,6 +21,16 @@ export enum MessageType {
   THREAD_STARTER_MESSAGE = 21,
 }
 
+export const IGNORED_MESSAGE_TYPES: MessageType[] = [
+  MessageType.USER_PREMIUM_GUILD_SUBSCRIPTION,
+  MessageType.USER_PREMIUM_GUILD_SUBSCRIPTION_TIER_1,
+  MessageType.USER_PREMIUM_GUILD_SUBSCRIPTION_TIER_2,
+  MessageType.USER_PREMIUM_GUILD_SUBSCRIPTION_TIER_3,
+  MessageType.CHANNEL_FOLLOW_ADD,
+  MessageType.GUILD_DISCOVERY_DISQUALIFIED,
+  MessageType.GUILD_DISCOVERY_REQUALIFIED,
+]
+
 export enum MessageEmbedType {
   ARTICLE = 'article',
   GIFV = 'gifv',
@@ -44,18 +54,18 @@ export enum ChannelType {
   GUILD_STAGE_VOICE = 13, // a voice channel for hosting events with an audience
 }
 
+export const IGNORED_CHANNEL_TYPES: ChannelType[] = [
+  ChannelType.GUILD_VOICE,
+  ChannelType.GUILD_CATEGORY,
+  ChannelType.GUILD_STAGE_VOICE,
+]
+
 // https://discord.com/developers/docs/resources/channel#message-object-message-sticker-format-types
 export enum StickerFormat {
   PNG = 1,
   APNG = 2,
   LOTTIE = 3,
 }
-
-export const IGNORED_CHANNEL_TYPES: ChannelType[] = [
-  ChannelType.GUILD_VOICE,
-  ChannelType.GUILD_CATEGORY,
-  ChannelType.GUILD_STAGE_VOICE,
-]
 
 export const THREAD_TYPES: ThreadType[] = [
   'channel', // GUILD_TEXT
