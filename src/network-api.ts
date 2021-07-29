@@ -10,6 +10,7 @@ import { GatewayCloseCode, GatewayMessageType } from './websocket/constants'
 import { defaultPacker } from './packers'
 import { IGNORED_CHANNEL_TYPES } from './constants'
 import { sleep } from './util'
+import { ACT_AS_USER, ENABLE_GUILDS, ENABLE_DM_GUILD_MEMBERS } from './preferences'
 
 const API_VERSION = 9
 const API_ENDPOINT = `https://discord.com/api/v${API_VERSION}`
@@ -17,9 +18,6 @@ const DEFAULT_GATEWAY = 'wss://gateway.discord.gg'
 
 const WAIT_TILL_READY = true // wait until received initial data?
 const RESTART_ON_FAIL = true // restart platform when failed?
-const ACT_AS_USER = false // subtle internal changes
-const ENABLE_GUILDS = false // enable guilds support?
-const ENABLE_DM_GUILD_MEMBERS = false // REALLY RISKY - allow user to dm guild members?
 
 export default class DiscordNetworkAPI {
   private client?: WSClient
@@ -31,7 +29,7 @@ export default class DiscordNetworkAPI {
 
   private channelsMap = ENABLE_GUILDS ? new Map<string, Thread[]>() : undefined
 
-  private mutedChannels: string[] = []
+  private mutedChannels: Set<string> = new Set()
 
   private usersPresence: PresenceMap = {}
 
@@ -51,7 +49,7 @@ export default class DiscordNetworkAPI {
 
   currentUser?: CurrentUser
 
-  userFriends: User[] = []
+  userFriends: Set<User> = new Set()
 
   httpClient = texts.createHttpClient()
 
@@ -298,8 +296,8 @@ export default class DiscordNetworkAPI {
   private getUserFriends = async () => {
     const res = await this.fetch({ method: 'GET', url: 'users/@me/relationships' })
     if (!res?.json) throw new Error('No response')
-    this.userFriends = res?.json.filter(f => f.type === 1) // Only friends
-      .map(f => mapUser(f.user))
+    const userFriends = res?.json.filter(f => f.type === 1).map(f => mapUser(f.user)) // Only friends
+    this.userFriends = new Set(userFriends)
   }
 
   private setupGatewayListeners = () => {
@@ -368,7 +366,11 @@ export default class DiscordNetworkAPI {
         }
 
         if (ENABLE_GUILDS) {
-          this.mutedChannels = (ACT_AS_USER ? payload.user_guild_settings.entries : payload.user_guild_settings)?.flatMap(g => g.channel_overrides).filter(g => g.muted).map(g => g.channel_id)
+          const mutedChannels = (ACT_AS_USER ? payload.user_guild_settings.entries : payload.user_guild_settings)
+            ?.flatMap(g => g.channel_overrides)
+            .filter(g => g.muted)
+            .map(g => g.channel_id)
+          this.mutedChannels = new Set(mutedChannels)
 
           payload.guilds.forEach(guild => {
             const guildID: string = guild.id
@@ -377,8 +379,8 @@ export default class DiscordNetworkAPI {
             // const guildIconID: string | undefined = guild.icon
 
             const channels = guild.channels.concat(guild.threads)
-              .filter(c => !IGNORED_CHANNEL_TYPES.includes(c.type))
-              .map(c => mapChannel(c, this.mutedChannels.includes(c.id), guildName))
+              .filter(c => !IGNORED_CHANNEL_TYPES.has(c.type))
+              .map(c => mapChannel(c, this.mutedChannels.has(c.id), guildName))
 
             this.channelsMap.set(guildID, channels)
           })
@@ -410,7 +412,7 @@ export default class DiscordNetworkAPI {
       case GatewayMessageType.CHANNEL_CREATE: {
         if (!ENABLE_GUILDS && payload.guild_id) return
 
-        const channel = mapChannel(payload, this.mutedChannels.includes(payload.id))
+        const channel = mapChannel(payload, this.mutedChannels.has(payload.id))
         const channels = this.channelsMap?.get(payload.guild_id)?.concat([channel])
         if (channels) {
           this.channelsMap?.set(payload.guild_id, channels)
@@ -436,7 +438,7 @@ export default class DiscordNetworkAPI {
         if (index < 0) return
 
         const channel = channels[index]
-        const newChannel = mapChannel(payload, this.mutedChannels.includes(payload.id))
+        const newChannel = mapChannel(payload, this.mutedChannels.has(payload.id))
         Object.assign(channel, newChannel)
         channels[index] = channel
         this.channelsMap?.set(payload.guild_id, channels)
@@ -519,8 +521,8 @@ export default class DiscordNetworkAPI {
         // const guildIconID: string | undefined = payload.icon
 
         const channels = payload.channels
-          .filter(c => !IGNORED_CHANNEL_TYPES.includes(c.type))
-          .map(c => mapChannel(c, this.mutedChannels.includes(c.id)), guildName)
+          .filter(c => !IGNORED_CHANNEL_TYPES.has(c.type))
+          .map(c => mapChannel(c, this.mutedChannels.has(c.id)), guildName)
 
         this.channelsMap?.set(guildID, channels)
 
@@ -736,17 +738,13 @@ export default class DiscordNetworkAPI {
 
       case GatewayMessageType.RELATIONSHIP_ADD: {
         const user = mapUser(payload.user)
-        if (!this.userFriends.includes(user)) {
-          this.userFriends.push(user)
-        }
+        this.userFriends.add(user)
         break
       }
 
       case GatewayMessageType.RELATIONSHIP_REMOVE: {
-        const index = this.userFriends.findIndex(f => f.id === payload.id)
-        if (index > 0) {
-          this.userFriends.splice(index, 1)
-        }
+        const user = Array.from(this.userFriends).find(u => u.id === payload.id)
+        if (user) this.userFriends.delete(user)
         break
       }
 

@@ -180,7 +180,7 @@ function mapAttachments(message: DiscordMessage) {
 }
 
 export function mapMessage(message: DiscordMessage, currentUserID: string, reactionsDetails?: any[]): Message | undefined {
-  if (IGNORED_MESSAGE_TYPES.includes(message.type)) return
+  if (IGNORED_MESSAGE_TYPES.has(message.type)) return
   else if (message.type === MessageType.THREAD_STARTER_MESSAGE) message = message.referenced_message
 
   const attachments = mapAttachments(message)
