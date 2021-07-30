@@ -59,8 +59,7 @@ export default class Discord implements PlatformAPI {
 
   searchUsers = (typed: string) => {
     const typedLower = typed.toLowerCase()
-    const arr = Array.from(this.api.userFriends)
-    return typed ? arr.filter(u => u.username.toLowerCase().includes(typedLower)) : arr
+    return typed ? this.api.userFriends.filter(u => u.username.toLowerCase().includes(typedLower)) : this.api.userFriends
   }
 
   getPresence = () => this.api.getUsersPresence()

@@ -49,7 +49,7 @@ export default class DiscordNetworkAPI {
 
   currentUser?: CurrentUser
 
-  userFriends: Set<User> = new Set()
+  userFriends: User[] = []
 
   httpClient = texts.createHttpClient()
 
@@ -296,8 +296,9 @@ export default class DiscordNetworkAPI {
   private getUserFriends = async () => {
     const res = await this.fetch({ method: 'GET', url: 'users/@me/relationships' })
     if (!res?.json) throw new Error('No response')
-    const userFriends = res?.json.filter(f => f.type === 1).map(f => mapUser(f.user)) // Only friends
-    this.userFriends = new Set(userFriends)
+    this.userFriends = res?.json
+      .filter(f => f.type === 1) // Only friends
+      .map(f => mapUser(f.user))
   }
 
   private setupGatewayListeners = () => {
@@ -737,14 +738,16 @@ export default class DiscordNetworkAPI {
       }
 
       case GatewayMessageType.RELATIONSHIP_ADD: {
-        const user = mapUser(payload.user)
-        this.userFriends.add(user)
+        if (!this.userFriends.find(f => f.id === payload.id)) {
+          const user = mapUser(payload.user)
+          this.userFriends.push(user)
+        }
         break
       }
 
       case GatewayMessageType.RELATIONSHIP_REMOVE: {
-        const user = Array.from(this.userFriends).find(u => u.id === payload.id)
-        if (user) this.userFriends.delete(user)
+        const index = this.userFriends.findIndex(f => f.id === payload.id)
+        if (index >= 0) this.userFriends.splice(index, 1)
         break
       }
 
