@@ -2,7 +2,7 @@ import { PlatformInfo, MessageDeletionMode, Attribute } from '@textshq/platform-
 
 const info: PlatformInfo = {
   name: 'discord',
-  version: '1.1.0',
+  version: '2021.08.01',
   tags: ['Beta'],
   displayName: 'Discord',
   icon: `
