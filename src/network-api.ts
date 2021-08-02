@@ -9,7 +9,7 @@ import WSClient from './websocket/wsclient'
 import { GatewayCloseCode, GatewayMessageType } from './websocket/constants'
 import { defaultPacker } from './packers'
 import { IGNORED_CHANNEL_TYPES } from './constants'
-import { sleep } from './util'
+import { generateSnowflake, sleep } from './util'
 import { ACT_AS_USER, ENABLE_GUILDS, ENABLE_DM_GUILD_MEMBERS } from './preferences'
 
 const API_VERSION = 9
@@ -23,15 +23,17 @@ export default class DiscordNetworkAPI {
   private client?: WSClient
 
   // ID-to-username mappings
-  private userMappings: Map<string, string> = new Map()
+  private readonly userMappings = new Map<string, string>()
 
-  private readStateMap: Map<string, string> = new Map()
+  private readonly readStateMap = new Map<string, string>()
 
-  private channelsMap = ENABLE_GUILDS ? new Map<string, Thread[]>() : undefined
+  private readonly channelsMap = ENABLE_GUILDS ? new Map<string, Thread[]>() : undefined
 
-  private mutedChannels: Set<string> = new Set()
+  private readonly sendMessageNonces = new Set<string>()
 
-  private usersPresence: PresenceMap = {}
+  private readonly usersPresence: PresenceMap = {}
+
+  private mutedChannels = new Set<string>()
 
   private lastAckToken?: string = null
 
@@ -178,7 +180,7 @@ export default class DiscordNetworkAPI {
     return messages.filter(Boolean).sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
   }
 
-  sendMessage = async (threadID: string, content: MessageContent, options?: MessageSendOptions): Promise<boolean> => {
+  sendMessage = async (threadID: string, content: MessageContent, options?: MessageSendOptions) => {
     await this.waitUntilReady()
 
     const text = this.mapMentions(content.text)
@@ -193,6 +195,9 @@ export default class DiscordNetworkAPI {
     if (options?.quotedMessageID) {
       requestContent.message_reference = { message_id: options?.quotedMessageID }
     }
+
+    const nonce = generateSnowflake().toString()
+    this.sendMessageNonces.add(nonce)
 
     if (content.fileBuffer || content.filePath) {
       const form = new FormData()
@@ -211,6 +216,7 @@ export default class DiscordNetworkAPI {
         content: text || '',
         tts: false,
         message_reference: requestContent.message_reference,
+        nonce,
       }
       form.append('payload_json', JSON.stringify(payload_json))
 
@@ -221,6 +227,7 @@ export default class DiscordNetworkAPI {
       requestContent.json = {
         content: text,
         tts: false,
+        nonce,
         message_reference: requestContent.message_reference,
       }
     }
@@ -235,7 +242,7 @@ export default class DiscordNetworkAPI {
 
     if (res?.statusCode !== 200) throw Error(res?.json?.message || `invalid response: ${res?.statusCode}`)
 
-    return true
+    return [mapMessage(res.json, this.currentUser.id)]
   }
 
   editMessage = async (threadID: string, messageID: string, content: MessageContent, options?: MessageSendOptions): Promise<boolean> => {
@@ -583,19 +590,23 @@ export default class DiscordNetworkAPI {
           }])
         }
 
-        // for some reason, discord has started sending this event with payload.content === ''
-        // so we're now sending the refresh event instead
-        // this.eventCallback?.([{
-        //   type: ServerEventType.STATE_SYNC,
-        //   mutationType: 'upsert',
-        //   objectName: 'message',
-        //   objectIDs: {
-        //     threadID: payload.channel_id,
-        //     messageID: payload.id,
-        //   },
-        //   entries: [mapMessage(payload, this.currentUser?.id)],
-        // }])
-        this.eventCallback?.([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: payload.channel_id }])
+        if (this.sendMessageNonces.has(payload.nonce)) {
+          this.sendMessageNonces.delete(payload.nonce)
+        } else {
+          // only send upsert message if message was sent from another client/device
+          // this is to prevent 2 messages from showing for a split second in somecases
+          // (prevents sending ServerEvent before sendMessage() resolves)
+          this.eventCallback?.([{
+            type: ServerEventType.STATE_SYNC,
+            mutationType: 'upsert',
+            objectName: 'message',
+            objectIDs: {
+              threadID: payload.channel_id,
+              messageID: payload.id,
+            },
+            entries: [mapMessage(payload, this.currentUser?.id)],
+          }])
+        }
         break
       }
 

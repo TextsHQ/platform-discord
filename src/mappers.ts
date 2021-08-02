@@ -216,7 +216,6 @@ export function mapMessage(message: DiscordMessage, currentUserID: string, react
     isSender: message.author ? currentUserID === message.author?.id : undefined,
     linkedMessageID: message.referenced_message?.id,
     isDeleted: message.deleted,
-    cursor: message.id,
     threadID: message.channel_id,
   }
 
