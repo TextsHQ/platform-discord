@@ -1,4 +1,4 @@
-import type { SupportedReaction } from '@textshq/platform-sdk'
+import type { ThreadType } from '@textshq/platform-sdk'
 
 export enum MessageType {
   DEFAULT = 0,
@@ -18,9 +18,68 @@ export enum MessageType {
   GUILD_DISCOVERY_REQUALIFIED = 15,
   REPLY = 19,
   APPLICATION_COMMAND = 20,
+  THREAD_STARTER_MESSAGE = 21,
 }
 
-export const tempSupportedReactions: Record<string, SupportedReaction> = {
-  '❤️': { title: 'Heart', render: '❤️' },
-  'chocoAYAYA:503343473349361675': { title: 'chocoAYAYA', render: 'https://cdn.discordapp.com/emojis/503343473349361675.png' },
+export const IGNORED_MESSAGE_TYPES: Set<MessageType> = new Set([
+  MessageType.USER_PREMIUM_GUILD_SUBSCRIPTION,
+  MessageType.USER_PREMIUM_GUILD_SUBSCRIPTION_TIER_1,
+  MessageType.USER_PREMIUM_GUILD_SUBSCRIPTION_TIER_2,
+  MessageType.USER_PREMIUM_GUILD_SUBSCRIPTION_TIER_3,
+  MessageType.CHANNEL_FOLLOW_ADD,
+  MessageType.GUILD_DISCOVERY_DISQUALIFIED,
+  MessageType.GUILD_DISCOVERY_REQUALIFIED,
+])
+
+export enum MessageEmbedType {
+  ARTICLE = 'article',
+  GIFV = 'gifv',
+  IMAGE = 'image',
+  LINK = 'link',
+  RICH = 'rich',
+  VIDEO = 'video',
 }
+
+export enum ChannelType {
+  GUILD_TEXT = 0, // a text channel within a server
+  DM = 1, // a direct message between users
+  GUILD_VOICE = 2, // a voice channel within a server
+  GROUP_DM = 3, // a direct message between multiple users
+  GUILD_CATEGORY = 4, // an organizational category that contains up to 50 channels
+  GUILD_NEWS = 5, // a channel that users can follow and crosspost into their own server
+  GUILD_STORE = 6, // a channel in which game developers can sell their game on Discord
+  GUILD_NEWS_THREAD = 10, // a temporary sub-channel within a GUILD_NEWS channel
+  GUILD_PUBLIC_THREAD = 11, // a temporary sub-channel within a GUILD_TEXT channel
+  GUILD_PRIVATE_THREAD = 12, // a temporary sub-channel within a GUILD_TEXT channel that is only viewable by those invited and those with the MANAGE_THREADS permission
+  GUILD_STAGE_VOICE = 13, // a voice channel for hosting events with an audience
+}
+
+export const IGNORED_CHANNEL_TYPES: Set<ChannelType> = new Set([
+  ChannelType.GUILD_VOICE,
+  ChannelType.GUILD_CATEGORY,
+  ChannelType.GUILD_STAGE_VOICE,
+])
+
+// https://discord.com/developers/docs/resources/channel#message-object-message-sticker-format-types
+export enum StickerFormat {
+  PNG = 1,
+  APNG = 2,
+  LOTTIE = 3,
+}
+
+export const THREAD_TYPES: ThreadType[] = [
+  'channel', // GUILD_TEXT
+  'single', // DM
+  'channel', // GUILD_VOICE
+  'group', // GROUP_DM
+  'channel', // GUILD_CATEGORY
+  'broadcast', // GUILD_NEWS
+  'broadcast', // GUILD_STORE,
+  undefined,
+  undefined,
+  undefined,
+  'broadcast', // GUILD_NEWS_THREAD
+  'channel', // GUILD_PUBLIC_THREAD
+  'channel', // GUILD_PRIVATE_THREAD,
+  undefined, // GUILD_STAGE_VOICE
+]

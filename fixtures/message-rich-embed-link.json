@@ -1,0 +1,49 @@
+{
+  "id": "849345592890359859",
+  "type": 0,
+  "content": "",
+  "channel_id": "847883550165303334",
+  "author": {
+    "id": "807998429140615219",
+    "username": "royal",
+    "avatar": "be5e6aa922fec15979236405faf5023f",
+    "discriminator": "7145",
+    "public_flags": 64
+  },
+  "attachments": [],
+  "embeds": [
+    {
+      "type": "rich",
+      "url": "https://twitter.com/appleinsider/status/1399782404806656005?s=21",
+      "description": "Mozilla's version 89 release of #Firefox overhauls the web browser with a modern appearance, and brings quite a few updates specifically for #macOS.  https://t.co/2YXfB4N3GC",
+      "color": 1942002,
+      "timestamp": "2021-06-01T17:38:26.662000+00:00",
+      "author": {
+        "name": "AppleInsider (@appleinsider)",
+        "url": "https://twitter.com/appleinsider",
+        "icon_url": "https://pbs.twimg.com/profile_images/563064706462535680/h1p6ZJ7V_bigger.jpeg",
+        "proxy_icon_url": "https://images-ext-2.discordapp.net/external/dDKtsB5mRdK8E2S6OM2ewfMxh5UyXNb4Jd70svj-xwc/https/pbs.twimg.com/profile_images/563064706462535680/h1p6ZJ7V_bigger.jpeg"
+      },
+      "image": {
+        "url": "https://pbs.twimg.com/media/E20GrdfWUAQYyTO.jpg:large",
+        "proxy_url": "https://images-ext-2.discordapp.net/external/g5NxTaHnu9LqQK-nVQh9T4BGpq_uN4pb09T0lCNvREM/https/pbs.twimg.com/media/E20GrdfWUAQYyTO.jpg%3Alarge",
+        "width": 1312,
+        "height": 731
+      },
+      "footer": {
+        "text": "Twitter",
+        "icon_url": "https://abs.twimg.com/icons/apple-touch-icon-192x192.png",
+        "proxy_icon_url": "https://images-ext-1.discordapp.net/external/bXJWV2Y_F3XSra_kEqIYXAAsI3m1meckfLhYuWzxIfI/https/abs.twimg.com/icons/apple-touch-icon-192x192.png"
+      }
+    }
+  ],
+  "mentions": [],
+  "mention_roles": [],
+  "pinned": false,
+  "mention_everyone": false,
+  "tts": false,
+  "timestamp": "2021-06-01T17:56:09.423000+00:00",
+  "edited_timestamp": null,
+  "flags": 0,
+  "components": []
+}

@@ -1,16 +1,17 @@
-import { CurrentUser, Message, MessageActionType, MessageAttachment, MessageAttachmentType, MessageLink, MessageReaction, Thread, ThreadType, User } from '@textshq/platform-sdk'
-import { MessageType } from './constants'
+import { CurrentUser, Message, MessageActionType, MessageAttachment, MessageAttachmentType, MessageLink, MessageReaction, TextEntity, Thread, ThreadType, User } from '@textshq/platform-sdk'
+import { IGNORED_MESSAGE_TYPES, MessageEmbedType, MessageType, StickerFormat, THREAD_TYPES } from './constants'
 import { mapTextAttributes } from './text-attributes'
 import type { DiscordMessage, DiscordMessageEmbed, DiscordThread, DiscordUser } from './types'
-
-// https://discord.com/developers/docs/resources/channel#message-object-message-types
-const SUPPORTED_MESSAGE_TYPES = [0, 1, 2, 3, 4, 5, 6, 19]
+import { getTimestampFromSnowflake, mapMimeType } from './util'
 
 const getUserAvatar = (userID: string, avatarID: string) =>
   `https://cdn.discordapp.com/avatars/${userID}/${avatarID}.${avatarID.startsWith('a_') ? 'gif' : 'png'}?size=256`
 
 const getThreadIcon = (threadID: string, iconID: string) =>
   `https://cdn.discordapp.com/channel-icons/${threadID}/${iconID}.png`
+
+const getGuildIcon = (guildID: string, iconID: string) =>
+  `https://cdn.discordapp.com/icons/${guildID}/${iconID}.png`
 
 const getEmojiURL = (emojiID: string, animated: boolean) =>
   `https://cdn.discordapp.com/emojis/${emojiID}.${animated ? 'gif' : 'png'}`
@@ -21,15 +22,6 @@ const getLottieStickerURL = (id: string, asset: string) =>
 // adding &passthrough=false makes it a regular png instead of apng
 const getPNGStickerURL = (id: string) =>
   `https://media.discordapp.net/stickers/${id}.png?size=512`
-
-const DISCORD_EPOCH = 1420070400000
-function getTimestampFromSnowflake(snowflake: string) {
-  if (!snowflake) return
-  const int = BigInt.asUintN(64, BigInt(snowflake))
-  // @ts-expect-error
-  const dateBits = Number(int >> 22n)
-  return new Date(dateBits + DISCORD_EPOCH)
-}
 
 export function mapUser(user: DiscordUser): User {
   return {
@@ -48,18 +40,32 @@ export function mapCurrentUser(user: DiscordUser): CurrentUser {
   }
 }
 
-const MAP_THREAD_TYPE: ThreadType[] = [
-  'group', // GUILD_TEXT
-  'single', // DM
-  'group', // GUILD_VOICE
-  'group', // GROUP_DM
-  'group', // GUILD_CATEGORY
-  'single', // GUILD_NEWS
-  'single', // GUILD_STORE
-]
+export function mapChannel(channel: any, isMuted: Boolean, guildName?: string): Thread {
+  return {
+    _original: JSON.stringify(channel),
+    folderName: guildName,
+    id: channel.id,
+    title: channel.name,
+    isUnread: false, // check it somehow
+    isReadOnly: false, // check permissions
+    mutedUntil: isMuted ? 'forever' : undefined,
+    type: 'channel', // 'channel' | 'broadcast'
+    // createdAt: guildJoinDate,
+    description: channel.topic,
+    timestamp: getTimestampFromSnowflake(channel.last_message_id),
+    messages: {
+      items: [],
+      hasMore: true,
+    },
+    participants: {
+      items: [],
+      hasMore: true,
+    },
+  }
+}
 
-export function mapThread(thread: DiscordThread, lastReadMessageID: string, currentUser?: User, userMappings?: Map<string, string>): Thread {
-  const type: ThreadType = MAP_THREAD_TYPE[thread.type]
+export function mapThread(thread: DiscordThread, lastReadMessageID?: string, currentUser?: User, userMappings?: Map<string, string>): Thread {
+  const type: ThreadType = THREAD_TYPES[thread.type]
 
   const participants: User[] = thread.recipients?.map(mapUser)
   participants.sort((a, b) => ((a.username ?? '') < (b.username ?? '') ? 1 : -1))
@@ -67,6 +73,7 @@ export function mapThread(thread: DiscordThread, lastReadMessageID: string, curr
 
   const timestamp = getTimestampFromSnowflake(thread.last_message_id)
   const lastMessageTimestamp = getTimestampFromSnowflake(lastReadMessageID)
+
   return {
     _original: JSON.stringify(thread),
     id: thread.id,
@@ -86,86 +93,6 @@ export function mapThread(thread: DiscordThread, lastReadMessageID: string, curr
       items: participants,
     },
   }
-}
-
-function mapAttachments(message: DiscordMessage) {
-  const mapEmbed = (embed: DiscordMessageEmbed): MessageAttachment => {
-    // todo handle more types
-    if (embed.type !== 'gifv') return
-    message.content = message.content.replace(embed.url, '')
-    return {
-      id: embed.id,
-      type: MessageAttachmentType.VIDEO,
-      mimeType: 'video/mp4',
-      isGif: true,
-      srcURL: embed.video.url,
-      size: { width: embed.video.width, height: embed.video.height },
-    }
-  }
-  return [
-    ...(message.attachments?.map(mapAttachment) || []),
-    ...(message.stickers?.map(mapSticker) || []),
-    ...(message.sticker_items?.map(mapSticker) || []),
-    ...(message.embeds?.map(mapEmbed) || []),
-  ].filter(Boolean)
-}
-
-export function mapMessage(message: DiscordMessage, currentUserID: string, reactionsDetails?: any[], userMappings?: Map<string, string>): Message | null {
-  if (!SUPPORTED_MESSAGE_TYPES.includes(message.type)) return null
-
-  const attachments = mapAttachments(message)
-
-  const links: MessageLink[] = message.embeds
-    .filter(e => e.type === 'article' || e.type === 'link' || e.type === 'video' || e.type === 'rich')
-    .filter(e => e.url)
-    .map(e => {
-      return {
-        url: e.url!,
-        img: e.thumbnail?.url || e.image?.url,
-        imgSize: { width: e.thumbnail?.width || e.image?.width, height: e.thumbnail?.height || e.image?.height },
-        title: e.title || e.author?.name || e.url!,
-        summary: e.description || undefined,
-      }
-    })
-
-  const reactions = reactionsDetails?.flatMap<MessageReaction>(r =>
-    r.users.map(u => ({
-      id: r.emoji.id || r.emoji.name,
-      reactionKey: r.emoji.id ? getEmojiURL(r.emoji.id, r.emoji.animated) : r.emoji.name,
-      participantID: u.id,
-      emoji: true,
-    })))
-
-  const mapped: Message = {
-    _original: JSON.stringify(message),
-    id: message.id,
-    timestamp: new Date(message.timestamp),
-    editedTimestamp: message.edited_timestamp ? new Date(message.edited_timestamp) : undefined,
-    senderID: message.author.id,
-    text: message.content,
-    attachments: attachments.length > 0 ? attachments : undefined,
-    links,
-    isSender: currentUserID === message.author.id,
-    linkedMessageID: message.referenced_message?.id,
-    isDeleted: message.deleted,
-    cursor: message.id,
-    threadID: message.channel_id,
-  }
-  // reactions property should only be present if they exist, or state sync message update event will remove the reactions
-  if (reactions) mapped.reactions = reactions
-
-  Object.assign(mapped, mapMessageType(message))
-
-  if (mapped.text) {
-    const getUserName = (id: string): string => (userMappings.get(id) || '').slice(0, -5)
-    const { text: transformedMessageText, textAttributes } = mapTextAttributes(mapped.text, getUserName)
-    if (transformedMessageText && textAttributes) {
-      mapped.text = transformedMessageText
-      mapped.textAttributes = textAttributes
-    }
-  }
-
-  return mapped
 }
 
 function mapAttachment(a): MessageAttachment {
@@ -202,11 +129,115 @@ function mapAttachment(a): MessageAttachment {
   }
 }
 
-// https://discord.com/developers/docs/resources/channel#message-object-message-sticker-format-types
-enum StickerFormat {
-  PNG = 1,
-  APNG = 2,
-  LOTTIE = 3,
+function mapAttachments(message: DiscordMessage) {
+  const mapEmbed = (embed: DiscordMessageEmbed): MessageAttachment => {
+    message.content = message.content?.replace(embed.url, '')
+
+    switch (embed.type) {
+      case MessageEmbedType.ARTICLE: {
+        // haven't seen one in the wild
+        break
+      }
+      case MessageEmbedType.GIFV: return {
+        id: embed.url,
+        type: MessageAttachmentType.VIDEO,
+        mimeType: mapMimeType(embed.video.url),
+        isGif: true,
+        srcURL: embed.video.url,
+        size: { width: embed.video.width, height: embed.video.height },
+      }
+      case MessageEmbedType.IMAGE: {
+        const isGif = embed.thumbnail.url.toLowerCase().endsWith('.gif')
+        return {
+          id: embed.url,
+          type: isGif ? MessageAttachmentType.VIDEO : MessageAttachmentType.IMG,
+          mimeType: mapMimeType(embed.thumbnail.url),
+          isGif,
+          srcURL: embed.thumbnail.url,
+          size: { width: embed.thumbnail.width, height: embed.thumbnail.height },
+        }
+      }
+      case MessageEmbedType.LINK: {
+        // already works ¯\_(ツ)_/¯
+        break
+      }
+      case MessageEmbedType.RICH: {
+        // handled somewhere else
+        break
+      }
+      case MessageEmbedType.VIDEO: {
+        // haven't seen one in the wild
+        break
+      }
+    }
+  }
+  return [
+    ...(message.attachments?.map(mapAttachment) || []),
+    ...(message.stickers?.map(mapSticker) || []),
+    ...(message.sticker_items?.map(mapSticker) || []),
+    ...(message.embeds?.map(mapEmbed) || []),
+  ].filter(Boolean)
+}
+
+export function mapMessage(message: DiscordMessage, currentUserID: string, reactionsDetails?: any[]): Message | undefined {
+  if (IGNORED_MESSAGE_TYPES.has(message.type)) return
+  else if (message.type === MessageType.THREAD_STARTER_MESSAGE) message = message.referenced_message
+
+  const attachments = mapAttachments(message)
+
+  const links: MessageLink[] = message.embeds
+    .filter(e => e.type === 'article' || e.type === 'link' || e.type === 'video' || e.type === 'rich')
+    .filter(e => e.url)
+    .map(e => {
+      return {
+        url: e.url!,
+        img: e.thumbnail?.url || e.image?.url,
+        imgSize: { width: e.thumbnail?.width || e.image?.width, height: e.thumbnail?.height || e.image?.height },
+        title: e.title || e.author?.name || e.url!,
+        summary: e.description || undefined,
+      }
+    })
+
+  const reactions = reactionsDetails?.flatMap<MessageReaction>(r =>
+    r.users.map(u => ({
+      id: r.emoji.id || r.emoji.name,
+      reactionKey: r.emoji.id ? getEmojiURL(r.emoji.id, r.emoji.animated) : r.emoji.name,
+      participantID: u.id,
+      emoji: true,
+    })))
+
+  const mapped: Message = {
+    _original: JSON.stringify(message),
+    id: message.id,
+    timestamp: new Date(message.timestamp),
+    editedTimestamp: message.edited_timestamp ? new Date(message.edited_timestamp) : undefined,
+    senderID: message.author?.id,
+    text: message.content,
+    isSender: message.author ? currentUserID === message.author?.id : undefined,
+    linkedMessageID: message.referenced_message?.id,
+    isDeleted: message.deleted,
+    cursor: message.id,
+    threadID: message.channel_id,
+  }
+
+  // reactions property should only be present if they exist, or state sync message update event will remove the reactions
+  if (reactions) mapped.reactions = reactions
+  if (attachments && attachments.length > 0) mapped.attachments = attachments
+  if (links && links.length > 0) mapped.links = links
+  if (message.embeds?.find(e => e.type === MessageEmbedType.RICH)) Object.assign(mapped, mapRichEmbeds(message))
+
+  Object.assign(mapped, mapMessageType(message))
+
+  if (mapped.text && mapped.text.length > 0) {
+    const getUserName = (id: string): string => message.mentions.find(m => m.id === id)?.username || id
+    const { text: transformedMessageText, textAttributes } = mapTextAttributes(mapped.text, getUserName)
+    if (transformedMessageText && textAttributes) {
+      mapped.text = transformedMessageText
+      mapped.textAttributes = textAttributes
+    }
+  }
+
+  return mapped
 }
 
 function mapSticker(sticker: any): MessageAttachment {
@@ -228,7 +259,7 @@ function mapSticker(sticker: any): MessageAttachment {
 
 function mapMessageType(message: DiscordMessage): Partial<Message> {
   switch (message.type) {
-    case MessageType.RECIPIENT_ADD:
+    case MessageType.RECIPIENT_ADD: {
       return {
         isAction: true,
         parseTemplate: true,
@@ -239,7 +270,9 @@ function mapMessageType(message: DiscordMessage): Partial<Message> {
           actorParticipantID: null,
         },
       }
-    case MessageType.RECIPIENT_REMOVE:
+    }
+
+    case MessageType.RECIPIENT_REMOVE: {
       return {
         isAction: true,
         parseTemplate: true,
@@ -250,6 +283,8 @@ function mapMessageType(message: DiscordMessage): Partial<Message> {
           actorParticipantID: null,
         },
       }
+    }
+
     case MessageType.CALL: {
       let text = message.content
       if (message.call?.ended_timestamp) {
@@ -269,7 +304,8 @@ function mapMessageType(message: DiscordMessage): Partial<Message> {
       }
       return { isAction: true, parseTemplate: true, text }
     }
-    case MessageType.CHANNEL_NAME_CHANGE:
+
+    case MessageType.CHANNEL_NAME_CHANGE: {
       return {
         isAction: true,
         parseTemplate: true,
@@ -280,7 +316,9 @@ function mapMessageType(message: DiscordMessage): Partial<Message> {
           actorParticipantID: null,
         },
       }
-    case MessageType.CHANNEL_ICON_CHANGE:
+    }
+
+    case MessageType.CHANNEL_ICON_CHANGE: {
       return {
         isAction: true,
         parseTemplate: true,
@@ -290,14 +328,96 @@ function mapMessageType(message: DiscordMessage): Partial<Message> {
           actorParticipantID: null,
         },
       }
-    case MessageType.CHANNEL_PINNED_MESSAGE:
+    }
+
+    case MessageType.CHANNEL_PINNED_MESSAGE: {
       return {
         isAction: true,
         parseTemplate: true,
         linkedMessageID: message.message_reference.message_id,
         text: `{{${message.author.id}}} pinned a message`,
       }
-    default:
-      return { text: message.content }
+    }
+
+    case MessageType.GUILD_MEMBER_JOIN: {
+      return {
+        isAction: true,
+        parseTemplate: true,
+        text: `{{${message.author.id}}} joined`,
+        action: {
+          type: MessageActionType.THREAD_PARTICIPANTS_ADDED,
+          participantIDs: [message.author.id],
+          actorParticipantID: null,
+        },
+      }
+    }
+
+    default: {
+      break
+    }
   }
+}
+
+function mapRichEmbeds(message: DiscordMessage): Partial<Message> {
+  type EmbedObject = { entity: TextEntity, text: string }
+
+  // TODO: Test more rich embeds
+  // TODO: Add support for `timestamp`, `color`, `footer`, `author` and `provider`
+
+  // there can be only one rich embed in a message
+  const embed = message.embeds?.find(e => e.type === MessageEmbedType.RICH)
+  if (!embed) return
+
+  const spacing = '\n\n'
+  let offset = 0
+
+  const description: EmbedObject | undefined = embed.description ? {
+    entity: {
+      from: 0,
+      to: embed.description.length,
+      bold: true,
+    },
+    text: embed.description,
+  } : undefined
+  if (description) offset += description.entity.to + spacing.length
+
+  const fields: EmbedObject[] | undefined = embed.fields?.map(f => {
+    const text = f.name + '\n' + f.value
+    const entity = {
+      from: offset,
+      to: offset + f.name.length,
+      bold: true,
+    }
+    offset += text.length + spacing.length
+
+    return { text, entity }
+  })
+
+  let textFooter: string | undefined
+  if (embed.footer?.text) textFooter = embed.footer.text
+  if (embed.author?.name) textFooter = textFooter ? `${textFooter} • ${embed.author.name}` : embed.author.name
+
+  const text = [description?.text].concat(fields?.map(f => f.text)).filter(Boolean).join(spacing)
+  const entities = [description?.entity].concat(fields?.map(f => f.entity)).filter(Boolean)
+
+  const final: Partial<Message> = {
+    text,
+    textAttributes: { entities },
+    textHeading: embed.title,
+    textFooter,
+    links: embed.url ? [embed.url] : undefined,
+  }
+
+  const media = embed.image ?? embed.video ?? embed.thumbnail
+  if (media) {
+    final.attachments = [{
+      id: media.url,
+      type: (embed.image || embed.thumbnail) ? MessageAttachmentType.IMG : (embed.video ? MessageAttachmentType.VIDEO : MessageAttachmentType.UNKNOWN),
+      mimeType: mapMimeType(media.url),
+      srcURL: media.url,
+      size: { width: media.width, height: media.height },
+    }]
+  }
+
+  return final
 }

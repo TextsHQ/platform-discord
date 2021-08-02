@@ -1,22 +1,23 @@
 import { promises as fs } from 'fs'
 import path from 'path'
 import FormData from 'form-data'
-import { texts, CurrentUser, MessageContent, PaginationArg, Thread, ServerEventType, OnServerEventCallback, ActivityType, User, InboxName, MessageSendOptions, ReAuthError, PresenceMap, Paginated, FetchOptions } from '@textshq/platform-sdk'
+import { uniqBy } from 'lodash'
+import { texts, CurrentUser, MessageContent, PaginationArg, Thread, Message, ServerEventType, OnServerEventCallback, ActivityType, User, InboxName, MessageSendOptions, ReAuthError, PresenceMap, Paginated, FetchOptions, ServerEvent } from '@textshq/platform-sdk'
 
-import { mapCurrentUser, mapMessage, mapThread, mapUser } from './mappers'
+import { mapChannel, mapCurrentUser, mapMessage, mapThread, mapUser } from './mappers'
 import WSClient from './websocket/wsclient'
 import { GatewayCloseCode, GatewayMessageType } from './websocket/constants'
 import { defaultPacker } from './packers'
+import { IGNORED_CHANNEL_TYPES } from './constants'
+import { sleep } from './util'
+import { ACT_AS_USER, ENABLE_GUILDS, ENABLE_DM_GUILD_MEMBERS } from './preferences'
 
-const API_ENDPOINT = 'https://discord.com/api/v8/'
-const WAIT_TILL_READY = true
-const RESTART_ON_FAIL = true
-const LIMIT_COUNT = 25
-const ACT_AS_USER = false
+const API_VERSION = 9
+const API_ENDPOINT = `https://discord.com/api/v${API_VERSION}`
+const DEFAULT_GATEWAY = 'wss://gateway.discord.gg'
 
-async function sleep(time: number) {
-  return new Promise(resolve => setTimeout(resolve, time))
-}
+const WAIT_TILL_READY = true // wait until received initial data?
+const RESTART_ON_FAIL = true // restart platform when failed?
 
 export default class DiscordNetworkAPI {
   private client?: WSClient
@@ -25,6 +26,10 @@ export default class DiscordNetworkAPI {
   private userMappings: Map<string, string> = new Map()
 
   private readStateMap: Map<string, string> = new Map()
+
+  private channelsMap = ENABLE_GUILDS ? new Map<string, Thread[]>() : undefined
+
+  private mutedChannels: Set<string> = new Set()
 
   private usersPresence: PresenceMap = {}
 
@@ -67,11 +72,11 @@ export default class DiscordNetworkAPI {
 
   setupWebsocket = async () => {
     const gatewayRes = await this.httpClient.requestAsString(`${API_ENDPOINT}/gateway`, { headers: { 'User-Agent': texts.constants.USER_AGENT } })
-    const gatewayHost = JSON.parse(gatewayRes?.body)?.url as string ?? 'wss://gateway.discord.gg'
-    const gatewayFullURL = `${gatewayHost}/?v=8&encoding=${defaultPacker.encoding}`
+    const gatewayHost = JSON.parse(gatewayRes?.body)?.url as string ?? DEFAULT_GATEWAY
+    const gatewayFullURL = `${gatewayHost}/?v=${API_VERSION}&encoding=${defaultPacker.encoding}`
 
-    this.client = new WSClient(gatewayFullURL, this.token, ACT_AS_USER, defaultPacker)
-    texts.log(gatewayFullURL)
+    this.client = new WSClient(gatewayFullURL, this.token, ENABLE_GUILDS, ACT_AS_USER, defaultPacker)
+    texts.log('[discord ws] URL:', gatewayFullURL)
     this.client.restartOnFail = RESTART_ON_FAIL
 
     this.setupGatewayListeners()
@@ -83,7 +88,7 @@ export default class DiscordNetworkAPI {
 
     const currentUser = mapCurrentUser(res?.json)
     this.currentUser = currentUser
-    this.userMappings.set(currentUser.id, currentUser.displayText)
+    if (currentUser.id && currentUser.displayText) this.userMappings.set(currentUser.id, currentUser.displayText)
 
     this.getUserFriends()
 
@@ -95,17 +100,18 @@ export default class DiscordNetworkAPI {
     const res = await this.fetch({ method: 'GET', url: 'users/@me/channels' })
     if (!res?.json) throw new Error('No response')
 
-    const threads: Thread[] = await Promise.all(res?.json
+    const threads: Thread[] = res?.json
       .sort((a, b) => a.last_message_id - b.last_message_id)
       .reverse()
-      .map(thread => mapThread(thread, this.readStateMap.get(thread.id), this.currentUser, this.userMappings)))
+      .map(thread => mapThread(thread, this.readStateMap.get(thread.id), this.currentUser))
 
-    return { items: threads, hasMore: false }
+    // TODO: App doesn't display empty (unloaded) channels
+    const items = ENABLE_GUILDS ? threads.concat([...this.channelsMap?.values()].flat()) : threads
+    return { items, hasMore: false }
   }
 
   createThread = async (userIDs: string[], title?: string): Promise<boolean | Thread> => {
     if (userIDs.length === 1 && userIDs[0] === this.currentUser?.id) return false
-
     await this.waitUntilReady()
 
     const res = await this.fetch({
@@ -115,7 +121,7 @@ export default class DiscordNetworkAPI {
     })
 
     if (!res?.json) throw new Error('No response')
-    return mapThread(res?.json, '', this.currentUser, this.userMappings)
+    return mapThread(res?.json, null, this.currentUser, this.userMappings)
   }
 
   /** https://discord.com/developers/docs/resources/channel#deleteclose-channel */
@@ -128,17 +134,15 @@ export default class DiscordNetworkAPI {
       ? await Promise.all(message.reactions.map(async r => {
         const emojiQuery = encodeURIComponent(r.emoji.id ? `${r.emoji.name}:${r.emoji.id}` : r.emoji.name)
         const reactedRes = await this.fetch({ method: 'GET', url: `channels/${threadID}/messages/${message.id}/reactions/${emojiQuery}` })
-        const parsed = reactedRes?.json
-        if (parsed) return { emoji: r.emoji, users: parsed }
-        return null
+        const users = reactedRes?.json
+        return users ? { emoji: r.emoji, users } : null
       }))
       : undefined
-    return mapMessage(message, this.currentUser.id, reactionsDetails, this.userMappings)
+    return mapMessage(message, this.currentUser.id, reactionsDetails)
   }
 
   getMessages = async (threadID: string, pagination?: PaginationArg) => {
     if (!this.currentUser) throw new Error('No current user')
-
     await this.waitUntilReady()
 
     const options = {
@@ -148,19 +152,30 @@ export default class DiscordNetworkAPI {
 
     const paginationQuery = options.before ? `before=${options.before}` : options.after ? `after=${options.after}` : ''
     const res = await this.fetch({ method: 'GET', url: `channels/${threadID}/messages?limit=50&${paginationQuery}` })
-    if (!res?.json) throw new Error('No response')
+    if (!res.json) throw new Error(res.json?.message || 'No response')
 
-    const messages = await Promise.all((res?.json as any[]).map(m => this.getMessage(m, threadID)))
+    const messages: Message[] = await Promise.all(res.json?.map(m => this.getMessage(m, threadID)))
+
+    if (ENABLE_GUILDS) {
+      // Guilds don't return all users, so we need to keep it updated using message authors
+      const users: User[] = res.json.map(m => {
+        const user = mapUser(m.author)
+        user.cannotMessage = !ENABLE_DM_GUILD_MEMBERS
+        return user
+      })
+      const entries = uniqBy(users, 'id')
+
+      const authorEvents: ServerEvent[] = [{
+        type: ServerEventType.STATE_SYNC,
+        mutationType: 'upsert',
+        objectName: 'participant',
+        objectIDs: { threadID },
+        entries,
+      }]
+      this.eventCallback?.(authorEvents)
+    }
+
     return messages.filter(Boolean).sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
-  }
-
-  mapMentions = (text: string) => {
-    // @ts-expect-error replaceAll
-    return text?.replaceAll(/@([^#@]{3,32}#[0-9]{4})/gi, (_, username) => {
-      const user = Array.from(this.userMappings).find(u => u[1] === username)
-      if (user) return `<@!${user[0]}>`
-      return username
-    })
   }
 
   sendMessage = async (threadID: string, content: MessageContent, options?: MessageSendOptions): Promise<boolean> => {
@@ -238,8 +253,7 @@ export default class DiscordNetworkAPI {
   }
 
   deleteMessage = async (threadID: string, messageID: string, forEveryone?: boolean): Promise<boolean> => {
-    if (!forEveryone) return true
-
+    if (!forEveryone) return false
     await this.waitUntilReady()
 
     const res = await this.fetch({ method: 'DELETE', url: `channels/${threadID}/messages/${messageID}` })
@@ -248,6 +262,7 @@ export default class DiscordNetworkAPI {
 
   sendReadReceipt = async (threadID: string, messageID: string) => {
     await this.waitUntilReady()
+
     const res = await this.fetch({ method: 'POST', url: `channels/${threadID}/messages/${messageID}/ack`, json: { token: this.lastAckToken } })
     this.lastAckToken = res.json.token
 
@@ -280,7 +295,8 @@ export default class DiscordNetworkAPI {
   private getUserFriends = async () => {
     const res = await this.fetch({ method: 'GET', url: 'users/@me/relationships' })
     if (!res?.json) throw new Error('No response')
-    this.userFriends = res?.json.filter(f => f.type === 1) // Only friends
+    this.userFriends = res?.json
+      .filter(f => f.type === 1) // Only friends
       .map(f => mapUser(f.user))
   }
 
@@ -288,12 +304,12 @@ export default class DiscordNetworkAPI {
     if (!this.client) throw new Error('WSClient not initialized!')
 
     this.client.onChangedReadyState = ready => {
-      texts.log('Connection state: ' + ready)
+      texts.log('[discord ws] Connection state: ' + ready)
       this.ready = ready
     }
 
     this.client.onConnectionClosed = (code, reason) => {
-      texts.log('Connection to websocket closed with code', code + '. Reason:', reason)
+      texts.log('[discord ws] Connection to websocket closed with code', code + '. Reason:', reason)
       this.ready = false
 
       switch (code) {
@@ -301,13 +317,14 @@ export default class DiscordNetworkAPI {
           this.startPolling?.()
           break
         case GatewayCloseCode.RECONNECT_REQUESTED:
-          texts.log('Gateway requested client reconnect.')
+          texts.log('[discord ws] Gateway requested client reconnect.')
           break
         case GatewayCloseCode.AUTHENTICATION_FAILED:
           this.client = null
+          // eslint-disable-next-line @typescript-eslint/no-throw-literal
           throw new ReAuthError('Access token invalid')
         case GatewayCloseCode.SESSION_TIMED_OUT:
-          texts.log('Gateway session timed out.')
+          texts.log('[discord ws] Gateway session timed out.')
           break
         default:
           break
@@ -318,191 +335,468 @@ export default class DiscordNetworkAPI {
       texts.Sentry.captureException(error)
     }
 
-    this.client.onMessage = (opcode, payload, type) => {
-      texts.log('[DISCORD GATEWAY]', opcode, type)
+    this.client.onMessage = this.handleGatewayMessage
+  }
 
-      switch (type) {
-        case GatewayMessageType.HELLO:
-          break
+  private handleGatewayMessage = (opcode, payload, type) => {
+    // texts.log('[discord ws]', opcode, type)
 
-        case GatewayMessageType.INVALID_SESSION:
-          break
+    switch (type) {
+      // * Documented
 
-        case GatewayMessageType.READY:
-          // const notes = payload.notes
-          // const user_settings = payload.user_settings
+      case GatewayMessageType.HELLO: {
+        // handled by WSClient
+        break
+      }
 
-          if (ACT_AS_USER) {
-            payload.relationships?.forEach(r => this.userMappings.set(r.id, (r.username + '#' + r.discriminator)))
-            payload.read_state?.entries?.forEach(p => this.readStateMap.set(p.id, p.last_message_id))
-            // apparently there's no presences when acting as a user
-          } else {
-            payload.relationships?.forEach(r => this.userMappings.set(r.id, (r.user.username + '#' + r.user.discriminator)))
-            payload.read_state?.forEach(p => this.readStateMap.set(p.id, p.last_message_id))
-            payload.presences?.forEach(p => {
-              this.usersPresence[p.user.id] = { userID: p.user.id, isActive: p.status === 'online', lastActive: new Date(+p.last_modified) }
-            })
-          }
+      case GatewayMessageType.READY: {
+        // const notes = payload.notes
+        // const user_settings = payload.user_settings
 
-          this.gotInitialUserData = true
-          break
-
-        case GatewayMessageType.RECONNECT:
-          break
-
-        case GatewayMessageType.RESUMED:
-          break
-
-        case GatewayMessageType.CHANNEL_CREATE:
-          if (payload.guild_id) return
-          this.eventCallback?.([{
-            type: ServerEventType.STATE_SYNC,
-            mutationType: 'update',
-            objectName: 'thread',
-            objectIDs: {
-              threadID: payload.id,
-            },
-            entries: [
-              {
-                id: payload.id,
-                isUnread: true,
-              },
-            ],
-          }])
-          break
-
-        case GatewayMessageType.CHANNEL_DELETE:
-          if (payload.guild_id) return
-          this.eventCallback?.([{
-            type: ServerEventType.STATE_SYNC,
-            mutationType: 'delete',
-            objectName: 'thread',
-            objectIDs: {
-              threadID: payload.id,
-            },
-            entries: [payload.id],
-          }])
-          break
-
-        case GatewayMessageType.MESSAGE_DELETE:
-          // payload = { channel_id: '790193575429799966', id: '834478990861402195' }
-          this.eventCallback?.([{
-            type: ServerEventType.STATE_SYNC,
-            mutationType: 'delete',
-            objectName: 'message',
-            objectIDs: { threadID: payload.channel_id },
-            entries: [payload.id],
-          }])
-          break
-
-        case GatewayMessageType.CHANNEL_PINS_UPDATE:
-        case GatewayMessageType.CHANNEL_UPDATE:
-          if (payload.guild_id) return
-          this.eventCallback?.([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: payload.channel_id }])
-          break
-
-        // https://discord.com/developers/docs/topics/gateway#message-create
-        case GatewayMessageType.MESSAGE_CREATE: {
-          if (payload.guild_id) return
-          this.eventCallback?.([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: payload.channel_id }])
-          // const threadID = payload.channel_id
-          // this.getMessage(payload, threadID).then(message => {
-          //   this.eventCallback?.([{
-          //     type: ServerEventType.STATE_SYNC,
-          //     mutationType: 'upsert',
-          //     objectName: 'message',
-          //     objectIDs: { threadID },
-          //     entries: [message],
-          //   }])
-          // })
-          break
+        if (ACT_AS_USER) {
+          payload.relationships?.forEach(r => this.userMappings.set(r.id, (r.username + '#' + r.discriminator)))
+          payload.read_state?.entries?.forEach(p => this.readStateMap.set(p.id, p.last_message_id))
+          // apparently there's no presences when acting as a user
+        } else {
+          payload.relationships?.forEach(r => this.userMappings.set(r.id, (r.user.username + '#' + r.user.discriminator)))
+          payload.read_state?.forEach(p => this.readStateMap.set(p.id, p.last_message_id))
+          payload.presences?.forEach(p => {
+            this.usersPresence[p.user.id] = { userID: p.user.id, isActive: p.status === 'online', lastActive: new Date(+p.last_modified) }
+          })
         }
 
-        // https://discord.com/developers/docs/topics/gateway#message-update
-        case GatewayMessageType.MESSAGE_UPDATE:
-          // for some reason, discord has started sending this event with payload.content === ''
-          // so we're now sending the refresh event instead
-          // this.eventCallback?.([{
-          //   type: ServerEventType.STATE_SYNC,
-          //   mutationType: 'update',
-          //   objectName: 'message',
-          //   objectIDs: { threadID: payload.channel_id },
-          //   entries: [mapMessage(payload, this.currentUser.id, undefined, this.userMappings)],
-          // }])
-          this.eventCallback?.([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: payload.channel_id }])
-          break
+        if (ENABLE_GUILDS) {
+          const mutedChannels = (ACT_AS_USER ? payload.user_guild_settings.entries : payload.user_guild_settings)
+            ?.flatMap(g => g.channel_overrides)
+            .filter(g => g.muted)
+            .map(g => g.channel_id)
+          this.mutedChannels = new Set(mutedChannels)
 
-        case GatewayMessageType.MESSAGE_ACK:
+          payload.guilds.forEach(guild => {
+            const guildID: string = guild.id
+            const guildName: string = guild.name
+            // const guildJoinDate: Date = new Date(guild.joined_at)
+            // const guildIconID: string | undefined = guild.icon
+
+            const channels = guild.channels.concat(guild.threads)
+              .filter(c => !IGNORED_CHANNEL_TYPES.has(c.type))
+              .map(c => mapChannel(c, this.mutedChannels.has(c.id), guildName))
+
+            this.channelsMap.set(guildID, channels)
+          })
+        }
+
+        this.gotInitialUserData = true
+        this.ready = true
+        break
+      }
+
+      case GatewayMessageType.RESUMED: {
+        // TODO: RESUMED
+        console.log(payload)
+        break
+      }
+
+      case GatewayMessageType.RECONNECT: {
+        // TODO: RECONNECT
+        console.log(payload)
+        break
+      }
+
+      case GatewayMessageType.INVALID_SESSION: {
+        // TODO: INVALID_SESSION
+        console.log(payload)
+        break
+      }
+
+      case GatewayMessageType.CHANNEL_CREATE: {
+        if (!ENABLE_GUILDS && payload.guild_id) return
+
+        const channel = mapChannel(payload, this.mutedChannels.has(payload.id))
+        const channels = this.channelsMap?.get(payload.guild_id)?.concat([channel])
+        if (channels) {
+          this.channelsMap?.set(payload.guild_id, channels)
+
           this.eventCallback?.([{
             type: ServerEventType.STATE_SYNC,
-            mutationType: 'update',
+            mutationType: 'upsert',
             objectName: 'thread',
+            objectIDs: {
+              threadID: payload.id,
+            },
+            entries: [channel],
+          }])
+        }
+        break
+      }
+
+      case GatewayMessageType.CHANNEL_UPDATE: {
+        if (!ENABLE_GUILDS && payload.guild_id) return
+
+        const channels = this.channelsMap?.get(payload.guild_id)
+        const index = channels.findIndex(c => c.id === payload.id)
+        if (index < 0) return
+
+        const channel = channels[index]
+        const newChannel = mapChannel(payload, this.mutedChannels.has(payload.id))
+        Object.assign(channel, newChannel)
+        channels[index] = channel
+        this.channelsMap?.set(payload.guild_id, channels)
+
+        this.eventCallback?.([{
+          type: ServerEventType.STATE_SYNC,
+          mutationType: 'update',
+          objectName: 'thread',
+          objectIDs: {
+            threadID: payload.id,
+          },
+          entries: [channel],
+        }])
+        break
+      }
+
+      case GatewayMessageType.CHANNEL_DELETE: {
+        if (!ENABLE_GUILDS && payload.guild_id) return
+
+        this.eventCallback?.([{
+          type: ServerEventType.STATE_SYNC,
+          mutationType: 'delete',
+          objectName: 'thread',
+          objectIDs: {
+            threadID: payload.id,
+          },
+          entries: [payload.id],
+        }])
+        break
+      }
+
+      case GatewayMessageType.CHANNEL_PINS_UPDATE: {
+        // TODO: CHANNEL_PINS_UPDATE
+        console.log(payload)
+        break
+      }
+
+      case GatewayMessageType.THREAD_CREATE: {
+        // TODO: THREAD_CREATE
+        console.log(payload)
+        break
+      }
+
+      case GatewayMessageType.THREAD_UPDATE: {
+        // TODO: THREAD_UPDATE
+        console.log(payload)
+        break
+      }
+
+      case GatewayMessageType.THREAD_DELETE: {
+        // TODO: THREAD_DELETE
+        console.log(payload)
+        break
+      }
+
+      case GatewayMessageType.THREAD_LIST_SYNC: {
+        // TODO: THREAD_LIST_SYNC
+        console.log(payload)
+        break
+      }
+
+      case GatewayMessageType.THREAD_MEMBER_UPDATE: {
+        // TODO: THREAD_MEMBER_UPDATE
+        console.log(payload)
+        break
+      }
+
+      case GatewayMessageType.THREAD_MEMBERS_UPDATE: {
+        // TODO: THREAD_MEMBERS_UPDATE
+        console.log(payload)
+        break
+      }
+
+      case GatewayMessageType.GUILD_CREATE: {
+        if (!ENABLE_GUILDS) return
+
+        const guildID: string = payload.id
+        const guildName: string = payload.name
+        // const guildJoinDate: Date = new Date(payload.joined_at)
+        // const guildIconID: string | undefined = payload.icon
+
+        const channels = payload.channels
+          .filter(c => !IGNORED_CHANNEL_TYPES.has(c.type))
+          .map(c => mapChannel(c, this.mutedChannels.has(c.id)), guildName)
+
+        this.channelsMap?.set(guildID, channels)
+
+        const events: ServerEvent[] = channels.map(c => ({
+          type: ServerEventType.STATE_SYNC,
+          mutationType: 'upsert',
+          objectName: 'thread',
+          objectIDs: {
+            threadID: c.id,
+          },
+          entries: [c],
+        }))
+        this.eventCallback?.(events)
+        break
+      }
+
+      case GatewayMessageType.GUILD_DELETE: {
+        if (!ENABLE_GUILDS) return
+
+        const channelIDs = this.channelsMap.get(payload.id).map(c => c.id)
+        const events: ServerEvent[] = channelIDs.map(id => ({
+          type: ServerEventType.STATE_SYNC,
+          mutationType: 'delete',
+          objectName: 'thread',
+          objectIDs: {
+            threadID: id,
+          },
+          entries: [id],
+        }))
+        this.eventCallback?.(events)
+
+        this.channelsMap.delete(payload.id)
+        break
+      }
+
+      case GatewayMessageType.GUILD_EMOJIS_UPDATE: {
+        // TODO: GUILD_EMOJIS_UPDATE
+        console.log(payload)
+        break
+      }
+
+      case GatewayMessageType.MESSAGE_CREATE: {
+        if (!ENABLE_GUILDS && payload.guild_id) return
+
+        payload.mentions.forEach(m => this.userMappings.set(m.id, (m.username + '#' + m.discriminator)))
+
+        if (payload.author) {
+          // upsert sender
+          const sender = mapUser(payload.author)
+          this.eventCallback?.([{
+            type: ServerEventType.STATE_SYNC,
+            mutationType: 'upsert',
+            objectName: 'participant',
             objectIDs: {
               threadID: payload.channel_id,
             },
-            entries: [
-              {
-                id: payload.channel_id,
-                isUnread: false,
-              },
-            ],
+            entries: [sender],
           }])
-          break
-
-        case GatewayMessageType.MESSAGE_DELETE_BULK: {
-          const messages = ACT_AS_USER ? payload.filter(m => !m.guild_id) : payload
-          this.eventCallback?.(messages.map(m => ({ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: m.channel_id })))
-          break
         }
 
-        case GatewayMessageType.MESSAGE_REACTION_ADD:
-        case GatewayMessageType.MESSAGE_REACTION_REMOVE:
-        case GatewayMessageType.MESSAGE_REACTION_REMOVE_ALL:
-        case GatewayMessageType.MESSAGE_REACTION_REMOVE_EMOJI:
-          if (payload.guild_id) return
-          this.eventCallback?.([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: payload.channel_id }])
-          break
+        // for some reason, discord has started sending this event with payload.content === ''
+        // so we're now sending the refresh event instead
+        // this.eventCallback?.([{
+        //   type: ServerEventType.STATE_SYNC,
+        //   mutationType: 'upsert',
+        //   objectName: 'message',
+        //   objectIDs: {
+        //     threadID: payload.channel_id,
+        //     messageID: payload.id,
+        //   },
+        //   entries: [mapMessage(payload, this.currentUser?.id)],
+        // }])
+        this.eventCallback?.([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: payload.channel_id }])
+        break
+      }
 
-        case GatewayMessageType.TYPING_START:
-          this.eventCallback?.([{
-            type: ServerEventType.USER_ACTIVITY,
-            activityType: ActivityType.TYPING,
-            durationMs: 10_000,
-            participantID: payload.user_id,
+      case GatewayMessageType.MESSAGE_UPDATE: {
+        if (!ENABLE_GUILDS && payload.guild_id) return
+
+        // for some reason, discord has started sending this event with payload.content === ''
+        // so we're now sending the refresh event instead
+        // this.eventCallback?.([{
+        //   type: ServerEventType.STATE_SYNC,
+        //   mutationType: 'update',
+        //   objectName: 'message',
+        //   objectIDs: { threadID: payload.channel_id },
+        //   entries: [mapMessage(payload, this.currentUser.id, undefined, this.userMappings)],
+        // }])
+        this.eventCallback?.([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: payload.channel_id }])
+        break
+      }
+
+      case GatewayMessageType.MESSAGE_DELETE: {
+        if (!ENABLE_GUILDS && payload.guild_id) return
+
+        this.eventCallback?.([{
+          type: ServerEventType.STATE_SYNC,
+          mutationType: 'delete',
+          objectName: 'message',
+          objectIDs: {
             threadID: payload.channel_id,
-          }])
-          break
+            messageID: payload.id,
+          },
+          entries: [payload.id],
+        }])
+        break
+      }
 
-        case GatewayMessageType.PRESENCE_UPDATE:
-          if (payload.guild_id) return
-          this.usersPresence[payload.user.id] = { userID: payload.user.id, isActive: payload.status === 'online', lastActive: new Date(+payload.last_modified) }
-          this.eventCallback?.([{
-            type: ServerEventType.USER_PRESENCE_UPDATED,
-            presence: {
-              userID: payload.user.id,
-              isActive: payload.status === 'online',
-              lastActive: new Date(),
-            },
-          }])
-          break
+      case GatewayMessageType.MESSAGE_DELETE_BULK: {
+        if (!ENABLE_GUILDS && payload.guild_id) return
 
-        case GatewayMessageType.USER_UPDATE:
-          break
+        this.eventCallback?.([{
+          type: ServerEventType.STATE_SYNC,
+          mutationType: 'delete',
+          objectName: 'message',
+          objectIDs: {
+            threadID: payload.channel_id,
+          },
+          entries: payload.ids,
+        }])
+        break
+      }
 
-        case GatewayMessageType.RELATIONSHIP_ADD:
-        case GatewayMessageType.RELATIONSHIP_REMOVE:
-          this.getUserFriends()
-          break
+      case GatewayMessageType.MESSAGE_REACTION_ADD: {
+        if (!ENABLE_GUILDS && payload.guild_id) return
 
-        default:
-          break
+        // TODO: Optimize it
+        this.eventCallback?.([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: payload.channel_id }])
+        break
+      }
+
+      case GatewayMessageType.MESSAGE_REACTION_REMOVE: {
+        if (!ENABLE_GUILDS && payload.guild_id) return
+
+        // TODO: Optimize it
+        this.eventCallback?.([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: payload.channel_id }])
+        break
+      }
+
+      case GatewayMessageType.MESSAGE_REACTION_REMOVE_ALL: {
+        if (!ENABLE_GUILDS && payload.guild_id) return
+
+        // TODO: Optimize it
+        this.eventCallback?.([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: payload.channel_id }])
+        break
+      }
+
+      case GatewayMessageType.MESSAGE_REACTION_REMOVE_EMOJI: {
+        if (!ENABLE_GUILDS && payload.guild_id) return
+
+        // TODO: Optimize it
+        this.eventCallback?.([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: payload.channel_id }])
+        break
+      }
+
+      case GatewayMessageType.PRESENCE_UPDATE: {
+        // we don't care about guild updates
+        if (payload.guild_id) return
+
+        this.usersPresence[payload.user.id] = { userID: payload.user.id, isActive: payload.status === 'online', lastActive: new Date(payload.last_modified) }
+        this.eventCallback?.([{
+          type: ServerEventType.USER_PRESENCE_UPDATED,
+          presence: {
+            userID: payload.user.id,
+            isActive: payload.status === 'online',
+            lastActive: new Date(),
+          },
+        }])
+        break
+      }
+
+      case GatewayMessageType.TYPING_START: {
+        if (!ENABLE_GUILDS && payload.guild_id) return
+
+        this.eventCallback?.([{
+          type: ServerEventType.USER_ACTIVITY,
+          activityType: ActivityType.TYPING,
+          durationMs: 10_000,
+          participantID: payload.user_id,
+          threadID: payload.channel_id,
+        }])
+        break
+      }
+
+      case GatewayMessageType.USER_UPDATE: {
+        // TODO: USER_UPDATE
+        console.log(payload)
+        break
+      }
+
+      // * Undocumented
+
+      case GatewayMessageType.CHANNEL_UNREAD_UPDATE: {
+        // TODO: CHANNEL_UNREAD_UPDATE
+        console.log(payload)
+        break
+      }
+
+      case GatewayMessageType.MESSAGE_ACK: {
+        if (!ENABLE_GUILDS && payload.guild_id) return
+
+        this.eventCallback?.([{
+          type: ServerEventType.STATE_SYNC,
+          mutationType: 'update',
+          objectName: 'thread',
+          objectIDs: {
+            threadID: payload.channel_id,
+          },
+          entries: [{ isUnread: false }],
+        }])
+        break
+      }
+
+      case GatewayMessageType.RELATIONSHIP_ADD: {
+        if (!this.userFriends.find(f => f.id === payload.id)) {
+          const user = mapUser(payload.user)
+          this.userFriends.push(user)
+        }
+        break
+      }
+
+      case GatewayMessageType.RELATIONSHIP_REMOVE: {
+        const index = this.userFriends.findIndex(f => f.id === payload.id)
+        if (index >= 0) this.userFriends.splice(index, 1)
+        break
+      }
+
+      // * Defaults
+
+      case GatewayMessageType.APPLICATION_COMMAND_CREATE:
+      case GatewayMessageType.APPLICATION_COMMAND_UPDATE:
+      case GatewayMessageType.APPLICATION_COMMAND_DELETE:
+      case GatewayMessageType.GUILD_UPDATE:
+      case GatewayMessageType.GUILD_BAN_ADD:
+      case GatewayMessageType.GUILD_BAN_REMOVE:
+      case GatewayMessageType.GUILD_APPLICATION_COMMAND_COUNTS_UPDATE:
+      case GatewayMessageType.GUILD_INTEGRATIONS_UPDATE:
+      case GatewayMessageType.GUILD_MEMBER_ADD:
+      case GatewayMessageType.GUILD_MEMBER_REMOVE:
+      case GatewayMessageType.GUILD_MEMBER_UPDATE:
+      case GatewayMessageType.GUILD_MEMBERS_CHUNK:
+      case GatewayMessageType.GUILD_ROLE_CREATE:
+      case GatewayMessageType.GUILD_ROLE_UPDATE:
+      case GatewayMessageType.GUILD_ROLE_DELETE:
+      case GatewayMessageType.INTEGRATION_CREATE:
+      case GatewayMessageType.INTEGRATION_UPDATE:
+      case GatewayMessageType.INTEGRATION_DELETE:
+      case GatewayMessageType.INTERACTION_CREATE:
+      case GatewayMessageType.INVITE_CREATE:
+      case GatewayMessageType.INVITE_DELETE:
+      case GatewayMessageType.VOICE_STATE_UPDATE:
+      case GatewayMessageType.VOICE_SERVER_UPDATE:
+      case GatewayMessageType.WEBHOOKS_UPDATE:
+      case GatewayMessageType.CHANNEL_PINS_ACK:
+      case GatewayMessageType.READY_SUPPLEMENTAL:
+      case GatewayMessageType.SESSIONS_REPLACE:
+      case null: {
+        break
+      }
+
+      default: {
+        texts.log('[discord ws] Unhandled', opcode, type, payload)
+        break
       }
     }
   }
 
-  private handleErrors = (json: any, statusCode: number) => {
-    if (statusCode === 401) throw new ReAuthError('Unauthorized')
-    if (json.message && json.code) texts.error(json)
+  private mapMentions = (text: string) => {
+    // @ts-expect-error replaceAll
+    return text?.replaceAll(/@([^#@]{3,32}#[0-9]{4})/gi, (_, username) => {
+      const user = Array.from(this.userMappings).find(u => u[1] === username)
+      if (user) return `<@!${user[0]}>`
+      return username
+    })
   }
 
   private waitForInitialData = async () => {
@@ -513,10 +807,16 @@ export default class DiscordNetworkAPI {
     while (!this.ready && WAIT_TILL_READY) await sleep(100)
   }
 
+  private handleErrors = (json: any, statusCode: number) => {
+    // eslint-disable-next-line @typescript-eslint/no-throw-literal
+    if (statusCode === 401) throw new ReAuthError('Unauthorized')
+    if (json.message && json.code) throw new Error(json.message)
+  }
+
   private fetch = async ({ url, headers = {}, json, ...rest }: FetchOptions & { url: string, json?: any }) => {
     try {
       const opts: FetchOptions = {
-        // todo timeout: 10000,
+        // TODO: timeout: 10000,
         ...rest,
         body: json ? JSON.stringify(json) : rest.body,
         headers: {
@@ -525,10 +825,12 @@ export default class DiscordNetworkAPI {
           ...headers,
         },
       }
+
       if (json) {
         opts.headers['Content-Type'] = 'application/json'
       }
-      const res = await this.httpClient.requestAsString(API_ENDPOINT + url, opts)
+
+      const res = await this.httpClient.requestAsString(`${API_ENDPOINT}/${url}`, opts)
 
       const responseJSON = res.body?.length ? JSON.parse(res.body) : undefined
       if (res.body) {

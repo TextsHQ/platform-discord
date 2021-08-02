@@ -1,0 +1,911 @@
+{
+  guild_id: '689856420803510296',
+  guild_hashes: {
+    version: 1,
+    roles: { hash: 'RXqDbZrnSPw' },
+    metadata: { hash: 'tGjPR/xAhLM' },
+    channels: { hash: 'aniDY1f/lS8' }
+  },
+  emojis: [
+    {
+      roles: [],
+      require_colons: true,
+      name: 'AYAYA',
+      managed: false,
+      id: '690248753059332160',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'KEKW',
+      managed: false,
+      id: '690248814485176397',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'OMEGALUL',
+      managed: false,
+      id: '690248865579925583',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'peepoSad',
+      managed: false,
+      id: '690248876984369162',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'POGGERS',
+      managed: false,
+      id: '690248904247476372',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'triKool',
+      managed: false,
+      id: '690248905085943813',
+      available: true,
+      animated: true
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'Clap',
+      managed: false,
+      id: '690250693424185552',
+      available: true,
+      animated: true
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: '5Head',
+      managed: false,
+      id: '690250693478842432',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'HYPERCLAP',
+      managed: false,
+      id: '690250693499813919',
+      available: true,
+      animated: true
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'ditto',
+      managed: false,
+      id: '690250693508071560',
+      available: true,
+      animated: true
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'Dance',
+      managed: false,
+      id: '690250693625380955',
+      available: true,
+      animated: true
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'bongoTap',
+      managed: false,
+      id: '690250693671780364',
+      available: true,
+      animated: true
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'pepeD',
+      managed: false,
+      id: '690250693851873304',
+      available: true,
+      animated: true
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'monkaSHAKE',
+      managed: false,
+      id: '690250694007324672',
+      available: true,
+      animated: true
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'monkaTOS',
+      managed: false,
+      id: '690250694300926076',
+      available: true,
+      animated: true
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'gachiGASM',
+      managed: false,
+      id: '690250694338412547',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'coronaS',
+      managed: false,
+      id: '690250694502121539',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'HYPERS',
+      managed: false,
+      id: '690250694514573367',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'monkaHmm',
+      managed: false,
+      id: '690250694673956972',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'peepoHappy',
+      managed: false,
+      id: '690250694686801942',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'monkaX',
+      managed: false,
+      id: '690250694779076796',
+      available: true,
+      animated: true
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'Pepega',
+      managed: false,
+      id: '690250694841729150',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'MonkaS',
+      managed: false,
+      id: '690250695026278439',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'PepeHands',
+      managed: false,
+      id: '690250695244382234',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'pepeLaugh',
+      managed: false,
+      id: '690250695244382301',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'PepoCheer',
+      managed: false,
+      id: '690250695265353871',
+      available: true,
+      animated: true
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'weSmart',
+      managed: false,
+      id: '690250695282393090',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'monkaSoap',
+      managed: false,
+      id: '690250695407960268',
+      available: true,
+      animated: true
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'pepeJAM',
+      managed: false,
+      id: '690250695542177795',
+      available: true,
+      animated: true
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'pepeMeltdown',
+      managed: false,
+      id: '690250696087437425',
+      available: true,
+      animated: true
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'gachiBASS',
+      managed: false,
+      id: '690250696406204536',
+      available: true,
+      animated: true
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'blobDance',
+      managed: false,
+      id: '690250696565719158',
+      available: true,
+      animated: true
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'peepoArrive',
+      managed: false,
+      id: '690250697320562728',
+      available: true,
+      animated: true
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'peepoLeave',
+      managed: false,
+      id: '690250697530540164',
+      available: true,
+      animated: true
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'PepePls',
+      managed: false,
+      id: '690250697651912739',
+      available: true,
+      animated: true
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'KKool',
+      managed: false,
+      id: '690250698209755237',
+      available: true,
+      animated: true
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'partyParrot',
+      managed: false,
+      id: '690250699757715510',
+      available: true,
+      animated: true
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'pikaOMG',
+      managed: false,
+      id: '690250700051054604',
+      available: true,
+      animated: true
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'TriDance',
+      managed: false,
+      id: '690250700734726223',
+      available: true,
+      animated: true
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'RainbowPls',
+      managed: false,
+      id: '690250701787496534',
+      available: true,
+      animated: true
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'COGGERS',
+      managed: false,
+      id: '690250702164983906',
+      available: true,
+      animated: true
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'CrabPls',
+      managed: false,
+      id: '690250702764900453',
+      available: true,
+      animated: true
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'monkaW',
+      managed: false,
+      id: '690251926524264495',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'FeelsOkayMan',
+      managed: false,
+      id: '690948054483992707',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'FeelsWeirdMan',
+      managed: false,
+      id: '690948085869969428',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'prxGasm',
+      managed: false,
+      id: '690948209262067744',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'YEP',
+      managed: false,
+      id: '690949832998649986',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: '4Head',
+      managed: false,
+      id: '690963354256277535',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'Kappa',
+      managed: false,
+      id: '690966834983469056',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'KKonaW',
+      managed: false,
+      id: '691472384317980682',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'Jebaited',
+      managed: false,
+      id: '691800784475521045',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'LULW',
+      managed: false,
+      id: '691802402881404930',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'TriHard',
+      managed: false,
+      id: '692056391351009300',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'CmonBruh',
+      managed: false,
+      id: '692167486308876349',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'Lewd',
+      managed: false,
+      id: '692728632950652998',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'KEKWait',
+      managed: false,
+      id: '692783542589194310',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: '4WeirdW',
+      managed: false,
+      id: '692842422652108800',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'peepoKomrade',
+      managed: false,
+      id: '692845005357711451',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'peepoJuice',
+      managed: false,
+      id: '692846203838398524',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'kappaPride',
+      managed: false,
+      id: '693019159604363294',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'gachiHyper',
+      managed: false,
+      id: '693019483798896661',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'peepoBike',
+      managed: false,
+      id: '693044253093527652',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'peepoMad',
+      managed: false,
+      id: '693045941233516635',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'honkler',
+      managed: false,
+      id: '693046533196611635',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'peepoKEKW',
+      managed: false,
+      id: '693047239668662332',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'peepoKEKWait',
+      managed: false,
+      id: '693050817443266580',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: '3Head',
+      managed: false,
+      id: '693054995091816538',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'peepoBlanket',
+      managed: false,
+      id: '693055515885830154',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'peepoStrong',
+      managed: false,
+      id: '693055716079960066',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'peepoPoo',
+      managed: false,
+      id: '693055750955597885',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'peepoS',
+      managed: false,
+      id: '693055782777913415',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'pepeLaugh2',
+      managed: false,
+      id: '693057067887362068',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'Kapp',
+      managed: false,
+      id: '693058822599737354',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: '4Weird',
+      managed: false,
+      id: '693147451690844252',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'lickL',
+      managed: false,
+      id: '693429276179038218',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'lickR',
+      managed: false,
+      id: '693429285251317800',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'pepeJAMJAM',
+      managed: false,
+      id: '693431218481659924',
+      available: true,
+      animated: true
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'peepoSmoke',
+      managed: false,
+      id: '693746661645615124',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'FeelsCrabMan',
+      managed: false,
+      id: '693790919136247829',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'sadCat',
+      managed: false,
+      id: '694111711879495750',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'facePalm',
+      managed: false,
+      id: '694315241458237471',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'simp',
+      managed: false,
+      id: '694556635586363455',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'pepeJam',
+      managed: false,
+      id: '694830804672708700',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'FeelsBadMan',
+      managed: false,
+      id: '694913654524739625',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'coomer',
+      managed: false,
+      id: '694913962676060252',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'peepoFat',
+      managed: false,
+      id: '694926282500079667',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'pepeSniff',
+      managed: false,
+      id: '695018131789447179',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'peepoComfy',
+      managed: false,
+      id: '695227484639199303',
+      available: true,
+      animated: true
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'kreyGasm',
+      managed: false,
+      id: '695342927072723015',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'peepoCoomer',
+      managed: false,
+      id: '696080397292798052',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'haHAA',
+      managed: false,
+      id: '696086477422985366',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'peepoPanties',
+      managed: false,
+      id: '696971654399524905',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'peepoHappySleep',
+      managed: false,
+      id: '696971678256988160',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'peepoEZ',
+      managed: false,
+      id: '696971961741475840',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'peepoLove',
+      managed: false,
+      id: '696972321117831168',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'FeelsStrongMan',
+      managed: false,
+      id: '697769448534310942',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'FeelsSexMan',
+      managed: false,
+      id: '698669553835835413',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'peepoHug',
+      managed: false,
+      id: '698699817349677096',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'nerdEmoji',
+      managed: false,
+      id: '698880294576717894',
+      available: true,
+      animated: false
+    },
+    {
+      roles: [],
+      require_colons: true,
+      name: 'boomer',
+      managed: false,
+      id: '698962365374529546',
+      available: true,
+      animated: false
+    },
+  ]
+}

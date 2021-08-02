@@ -4,8 +4,7 @@ import { texts } from '@textshq/platform-sdk'
 import { DiscordPresenceStatus, OPCode, GatewayMessageType, GatewayCloseCode } from './constants'
 import type { GatewayMessage } from './types'
 import type { Packer } from '../packers'
-
-const promiseDelay = (timeout: number) => new Promise(resolve => setTimeout(resolve, timeout))
+import { sleep } from '../util'
 
 export default class WSClient {
   private ws?: WebSocket
@@ -17,6 +16,14 @@ export default class WSClient {
   private resumeConnectionOnConnect = false
 
   private heartbeatInterval?: NodeJS.Timeout
+
+  private constants = {
+    browser: 'Chrome',
+    releaseChannel: 'stable',
+    buildNumber: 76771,
+    capabilities: 61, // sniffed
+    intents: this.enableGuilds ? 32515 : 28672, // https://discord.com/developers/docs/topics/gateway#gateway-intents
+  }
 
   ready = false
 
@@ -33,6 +40,7 @@ export default class WSClient {
   constructor(
     public gateway: string,
     private token: string,
+    private enableGuilds = false,
     private actAsUser = false,
     private packer: Packer,
   ) {
@@ -40,7 +48,7 @@ export default class WSClient {
   }
 
   connect = () => {
-    texts.log('Opening gateway connection...')
+    // texts.log('[discord ws] Opening gateway connection...')
     this.ws = new WebSocket(this.gateway)
     this.setupHandlers()
   }
@@ -91,7 +99,7 @@ export default class WSClient {
     this.ws?.on('error', error => this.onError?.(error))
 
     this.ws?.on('unexpected-response', (request, response) => {
-      texts.log('Unexpected response: ' + request, response)
+      texts.log('[discord ws] Unexpected response: ' + request, response)
     })
 
     this.ws.onmessage = this.wsOnMessage
@@ -125,7 +133,7 @@ export default class WSClient {
 
   private waitAndSend = async (payload: GatewayMessage) => {
     while (this.ws.readyState === this.ws.CONNECTING) {
-      await promiseDelay(25)
+      await sleep(25)
     }
     this.send(payload)
   }
@@ -149,14 +157,14 @@ export default class WSClient {
   }
 
   private sendHeartbeat = () => {
-    // texts.log('[!] Sending heartbeat')
+    // texts.log('[discord ws] Sending heartbeat')
     if (this.ws.readyState === this.ws.CONNECTING) return
     const payload: GatewayMessage = { op: OPCode.HEARTBEAT, d: this.lastSequenceNumber }
     this.send(payload)
   }
 
   private setHeartbeatInterval = (interval: number) => {
-    texts.log('Heartbeat interval set to', interval)
+    texts.log('[discord ws] Heartbeat interval set to', interval)
     this.heartbeatInterval = setInterval(this.sendHeartbeat, interval)
   }
 
@@ -167,7 +175,7 @@ export default class WSClient {
         token: this.token,
         properties: {
           os: os.platform(),
-          browser: 'Chrome',
+          browser: this.constants.browser,
           device: '',
           system_locale: '',
           browser_user_agent: texts.constants.USER_AGENT,
@@ -177,19 +185,19 @@ export default class WSClient {
           referring_domain: '',
           referrer_current: '',
           referring_domain_current: '',
-          release_channel: 'stable',
-          client_build_number: 76771,
+          release_channel: this.constants.releaseChannel,
+          client_build_number: this.constants.buildNumber,
           client_event_source: null,
         },
         presence: {
           status: DiscordPresenceStatus.ONLINE,
-          since: 0,
+          since: Date.now(),
           activites: [],
           afk: false,
         },
         compress: this.packer.encoding === 'etf',
-        capabilities: this.actAsUser ? 61 : undefined,
-        intents: this.actAsUser ? undefined : 28672,
+        capabilities: this.actAsUser ? this.constants.capabilities : undefined,
+        intents: this.actAsUser ? undefined : this.constants.intents,
         client_state: this.actAsUser ? {
           guild_hashes: {},
           highest_last_message_id: '0',
