@@ -100,10 +100,10 @@ export default class DiscordNetworkAPI {
     const res = await this.fetch({ method: 'GET', url: 'users/@me/channels' })
     if (!res?.json) throw new Error('No response')
 
-    const threads: Thread[] = await Promise.all(res?.json
+    const threads: Thread[] = res?.json
       .sort((a, b) => a.last_message_id - b.last_message_id)
       .reverse()
-      .map(thread => mapThread(thread, this.readStateMap.get(thread.id), this.currentUser)))
+      .map(thread => mapThread(thread, this.readStateMap.get(thread.id), this.currentUser))
 
     // TODO: App doesn't display empty (unloaded) channels
     const items = ENABLE_GUILDS ? threads.concat([...this.channelsMap?.values()].flat()) : threads
@@ -134,9 +134,8 @@ export default class DiscordNetworkAPI {
       ? await Promise.all(message.reactions.map(async r => {
         const emojiQuery = encodeURIComponent(r.emoji.id ? `${r.emoji.name}:${r.emoji.id}` : r.emoji.name)
         const reactedRes = await this.fetch({ method: 'GET', url: `channels/${threadID}/messages/${message.id}/reactions/${emojiQuery}` })
-        const parsed = reactedRes?.json
-        if (!parsed) return null
-        return { emoji: r.emoji, users: parsed }
+        const users = reactedRes?.json
+        return users ? { emoji: r.emoji, users } : null
       }))
       : undefined
     return mapMessage(message, this.currentUser.id, reactionsDetails)
@@ -155,7 +154,7 @@ export default class DiscordNetworkAPI {
     const res = await this.fetch({ method: 'GET', url: `channels/${threadID}/messages?limit=50&${paginationQuery}` })
     if (!res.json) throw new Error(res.json?.message || 'No response')
 
-    const messages: Message[] = await Promise.all(res.json?.map(async m => this.getMessage(m, threadID)))
+    const messages: Message[] = await Promise.all(res.json?.map(m => this.getMessage(m, threadID)))
 
     if (ENABLE_GUILDS) {
       // Guilds don't return all users, so we need to keep it updated using message authors
