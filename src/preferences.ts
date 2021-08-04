@@ -1,5 +1,5 @@
 // Subtle internal changes
-export const ACT_AS_USER = false
+export const ACT_AS_USER = true
 
 // Enable guilds support?
 export const ENABLE_GUILDS = false

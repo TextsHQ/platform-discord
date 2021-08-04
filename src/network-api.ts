@@ -613,16 +613,14 @@ export default class DiscordNetworkAPI {
       case GatewayMessageType.MESSAGE_UPDATE: {
         if (!ENABLE_GUILDS && payload.guild_id) return
 
-        // for some reason, discord has started sending this event with payload.content === ''
-        // so we're now sending the refresh event instead
-        // this.eventCallback?.([{
-        //   type: ServerEventType.STATE_SYNC,
-        //   mutationType: 'update',
-        //   objectName: 'message',
-        //   objectIDs: { threadID: payload.channel_id },
-        //   entries: [mapMessage(payload, this.currentUser.id, undefined, this.userMappings)],
-        // }])
-        this.eventCallback?.([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: payload.channel_id }])
+        // when ACT_AS_USER = false, discord sends this event with payload.content === ''
+        this.eventCallback?.([{
+          type: ServerEventType.STATE_SYNC,
+          mutationType: 'update',
+          objectName: 'message',
+          objectIDs: { threadID: payload.channel_id },
+          entries: [mapMessage(payload, this.currentUser.id)],
+        }])
         break
       }
 
