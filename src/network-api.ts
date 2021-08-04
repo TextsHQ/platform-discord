@@ -576,8 +576,7 @@ export default class DiscordNetworkAPI {
 
         payload.mentions.forEach(m => this.userMappings.set(m.id, (m.username + '#' + m.discriminator)))
 
-        if (payload.author) {
-          // upsert sender
+        if (ENABLE_GUILDS && payload.author) {
           const sender = mapUser(payload.author)
           this.eventCallback?.([{
             type: ServerEventType.STATE_SYNC,
@@ -733,14 +732,15 @@ export default class DiscordNetworkAPI {
       case GatewayMessageType.MESSAGE_ACK: {
         if (!ENABLE_GUILDS && payload.guild_id) return
 
+        const threadID = payload.channel_id
         this.eventCallback?.([{
           type: ServerEventType.STATE_SYNC,
           mutationType: 'update',
           objectName: 'thread',
           objectIDs: {
-            threadID: payload.channel_id,
+            threadID,
           },
-          entries: [{ isUnread: false }],
+          entries: [{ id: threadID, isUnread: false }],
         }])
         break
       }
