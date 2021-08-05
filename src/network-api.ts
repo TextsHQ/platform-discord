@@ -363,7 +363,7 @@ export default class DiscordNetworkAPI {
         if (ACT_AS_USER) {
           payload.relationships?.forEach(r => this.userMappings.set(r.id, (r.username + '#' + r.discriminator)))
           payload.read_state?.entries?.forEach(p => this.readStateMap.set(p.id, p.last_message_id))
-          // apparently there's no presences when acting as a user
+          // presences are in READY_SUPPLEMENTAL if ACT_AS_USER = true
         } else {
           payload.relationships?.forEach(r => this.userMappings.set(r.id, (r.user.username + '#' + r.user.discriminator)))
           payload.read_state?.forEach(p => this.readStateMap.set(p.id, p.last_message_id))
@@ -395,6 +395,13 @@ export default class DiscordNetworkAPI {
 
         this.gotInitialUserData = true
         this.ready = true
+        break
+      }
+
+      case GatewayMessageType.READY_SUPPLEMENTAL: {
+        payload.merged_presences.friends?.forEach(p => {
+          this.usersPresence[p.user_id] = { userID: p.user_id, isActive: p.status === 'online', lastActive: new Date(+p.last_modified) }
+        })
         break
       }
 
@@ -786,7 +793,6 @@ export default class DiscordNetworkAPI {
       case GatewayMessageType.VOICE_SERVER_UPDATE:
       case GatewayMessageType.WEBHOOKS_UPDATE:
       case GatewayMessageType.CHANNEL_PINS_ACK:
-      case GatewayMessageType.READY_SUPPLEMENTAL:
       case GatewayMessageType.SESSIONS_REPLACE:
       case null: {
         break

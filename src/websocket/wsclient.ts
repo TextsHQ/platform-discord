@@ -20,8 +20,8 @@ export default class WSClient {
   private constants = {
     browser: 'Chrome',
     releaseChannel: 'stable',
-    buildNumber: 76771,
-    capabilities: 61, // sniffed
+    buildNumber: 92358,
+    capabilities: 125, // sniffed
     intents: this.enableGuilds ? 32515 : 28672, // https://discord.com/developers/docs/topics/gateway#gateway-intents
   }
 
@@ -174,20 +174,19 @@ export default class WSClient {
       d: {
         token: this.token,
         properties: {
-          os: os.platform(),
-          browser: this.constants.browser,
-          device: '',
-          system_locale: '',
           browser_user_agent: texts.constants.USER_AGENT,
-          browser_version: texts.constants.APP_VERSION,
-          os_version: os.version(),
-          referrer: '',
-          referring_domain: '',
-          referrer_current: '',
-          referring_domain_current: '',
-          release_channel: this.constants.releaseChannel,
+          browser_version: os.version(),
           client_build_number: this.constants.buildNumber,
           client_event_source: null,
+          device: '',
+          os: os.platform(),
+          os_version: os.version(),
+          referrer: '',
+          referrer_current: '',
+          referring_domain: '',
+          referring_domain_current: '',
+          release_channel: this.constants.releaseChannel,
+          system_locale: 'en-US',
         },
         presence: {
           status: DiscordPresenceStatus.ONLINE,
