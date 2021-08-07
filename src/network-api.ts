@@ -677,7 +677,8 @@ export default class DiscordNetworkAPI {
         break
       }
 
-      case GatewayMessageType.MESSAGE_REACTION_REMOVE: {
+      case GatewayMessageType.MESSAGE_REACTION_REMOVE:
+      case GatewayMessageType.MESSAGE_REACTION_REMOVE_EMOJI: {
         if (!ENABLE_GUILDS && payload.guild_id) return
 
         this.eventCallback?.([{
@@ -708,22 +709,6 @@ export default class DiscordNetworkAPI {
             id: payload.message_id,
             reactions: [],
           }],
-        }])
-        break
-      }
-
-      case GatewayMessageType.MESSAGE_REACTION_REMOVE_EMOJI: {
-        if (!ENABLE_GUILDS && payload.guild_id) return
-
-        this.eventCallback?.([{
-          type: ServerEventType.STATE_SYNC,
-          mutationType: 'delete',
-          objectName: 'message_reaction',
-          objectIDs: {
-            threadID: payload.channel_id,
-            messageID: payload.message_id,
-          },
-          entries: [(payload.emoji.id || payload.emoji.name)],
         }])
         break
       }
