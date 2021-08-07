@@ -689,7 +689,7 @@ export default class DiscordNetworkAPI {
             threadID: payload.channel_id,
             messageID: payload.message_id,
           },
-          entries: [(payload.emoji.id || payload.emoji.name)],
+          entries: [`${payload.user_id}${payload.emoji.id || payload.emoji.name}`],
         }])
         break
       }
@@ -703,7 +703,6 @@ export default class DiscordNetworkAPI {
           objectName: 'message',
           objectIDs: {
             threadID: payload.channel_id,
-            messageID: payload.message_id,
           },
           entries: [{
             id: payload.message_id,

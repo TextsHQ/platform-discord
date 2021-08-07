@@ -23,10 +23,10 @@ const getLottieStickerURL = (id: string, asset: string) =>
 const getPNGStickerURL = (id: string) =>
   `https://media.discordapp.net/stickers/${id}.png?size=512`
 
-export const mapReaction = (reaction: any, userID: string): MessageReaction => ({
-  id: reaction.emoji.id || reaction.emoji.name,
+export const mapReaction = (reaction: any, participantID: string): MessageReaction => ({
+  id: `${participantID}${reaction.emoji.id || reaction.emoji.name}`,
   reactionKey: reaction.emoji.id ? getEmojiURL(reaction.emoji.id, reaction.emoji.animated) : reaction.emoji.name,
-  participantID: userID,
+  participantID,
   emoji: true,
 })
 
@@ -204,7 +204,7 @@ export function mapMessage(message: DiscordMessage, currentUserID: string, react
       }
     })
 
-  const reactions = reactionsDetails?.flatMap<MessageReaction>(r => r.users.map(u => mapReaction(r, u.id)))
+  const reactions = reactionsDetails?.flatMap<MessageReaction>(r => (r.users as any[]).map(u => mapReaction(r, u.id)))
 
   const mapped: Message = {
     _original: JSON.stringify(message),
