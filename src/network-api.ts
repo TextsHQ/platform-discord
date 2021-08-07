@@ -4,7 +4,7 @@ import FormData from 'form-data'
 import { uniqBy } from 'lodash'
 import { texts, CurrentUser, MessageContent, PaginationArg, Thread, Message, ServerEventType, OnServerEventCallback, ActivityType, User, InboxName, MessageSendOptions, ReAuthError, PresenceMap, Paginated, FetchOptions, ServerEvent } from '@textshq/platform-sdk'
 
-import { mapChannel, mapCurrentUser, mapMessage, mapThread, mapUser } from './mappers'
+import { mapChannel, mapCurrentUser, mapMessage, mapReaction, mapThread, mapUser } from './mappers'
 import WSClient from './websocket/wsclient'
 import { GatewayCloseCode, GatewayMessageType } from './websocket/constants'
 import { defaultPacker } from './packers'
@@ -267,7 +267,7 @@ export default class DiscordNetworkAPI {
     return res?.statusCode === 204
   }
 
-  sendReadReceipt = async (threadID: string, messageID: string) => {
+  sendReadReceipt = async (threadID: string, messageID?: string) => {
     await this.waitUntilReady()
 
     const res = await this.fetch({ method: 'POST', url: `channels/${threadID}/messages/${messageID}/ack`, json: { token: this.lastAckToken } })
@@ -664,37 +664,71 @@ export default class DiscordNetworkAPI {
       case GatewayMessageType.MESSAGE_REACTION_ADD: {
         if (!ENABLE_GUILDS && payload.guild_id) return
 
-        // TODO: Optimize it
-        this.eventCallback?.([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: payload.channel_id }])
+        this.eventCallback?.([{
+          type: ServerEventType.STATE_SYNC,
+          mutationType: 'upsert',
+          objectName: 'message_reaction',
+          objectIDs: {
+            threadID: payload.channel_id,
+            messageID: payload.message_id,
+          },
+          entries: [mapReaction(payload, payload.user_id)],
+        }])
         break
       }
 
       case GatewayMessageType.MESSAGE_REACTION_REMOVE: {
         if (!ENABLE_GUILDS && payload.guild_id) return
 
-        // TODO: Optimize it
-        this.eventCallback?.([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: payload.channel_id }])
+        this.eventCallback?.([{
+          type: ServerEventType.STATE_SYNC,
+          mutationType: 'delete',
+          objectName: 'message_reaction',
+          objectIDs: {
+            threadID: payload.channel_id,
+            messageID: payload.message_id,
+          },
+          entries: [(payload.emoji.id || payload.emoji.name)],
+        }])
         break
       }
 
       case GatewayMessageType.MESSAGE_REACTION_REMOVE_ALL: {
         if (!ENABLE_GUILDS && payload.guild_id) return
 
-        // TODO: Optimize it
-        this.eventCallback?.([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: payload.channel_id }])
+        this.eventCallback?.([{
+          type: ServerEventType.STATE_SYNC,
+          mutationType: 'update',
+          objectName: 'message',
+          objectIDs: {
+            threadID: payload.channel_id,
+            messageID: payload.message_id,
+          },
+          entries: [{
+            id: payload.message_id,
+            reactions: [],
+          }],
+        }])
         break
       }
 
       case GatewayMessageType.MESSAGE_REACTION_REMOVE_EMOJI: {
         if (!ENABLE_GUILDS && payload.guild_id) return
 
-        // TODO: Optimize it
-        this.eventCallback?.([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: payload.channel_id }])
+        this.eventCallback?.([{
+          type: ServerEventType.STATE_SYNC,
+          mutationType: 'delete',
+          objectName: 'message_reaction',
+          objectIDs: {
+            threadID: payload.channel_id,
+            messageID: payload.message_id,
+          },
+          entries: [(payload.emoji.id || payload.emoji.name)],
+        }])
         break
       }
 
       case GatewayMessageType.PRESENCE_UPDATE: {
-        // we don't care about guild updates
         if (payload.guild_id) return
 
         this.usersPresence[payload.user.id] = { userID: payload.user.id, isActive: payload.status === 'online', lastActive: new Date(payload.last_modified) }

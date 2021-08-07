@@ -23,6 +23,13 @@ const getLottieStickerURL = (id: string, asset: string) =>
 const getPNGStickerURL = (id: string) =>
   `https://media.discordapp.net/stickers/${id}.png?size=512`
 
+export const mapReaction = (reaction: any, userID: string): MessageReaction => ({
+  id: reaction.emoji.id || reaction.emoji.name,
+  reactionKey: reaction.emoji.id ? getEmojiURL(reaction.emoji.id, reaction.emoji.animated) : reaction.emoji.name,
+  participantID: userID,
+  emoji: true,
+})
+
 export function mapUser(user: DiscordUser): User {
   return {
     id: user.id,
@@ -184,13 +191,12 @@ export function mapMessage(message: DiscordMessage, currentUserID: string, react
   else if (message.type === MessageType.THREAD_STARTER_MESSAGE) message = message.referenced_message
 
   const attachments = mapAttachments(message)
-
   const links: MessageLink[] = message.embeds
-    .filter(e => e.type === 'article' || e.type === 'link' || e.type === 'video' || e.type === 'rich')
+    ?.filter(e => e.type === MessageEmbedType.ARTICLE || e.type === MessageEmbedType.LINK || e.type === MessageEmbedType.VIDEO || e.type === MessageEmbedType.RICH)
     .filter(e => e.url)
     .map(e => {
       return {
-        url: e.url!,
+        url: e.url,
         img: e.thumbnail?.url || e.image?.url,
         imgSize: { width: e.thumbnail?.width || e.image?.width, height: e.thumbnail?.height || e.image?.height },
         title: e.title || e.author?.name || e.url!,
@@ -198,13 +204,7 @@ export function mapMessage(message: DiscordMessage, currentUserID: string, react
       }
     })
 
-  const reactions = reactionsDetails?.flatMap<MessageReaction>(r =>
-    r.users.map(u => ({
-      id: r.emoji.id || r.emoji.name,
-      reactionKey: r.emoji.id ? getEmojiURL(r.emoji.id, r.emoji.animated) : r.emoji.name,
-      participantID: u.id,
-      emoji: true,
-    })))
+  const reactions = reactionsDetails?.flatMap<MessageReaction>(r => r.users.map(u => mapReaction(r, u.id)))
 
   const mapped: Message = {
     _original: JSON.stringify(message),
