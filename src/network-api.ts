@@ -407,19 +407,19 @@ export default class DiscordNetworkAPI {
 
       case GatewayMessageType.RESUMED: {
         // TODO: RESUMED
-        console.log(payload)
+        texts.log(type, payload)
         break
       }
 
       case GatewayMessageType.RECONNECT: {
         // TODO: RECONNECT
-        console.log(payload)
+        texts.log(type, payload)
         break
       }
 
       case GatewayMessageType.INVALID_SESSION: {
         // TODO: INVALID_SESSION
-        console.log(payload)
+        texts.log(type, payload)
         break
       }
 
@@ -486,43 +486,43 @@ export default class DiscordNetworkAPI {
 
       case GatewayMessageType.CHANNEL_PINS_UPDATE: {
         // TODO: CHANNEL_PINS_UPDATE
-        console.log(payload)
+        texts.log(type, payload)
         break
       }
 
       case GatewayMessageType.THREAD_CREATE: {
         // TODO: THREAD_CREATE
-        console.log(payload)
+        texts.log(type, payload)
         break
       }
 
       case GatewayMessageType.THREAD_UPDATE: {
         // TODO: THREAD_UPDATE
-        console.log(payload)
+        texts.log(type, payload)
         break
       }
 
       case GatewayMessageType.THREAD_DELETE: {
         // TODO: THREAD_DELETE
-        console.log(payload)
+        texts.log(type, payload)
         break
       }
 
       case GatewayMessageType.THREAD_LIST_SYNC: {
         // TODO: THREAD_LIST_SYNC
-        console.log(payload)
+        texts.log(type, payload)
         break
       }
 
       case GatewayMessageType.THREAD_MEMBER_UPDATE: {
         // TODO: THREAD_MEMBER_UPDATE
-        console.log(payload)
+        texts.log(type, payload)
         break
       }
 
       case GatewayMessageType.THREAD_MEMBERS_UPDATE: {
         // TODO: THREAD_MEMBERS_UPDATE
-        console.log(payload)
+        texts.log(type, payload)
         break
       }
 
@@ -574,7 +574,7 @@ export default class DiscordNetworkAPI {
 
       case GatewayMessageType.GUILD_EMOJIS_UPDATE: {
         // TODO: GUILD_EMOJIS_UPDATE
-        console.log(payload)
+        texts.log(type, payload)
         break
       }
 
@@ -743,7 +743,7 @@ export default class DiscordNetworkAPI {
 
       case GatewayMessageType.USER_UPDATE: {
         // TODO: USER_UPDATE
-        console.log(payload)
+        texts.log(type, payload)
         break
       }
 
@@ -751,7 +751,7 @@ export default class DiscordNetworkAPI {
 
       case GatewayMessageType.CHANNEL_UNREAD_UPDATE: {
         // TODO: CHANNEL_UNREAD_UPDATE
-        console.log(payload)
+        texts.log(type, payload)
         break
       }
 
