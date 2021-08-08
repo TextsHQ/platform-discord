@@ -268,6 +268,8 @@ export default class DiscordNetworkAPI {
   }
 
   sendReadReceipt = async (threadID: string, messageID?: string) => {
+    if (!messageID) throw new TypeError('messageID is falsey')
+
     await this.waitUntilReady()
 
     const res = await this.fetch({ method: 'POST', url: `channels/${threadID}/messages/${messageID}/ack`, json: { token: this.lastAckToken } })
@@ -843,7 +845,10 @@ export default class DiscordNetworkAPI {
   private handleErrors = (json: any, statusCode: number) => {
     // eslint-disable-next-line @typescript-eslint/no-throw-literal
     if (statusCode === 401) throw new ReAuthError('Unauthorized')
-    if (json.message && json.code) throw new Error(json.message)
+    if (json.message && json.code) {
+      texts.log('discord response error:', JSON.stringify(json, null, 2))
+      throw new Error('discord response error: ' + json.message)
+    }
   }
 
   private fetch = async ({ url, headers = {}, json, ...rest }: FetchOptions & { url: string, json?: any }) => {
@@ -866,9 +871,7 @@ export default class DiscordNetworkAPI {
       const res = await this.httpClient.requestAsString(`${API_ENDPOINT}/${url}`, opts)
 
       const responseJSON = res.body?.length ? JSON.parse(res.body) : undefined
-      if (res.body) {
-        if (responseJSON) this.handleErrors(responseJSON, res.statusCode)
-      }
+      if (responseJSON) this.handleErrors(responseJSON, res.statusCode)
       return {
         statusCode: res.statusCode,
         json: responseJSON,
