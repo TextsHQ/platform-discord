@@ -268,8 +268,6 @@ export default class DiscordNetworkAPI {
   }
 
   sendReadReceipt = async (threadID: string, messageID?: string) => {
-    if (!messageID) throw new TypeError('messageID is falsey')
-
     await this.waitUntilReady()
 
     const res = await this.fetch({ method: 'POST', url: `channels/${threadID}/messages/${messageID}/ack`, json: { token: this.lastAckToken } })

@@ -1,15 +1,18 @@
-import { PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Message, InboxName, MessageContent, PaginationArg, ActivityType, MessageSendOptions, texts, LoginCreds, Thread } from '@textshq/platform-sdk'
+import { PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Message, InboxName, MessageContent, PaginationArg, ActivityType, MessageSendOptions, texts, LoginCreds, Thread, AccountInfo } from '@textshq/platform-sdk'
 import DiscordNetworkAPI from './network-api'
 
 export const getDataURI = (buffer: Buffer, mimeType: string = '') =>
   `data:${mimeType};base64,${buffer.toString('base64')}`
 
 export default class Discord implements PlatformAPI {
+  private accountID: string
+
   private api = new DiscordNetworkAPI()
 
   private pollingInterval?: NodeJS.Timeout
 
-  init = async (session: any) => {
+  init = async (session: any, { accountID }: AccountInfo) => {
+    this.accountID = accountID
     if (!session) return
     await this.api.login(session)
 
@@ -96,8 +99,14 @@ export default class Discord implements PlatformAPI {
   sendActivityIndicator = (type: ActivityType, threadID: string) =>
     this.api.setTyping(type, threadID)
 
-  sendReadReceipt = (threadID: string, messageID: string) =>
-    this.api.sendReadReceipt(threadID, messageID)
+  sendReadReceipt = (threadID: string, messageID: string) => {
+    if (!messageID) {
+      const ogThreadJSON = texts.getOriginalObject('discord', this.accountID, ['thread', threadID])
+      const ogThread = JSON.parse(ogThreadJSON)
+      messageID = ogThread.last_message_id
+    }
+    return this.api.sendReadReceipt(threadID, messageID)
+  }
 
   updateThread = (threadID: string, updates: Partial<Thread>) => {
     if ('title' in updates) return this.api.patchChannel(threadID, { name: updates.title })
