@@ -16,6 +16,8 @@ const API_VERSION = 9
 const API_ENDPOINT = `https://discord.com/api/v${API_VERSION}`
 const DEFAULT_GATEWAY = 'wss://gateway.discord.gg'
 
+const SLEEP_INTERVAL = 100
+
 const WAIT_TILL_READY = true // wait until received initial data?
 const RESTART_ON_FAIL = true // restart platform when failed?
 
@@ -88,7 +90,7 @@ export default class DiscordNetworkAPI {
     const res = await this.fetch({ method: 'GET', url: 'users/@me' })
     if (!res?.json) throw new Error('No response')
 
-    const currentUser = mapCurrentUser(res?.json)
+    const currentUser = mapCurrentUser(res.json)
     this.currentUser = currentUser
     if (currentUser.id && currentUser.displayText) this.userMappings.set(currentUser.id, currentUser.displayText)
 
@@ -99,15 +101,18 @@ export default class DiscordNetworkAPI {
 
   getThreads = async (inboxName: InboxName, pagination?: PaginationArg): Promise<Paginated<Thread>> => {
     await this.waitForInitialData()
+
     const res = await this.fetch({ method: 'GET', url: 'users/@me/channels' })
     if (!res?.json) throw new Error('No response')
 
-    const threads: Thread[] = res?.json
+    const threads: Thread[] = res.json
       .sort((a, b) => a.last_message_id - b.last_message_id)
       .reverse()
       .map(thread => mapThread(thread, this.readStateMap.get(thread.id), this.currentUser))
 
-    // TODO: App doesn't display empty (unloaded) channels
+    threads.flatMap(t => t.participants.items).forEach(p => this.userMappings.set(p.id, p.username))
+
+    // TODO: App doesn't display empty channels
     const items = ENABLE_GUILDS ? threads.concat([...this.channelsMap?.values()].flat()) : threads
     return { items, hasMore: false }
   }
@@ -123,7 +128,7 @@ export default class DiscordNetworkAPI {
     })
 
     if (!res?.json) throw new Error('No response')
-    return mapThread(res?.json, null, this.currentUser, this.userMappings)
+    return mapThread(res.json, null, this.currentUser, this.userMappings)
   }
 
   /** https://discord.com/developers/docs/resources/channel#deleteclose-channel */
@@ -241,7 +246,6 @@ export default class DiscordNetworkAPI {
     })
 
     if (res?.statusCode !== 200) throw Error(res?.json?.message || `invalid response: ${res?.statusCode}`)
-
     return [mapMessage(res.json, this.currentUser.id)]
   }
 
@@ -251,12 +255,14 @@ export default class DiscordNetworkAPI {
     const text = this.mapMentions(content.text)
 
     const res = await this.fetch({ url: `channels/${threadID}/messages/${messageID}`, method: 'PATCH', json: { content: text } })
-    return res?.statusCode === 200
+    if (res?.statusCode !== 200) throw Error(res?.json?.message || `invalid response: ${res?.statusCode}`)
+    return true
   }
 
   patchChannel = async (channelID: string, patches: { name?: string, icon?: string }) => {
     const res = await this.fetch({ url: `channels/${channelID}`, method: 'PATCH', json: patches })
-    return res?.statusCode === 200
+    if (res?.statusCode !== 200) throw Error(res?.json?.message || `invalid response: ${res?.statusCode}`)
+    return true
   }
 
   deleteMessage = async (threadID: string, messageID: string, forEveryone?: boolean): Promise<boolean> => {
@@ -264,7 +270,8 @@ export default class DiscordNetworkAPI {
     await this.waitUntilReady()
 
     const res = await this.fetch({ method: 'DELETE', url: `channels/${threadID}/messages/${messageID}` })
-    return res?.statusCode === 204
+    if (res?.statusCode !== 204) throw Error(res?.json?.message || `invalid response: ${res?.statusCode}`)
+    return true
   }
 
   sendReadReceipt = async (threadID: string, messageID?: string) => {
@@ -273,21 +280,24 @@ export default class DiscordNetworkAPI {
     const res = await this.fetch({ method: 'POST', url: `channels/${threadID}/messages/${messageID}/ack`, json: { token: this.lastAckToken } })
     this.lastAckToken = res.json.token
 
-    if (res?.statusCode === 204) this.readStateMap.set(threadID, messageID)
+    if (res?.statusCode !== 204) throw Error(res?.json?.message || `invalid response: ${res?.statusCode}`)
+    this.readStateMap.set(threadID, messageID)
   }
 
   addReaction = async (threadID: string, messageID: string, reactionKey: string): Promise<boolean> => {
     await this.waitUntilReady()
 
     const res = await this.fetch({ method: 'PUT', url: `channels/${threadID}/messages/${messageID}/reactions/${encodeURIComponent(reactionKey)}/@me` })
-    return res?.statusCode === 204
+    if (res?.statusCode !== 204) throw Error(res?.json?.message || `invalid response: ${res?.statusCode}`)
+    return true
   }
 
   removeReaction = async (threadID: string, messageID: string, reactionKey: string): Promise<boolean> => {
     await this.waitUntilReady()
 
     const res = await this.fetch({ method: 'DELETE', url: `channels/${threadID}/messages/${messageID}/reactions/${encodeURIComponent(reactionKey)}/@me` })
-    return res?.statusCode === 204
+    if (res?.statusCode !== 204) throw Error(res?.json?.message || `invalid response: ${res?.statusCode}`)
+    return true
   }
 
   setTyping = async (type: ActivityType, threadID: string): Promise<void> => {
@@ -302,13 +312,23 @@ export default class DiscordNetworkAPI {
   private getUserFriends = async () => {
     const res = await this.fetch({ method: 'GET', url: 'users/@me/relationships' })
     if (!res?.json) throw new Error('No response')
-    this.userFriends = res?.json
+    this.userFriends = res.json
       .filter(f => f.type === 1) // Only friends
       .map(f => mapUser(f.user))
   }
 
+  private mapMentions = (text: string) => {
+    const userMappings = Array.from(this.userMappings)
+    // @ts-expect-error replaceAll
+    return text?.replaceAll(/@([^#@]{3,32}#[0-9]{4})/gi, (_, username) => {
+      const user = userMappings.find(u => u[1] === username)
+      if (user) return `<@!${user[0]}>`
+      return username
+    })
+  }
+
   private setupGatewayListeners = () => {
-    if (!this.client) throw new Error('WSClient not initialized!')
+    if (!this.client) throw new Error('[discord ws] not initialized!')
 
     this.client.onChangedReadyState = ready => {
       texts.log('[discord ws] Connection state: ' + ready)
@@ -361,9 +381,14 @@ export default class DiscordNetworkAPI {
         // const user_settings = payload.user_settings
 
         if (ACT_AS_USER) {
-          payload.relationships?.forEach(r => this.userMappings.set(r.id, (r.username + '#' + r.discriminator)))
+          payload.users?.forEach(r => this.userMappings.set(r.id, (r.username + '#' + r.discriminator)))
           payload.read_state?.entries?.forEach(p => this.readStateMap.set(p.id, p.last_message_id))
           // presences are in READY_SUPPLEMENTAL if ACT_AS_USER = true
+
+          if (payload.user.premium_type && payload.user.premium_type !== 0) {
+            // User has nitro, so store emojis
+            const emojis = payload.guilds.map(g => g.emojis)
+          }
         } else {
           payload.relationships?.forEach(r => this.userMappings.set(r.id, (r.user.username + '#' + r.user.discriminator)))
           payload.read_state?.forEach(p => this.readStateMap.set(p.id, p.last_message_id))
@@ -823,21 +848,12 @@ export default class DiscordNetworkAPI {
     }
   }
 
-  private mapMentions = (text: string) => {
-    // @ts-expect-error replaceAll
-    return text?.replaceAll(/@([^#@]{3,32}#[0-9]{4})/gi, (_, username) => {
-      const user = Array.from(this.userMappings).find(u => u[1] === username)
-      if (user) return `<@!${user[0]}>`
-      return username
-    })
-  }
-
   private waitForInitialData = async () => {
-    while (!this.gotInitialUserData) await sleep(100)
+    while (!this.gotInitialUserData && WAIT_TILL_READY) await sleep(SLEEP_INTERVAL)
   }
 
   private waitUntilReady = async () => {
-    while (!this.ready && WAIT_TILL_READY) await sleep(100)
+    while (!this.ready && WAIT_TILL_READY) await sleep(SLEEP_INTERVAL)
   }
 
   private handleErrors = (json: any, statusCode: number) => {

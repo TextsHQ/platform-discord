@@ -107,7 +107,6 @@ export default class WSClient {
 
   private processMessage = (message: GatewayMessage) => {
     this.lastSequenceNumber = message.s
-    this.onMessage?.(message.op, message.d, message.t)
 
     switch (message.op) {
       case OPCode.DISPATCH:
@@ -124,11 +123,11 @@ export default class WSClient {
       case OPCode.HELLO:
         this.setHeartbeatInterval(message.d.heartbeat_interval)
         break
-      case OPCode.HEARTBEAT_ACK:
-        break
       default:
         break
     }
+
+    this.onMessage?.(message.op, message.d, message.t)
   }
 
   private waitAndSend = async (payload: GatewayMessage) => {
