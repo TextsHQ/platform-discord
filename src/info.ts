@@ -48,8 +48,9 @@ const info: PlatformInfo = {
     Attribute.SUBSCRIBE_TO_CONN_STATE_CHANGE,
   ]),
   attachments: {
-    supportsCaption: true,
+    recordedAudioMimeType: 'audio/ogg',
     gifMimeType: 'image/gif',
+    supportsCaption: true,
   },
   maxGroupTitleLength: 100,
 }
