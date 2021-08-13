@@ -13,15 +13,15 @@ const getThreadIcon = (threadID: string, iconID: string) =>
 const getGuildIcon = (guildID: string, iconID: string) =>
   `https://cdn.discordapp.com/icons/${guildID}/${iconID}.png`
 
-const getEmojiURL = (emojiID: string, animated: boolean) =>
-  `https://cdn.discordapp.com/emojis/${emojiID}.${animated ? 'gif' : 'png'}`
-
 const getLottieStickerURL = (id: string, asset: string) =>
   (asset ? `https://discord.com/stickers/${id}/${asset}.json` : `https://discord.com/stickers/${id}.json`)
 
 // adding &passthrough=false makes it a regular png instead of apng
 const getPNGStickerURL = (id: string) =>
   `https://media.discordapp.net/stickers/${id}.png?size=512`
+
+export const getEmojiURL = (emojiID: string, animated: boolean) =>
+  `https://cdn.discordapp.com/emojis/${emojiID}.${animated ? 'gif' : 'png'}`
 
 export const mapReaction = (reaction: any, participantID: string): MessageReaction => ({
   id: `${participantID}${reaction.emoji.id || reaction.emoji.name}`,

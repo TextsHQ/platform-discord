@@ -115,4 +115,6 @@ export default class Discord implements PlatformAPI {
   changeThreadImage = async (threadID: string, imageBuffer: Buffer, mimeType: string) => {
     await this.api.patchChannel(threadID, { icon: getDataURI(imageBuffer, mimeType) })
   }
+
+  getCustomEmojis = () => this.api.getCustomEmojis()
 }

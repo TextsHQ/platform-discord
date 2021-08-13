@@ -45,6 +45,7 @@ const info: PlatformInfo = {
     Attribute.SUPPORTS_GROUP_IMAGE_CHANGE,
     Attribute.SUPPORTS_EDIT_MESSAGE,
     // Attribute.SUPPORTS_ARCHIVE,
+    Attribute.SUPPORTS_CUSTOM_EMOJIS,
     Attribute.SUBSCRIBE_TO_CONN_STATE_CHANGE,
   ]),
   attachments: {
