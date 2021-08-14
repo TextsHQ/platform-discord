@@ -190,7 +190,7 @@ export default class DiscordNetworkAPI {
   sendMessage = async (threadID: string, content: MessageContent, options?: MessageSendOptions) => {
     await this.waitUntilReady()
 
-    const text = this.mapMentionsAndEmotes(content.text)
+    const text = this.mapMentionsAndEmojis(content.text)
 
     const requestContent = {
       headers: {},
@@ -254,7 +254,7 @@ export default class DiscordNetworkAPI {
   editMessage = async (threadID: string, messageID: string, content: MessageContent, options?: MessageSendOptions): Promise<boolean> => {
     await this.waitUntilReady()
 
-    const text = this.mapMentionsAndEmotes(content.text)
+    const text = this.mapMentionsAndEmojis(content.text)
 
     const res = await this.fetch({ url: `channels/${threadID}/messages/${messageID}`, method: 'PATCH', json: { content: text } })
     if (res?.statusCode !== 200) throw Error(res?.json?.message || `invalid response: ${res?.statusCode}`)
@@ -326,10 +326,10 @@ export default class DiscordNetworkAPI {
       .map(f => mapUser(f.user))
   }
 
-  private mapMentionsAndEmotes = (text: string): string => {
+  private mapMentionsAndEmojis = (text: string): string => {
     const userMappings = Array.from(this.userMappings)
     const mentionRegex = /@([^#@]{3,32}#[0-9]{4})/gi
-    const emoteRegex = /:(<:.*:\d*>):/g
+    const emojiRegex = /:<:([a-zA-Z0-9-]*)(~\d*)?:(\d*)>:/g
 
     return text
       // @ts-expect-error replaceAll
@@ -338,7 +338,7 @@ export default class DiscordNetworkAPI {
         if (user) return `<@!${user[0]}>`
         return username
       })
-      .replaceAll(emoteRegex, '$1') // emotes
+      .replaceAll(emojiRegex, '<:$1:$3>') // emojis
   }
 
   private setupGatewayListeners = () => {
@@ -613,8 +613,9 @@ export default class DiscordNetworkAPI {
       }
 
       case GatewayMessageType.GUILD_EMOJIS_UPDATE: {
-        // TODO: GUILD_EMOJIS_UPDATE
-        texts.log(type, payload)
+        if (!ENABLE_GUILDS || !this.customEmojis) return
+
+        payload.emojis.forEach(e => { this.customEmojis[`<:${e.name}:${e.id}>`] = getEmojiURL(e.id, e.animated) })
         break
       }
 
