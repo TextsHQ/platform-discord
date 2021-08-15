@@ -1,5 +1,5 @@
 import { CurrentUser, Message, MessageActionType, MessageAttachment, MessageAttachmentType, MessageLink, MessageReaction, TextEntity, Thread, ThreadType, User } from '@textshq/platform-sdk'
-import { IGNORED_MESSAGE_TYPES, MessageEmbedType, MessageType, StickerFormat, THREAD_TYPES } from './constants'
+import { IGNORED_MESSAGE_TYPES, MessageActivityType, MessageEmbedType, MessageType, StickerFormat, THREAD_TYPES } from './constants'
 import { mapTextAttributes } from './text-attributes'
 import type { DiscordMessage, DiscordMessageEmbed, DiscordThread, DiscordUser } from './types'
 import { getTimestampFromSnowflake, mapMimeType } from './util'
@@ -204,6 +204,14 @@ export function mapMessage(message: DiscordMessage, currentUserID: string, react
       }
     })
 
+  if (message.activity?.type === MessageActivityType.SPOTIFY) {
+    const spotifyLink: MessageLink = {
+      url: message.activity.party_id,
+      title: `Spotify - Listen together with ${message.author.username}`,
+    }
+    links.push(spotifyLink)
+  }
+
   const reactions = reactionsDetails?.flatMap<MessageReaction>(r => (r.users as any[]).map(u => mapReaction(r, u.id)))
 
   const mapped: Message = {
@@ -217,6 +225,7 @@ export function mapMessage(message: DiscordMessage, currentUserID: string, react
     linkedMessageID: message.referenced_message?.id,
     isDeleted: message.deleted,
     threadID: message.channel_id,
+    links,
   }
 
   // reactions property should only be present if they exist, or state sync message update event will remove the reactions

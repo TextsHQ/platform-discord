@@ -332,9 +332,9 @@ export default class DiscordNetworkAPI {
 
   private mapMentionsAndEmojis = (text: string): string => {
     const userMappings = Array.from(this.userMappings).map(a => a[1])
-    const emojiMappings = Array.from(this.customEmojis).flatMap(a => a[1])
+    const emojiMappings = this.customEmojis ? Array.from(this.customEmojis).flatMap(a => a[1]) : undefined
     const mentionRegex = /@([^#@]{3,32}#[0-9]{4})/gi
-    const emojiRegex = /:([a-zA-Z0-9-]*)(~\d*)?:/gi // /:<:([a-zA-Z0-9-]*)(~\d*)?:(\d*)>:/g
+    const emojiRegex = /:([a-zA-Z0-9-]*)(~\d*)?:/gi
 
     return text
       // @ts-expect-error replaceAll
@@ -344,7 +344,7 @@ export default class DiscordNetworkAPI {
         return username
       })
       .replaceAll(emojiRegex, match => { // emojis
-        const emoji = emojiMappings.find(e => `:${e.displayName}:` === match)
+        const emoji = emojiMappings?.find(e => `:${e.displayName}:` === match)
         if (emoji) return emoji.reactionKey
         return match
       })

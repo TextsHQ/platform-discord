@@ -21,6 +21,10 @@ export enum MessageType {
   THREAD_STARTER_MESSAGE = 21,
 }
 
+export enum MessageActivityType {
+  SPOTIFY = 3,
+}
+
 export const IGNORED_MESSAGE_TYPES: Set<MessageType> = new Set([
   MessageType.USER_PREMIUM_GUILD_SUBSCRIPTION,
   MessageType.USER_PREMIUM_GUILD_SUBSCRIPTION_TIER_1,
