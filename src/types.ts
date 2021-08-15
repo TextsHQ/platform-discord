@@ -25,3 +25,9 @@ export type DiscordMessage = {
 } & any
 
 export type DiscordThread = {} & any
+
+export type DiscordEmoji = {
+  displayName: string
+  reactionKey: string
+  url: string
+}

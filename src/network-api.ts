@@ -11,6 +11,7 @@ import { defaultPacker } from './packers'
 import { IGNORED_CHANNEL_TYPES } from './constants'
 import { generateSnowflake, sleep } from './util'
 import { ACT_AS_USER, ENABLE_GUILDS, ENABLE_DM_GUILD_MEMBERS } from './preferences'
+import type { DiscordEmoji } from './types'
 
 const API_VERSION = 9
 const API_ENDPOINT = `https://discord.com/api/v${API_VERSION}`
@@ -37,7 +38,7 @@ export default class DiscordNetworkAPI {
 
   private readonly usersPresence: PresenceMap = {}
 
-  private customEmojis?: Map<string, CustomEmojiMap>
+  private customEmojis?: Map<string, DiscordEmoji[]>
 
   private mutedChannels = new Set<string>()
 
@@ -316,7 +317,9 @@ export default class DiscordNetworkAPI {
   getCustomEmojis = async (): Promise<CustomEmojiMap> => {
     await this.waitForInitialData()
     if (!this.customEmojis) return {}
-    return Array.from(this.customEmojis).map(e => e[1]).reduce(e => e)
+
+    const emojis = Array.from(this.customEmojis).flatMap(a => a[1]).map(e => [e.displayName, e.url])
+    return Object.fromEntries(emojis)
   }
 
   private getUserFriends = async () => {
@@ -328,18 +331,23 @@ export default class DiscordNetworkAPI {
   }
 
   private mapMentionsAndEmojis = (text: string): string => {
-    const userMappings = Array.from(this.userMappings)
+    const userMappings = Array.from(this.userMappings).map(a => a[1])
+    const emojiMappings = Array.from(this.customEmojis).flatMap(a => a[1])
     const mentionRegex = /@([^#@]{3,32}#[0-9]{4})/gi
-    const emojiRegex = /:<:([a-zA-Z0-9-]*)(~\d*)?:(\d*)>:/g
+    const emojiRegex = /:([a-zA-Z0-9-]*)(~\d*)?:/gi // /:<:([a-zA-Z0-9-]*)(~\d*)?:(\d*)>:/g
 
     return text
       // @ts-expect-error replaceAll
       ?.replaceAll(mentionRegex, (_, username) => { // mentions
-        const user = userMappings.find(u => u[1] === username)
+        const user = userMappings.find(u => u === username)
         if (user) return `<@!${user[0]}>`
         return username
       })
-      .replaceAll(emojiRegex, '<:$1:$3>') // emojis
+      .replaceAll(emojiRegex, match => { // emojis
+        const emoji = emojiMappings.find(e => `:${e.displayName}:` === match)
+        if (emoji) return emoji.reactionKey
+        return match
+      })
   }
 
   private setupGatewayListeners = () => {
@@ -402,10 +410,14 @@ export default class DiscordNetworkAPI {
 
           if (payload.user.premium_type && payload.user.premium_type !== 0) {
             // User has nitro, so store emojis
-            this.customEmojis = new Map<string, CustomEmojiMap>()
+            this.customEmojis = new Map<string, DiscordEmoji[]>()
             payload.guilds.forEach(g => {
-              const emojis = g.emojis.map(e => [`<:${e.name}:${e.id}>`, getEmojiURL(e.id, e.animated)])
-              this.customEmojis.set(g.id, Object.fromEntries(emojis))
+              const emojis = g.emojis.map(e => ({
+                displayName: e.name,
+                reactionKey: `<:${e.name}:${e.id}>`,
+                url: getEmojiURL(e.id, e.animated),
+              }))
+              this.customEmojis.set(g.id, emojis)
             })
           }
         } else {
@@ -571,8 +583,13 @@ export default class DiscordNetworkAPI {
       }
 
       case GatewayMessageType.GUILD_CREATE: {
-        const emojis = payload.emojis.map(e => ({ id: `<:${e.name}:${e.id}>`, url: getEmojiURL(e.id, e.animated) }))
-        emojis.forEach(e => { this.customEmojis[e.id] = e.url })
+        const emojis = payload.emojis.map(e => ({
+          displayName: e.name,
+          reactionKey: `<:${e.name}:${e.id}>`,
+          url: getEmojiURL(e.id, e.animated),
+        }))
+        this.customEmojis.set(payload.id, emojis)
+
         const emojiEvent: ServerEvent = {
           type: ServerEventType.STATE_SYNC,
           objectIDs: {},
@@ -586,16 +603,11 @@ export default class DiscordNetworkAPI {
           return
         }
 
-        const guildID: string = payload.id
-        const guildName: string = payload.name
-        // const guildJoinDate: Date = new Date(payload.joined_at)
-        // const guildIconID: string | undefined = payload.icon
-
         const channels = payload.channels
           .filter(c => !IGNORED_CHANNEL_TYPES.has(c.type))
-          .map(c => mapChannel(c, this.mutedChannels.has(c.id)), guildName)
+          .map(c => mapChannel(c, this.mutedChannels.has(c.id)), payload.name)
 
-        this.channelsMap?.set(guildID, channels)
+        this.channelsMap?.set(payload.id, channels)
 
         const channelEvents: ServerEvent[] = channels.map(c => ({
           type: ServerEventType.STATE_SYNC,
@@ -636,8 +648,12 @@ export default class DiscordNetworkAPI {
       case GatewayMessageType.GUILD_EMOJIS_UPDATE: {
         if (!this.customEmojis) return
 
-        const emojis = payload.emojis.map(e => [`<:${e.name}:${e.id}>`, getEmojiURL(e.id, e.animated)])
-        this.customEmojis.set(payload.guild_id, Object.fromEntries(emojis))
+        const emojis = payload.emojis.map(e => ({
+          displayName: e.name,
+          reactionKey: `<:${e.name}:${e.id}>`,
+          url: getEmojiURL(e.id, e.animated),
+        }))
+        this.customEmojis.set(payload.guild_id, emojis)
 
         // TODO: State sync
 
