@@ -225,7 +225,6 @@ export function mapMessage(message: DiscordMessage, currentUserID: string, react
     linkedMessageID: message.referenced_message?.id,
     isDeleted: message.deleted,
     threadID: message.channel_id,
-    links,
   }
 
   // reactions property should only be present if they exist, or state sync message update event will remove the reactions
