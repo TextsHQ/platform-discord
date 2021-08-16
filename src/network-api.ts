@@ -169,7 +169,7 @@ export default class DiscordNetworkAPI {
     const res = await this.fetch({ method: 'GET', url: `channels/${threadID}/messages?limit=50&${paginationQuery}` })
     if (res.statusCode < 200 || res.statusCode > 204 || !res.json) throw new Error(getErrorMessage(res))
 
-    const messages: Message[] = await Promise.all(res.json?.map(m => this.getMessage(m, threadID)))
+    const messages: Message[] = await Promise.all(res.json.map(m => this.getMessage(m, threadID)))
 
     if (ENABLE_GUILDS) {
       // Guilds don't return all users, so we need to keep it updated using message authors
@@ -205,9 +205,7 @@ export default class DiscordNetworkAPI {
       body: undefined,
     }
 
-    if (options?.quotedMessageID) {
-      requestContent.message_reference = { message_id: options?.quotedMessageID }
-    }
+    if (options?.quotedMessageID) requestContent.message_reference = { message_id: options?.quotedMessageID }
 
     const nonce = generateSnowflake().toString()
     this.sendMessageNonces.add(nonce)
@@ -286,7 +284,7 @@ export default class DiscordNetworkAPI {
     await this.waitUntilReady()
 
     const res = await this.fetch({ method: 'POST', url: `channels/${threadID}/messages/${messageID}/ack`, json: { token: this.lastAckToken } })
-    this.lastAckToken = res.json.token
+    this.lastAckToken = res.json?.token
 
     if (res.statusCode < 200 || res.statusCode > 204) throw Error(getErrorMessage(res))
     this.readStateMap.set(threadID, messageID)
@@ -306,6 +304,10 @@ export default class DiscordNetworkAPI {
 
   removeReaction = async (threadID: string, messageID: string, reactionKey: string): Promise<boolean> => {
     await this.waitUntilReady()
+
+    const emoji = this.allCustomEmojis?.find(e => e.displayName === reactionKey)
+    // eslint-disable-next-line no-param-reassign
+    if (emoji) reactionKey = emoji.reactionKey.slice(2, -1)
 
     const res = await this.fetch({ method: 'DELETE', url: `channels/${threadID}/messages/${messageID}/reactions/${encodeURIComponent(reactionKey)}/@me` })
     if (res.statusCode < 200 || res.statusCode > 204) throw Error(getErrorMessage(res))
@@ -926,7 +928,7 @@ export default class DiscordNetworkAPI {
     while (!this.ready && WAIT_TILL_READY) await sleep(SLEEP_INTERVAL)
   }
 
-  private fetch = async ({ url, headers = {}, json, ...rest }: FetchOptions & { url: string, json?: any }) => {
+  private fetch = async ({ url, headers = {}, json, ...rest }: FetchOptions & { url: string, json?: any }): Promise<{ statusCode: number; json?: any }> => {
     try {
       const opts: FetchOptions = {
         // TODO: timeout: 10000,
