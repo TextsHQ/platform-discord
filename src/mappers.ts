@@ -23,12 +23,18 @@ const getPNGStickerURL = (id: string) =>
 export const getEmojiURL = (emojiID: string, animated: boolean) =>
   `https://cdn.discordapp.com/emojis/${emojiID}.${animated ? 'gif' : 'png'}`
 
-export const mapReaction = (reaction: any, participantID: string): MessageReaction => ({
-  id: `${participantID}${reaction.emoji.id || reaction.emoji.name}`,
-  reactionKey: reaction.emoji.id ? getEmojiURL(reaction.emoji.id, reaction.emoji.animated) : reaction.emoji.name,
-  participantID,
-  emoji: true,
-})
+export const mapReaction = (reaction: any, participantID: string): MessageReaction => {
+  // reaction.emoji = { id: '352592187265122304', name: 'pat' }
+  // reaction.emoji = { id: null, name: '👍' }
+  const reactionKey = reaction.emoji.name || reaction.emoji.id
+  return {
+    id: `${participantID}${reactionKey}`,
+    reactionKey,
+    imgURL: reaction.emoji.id ? getEmojiURL(reaction.emoji.id, reaction.emoji.animated) : undefined,
+    participantID,
+    emoji: true,
+  }
+}
 
 export function mapUser(user: DiscordUser): User {
   return {
