@@ -22,7 +22,7 @@ const SLEEP_INTERVAL = 100
 const WAIT_TILL_READY = true // wait until received initial data?
 const RESTART_ON_FAIL = true // restart platform when failed?
 
-const ERROR_MESSAGE = (res?: any): string => res?.json?.message || `Invalid response: ${res?.statusCode}`
+const getErrorMessage = (res: { statusCode: number, json?: any }): string => res.json?.message || `Invalid response: ${res.statusCode}`
 
 export default class DiscordNetworkAPI {
   private client?: WSClient
@@ -96,7 +96,7 @@ export default class DiscordNetworkAPI {
 
   getCurrentUser = async (): Promise<CurrentUser> => {
     const res = await this.fetch({ method: 'GET', url: 'users/@me' })
-    if (res?.statusCode < 200 || res?.statusCode > 204) throw new Error(ERROR_MESSAGE(res))
+    if (res.statusCode < 200 || res.statusCode > 204 || !res.json) throw new Error(getErrorMessage(res))
 
     const currentUser = mapCurrentUser(res.json)
     this.currentUser = currentUser
@@ -111,7 +111,7 @@ export default class DiscordNetworkAPI {
     await this.waitForInitialData()
 
     const res = await this.fetch({ method: 'GET', url: 'users/@me/channels' })
-    if (res?.statusCode < 200 || res?.statusCode > 204) throw new Error(ERROR_MESSAGE(res))
+    if (res.statusCode < 200 || res.statusCode > 204 || !res.json) throw new Error(getErrorMessage(res))
 
     const threads: Thread[] = res.json
       .sort((a, b) => a.last_message_id - b.last_message_id)
@@ -135,7 +135,7 @@ export default class DiscordNetworkAPI {
       json: userIDs.length === 1 ? { recipient_id: userIDs[0] } : { recipients: userIDs },
     })
 
-    if (res?.statusCode < 200 || res?.statusCode > 204) throw new Error(ERROR_MESSAGE(res))
+    if (res.statusCode < 200 || res.statusCode > 204 || !res.json) throw new Error(getErrorMessage(res))
     return mapThread(res.json, null, this.currentUser, this.userMappings)
   }
 
@@ -167,7 +167,7 @@ export default class DiscordNetworkAPI {
 
     const paginationQuery = options.before ? `before=${options.before}` : options.after ? `after=${options.after}` : ''
     const res = await this.fetch({ method: 'GET', url: `channels/${threadID}/messages?limit=50&${paginationQuery}` })
-    if (res?.statusCode < 200 || res?.statusCode > 204) throw new Error(ERROR_MESSAGE(res))
+    if (res.statusCode < 200 || res.statusCode > 204 || !res.json) throw new Error(getErrorMessage(res))
 
     const messages: Message[] = await Promise.all(res.json?.map(m => this.getMessage(m, threadID)))
 
@@ -253,7 +253,7 @@ export default class DiscordNetworkAPI {
       body: requestContent.body,
     })
 
-    if (res?.statusCode < 200 || res?.statusCode > 204) throw Error(ERROR_MESSAGE(res))
+    if (res.statusCode < 200 || res.statusCode > 204 || !res.json) throw Error(getErrorMessage(res))
     return [mapMessage(res.json, this.currentUser.id)]
   }
 
@@ -263,13 +263,13 @@ export default class DiscordNetworkAPI {
     const text = this.mapMentionsAndEmojis(content.text)
 
     const res = await this.fetch({ url: `channels/${threadID}/messages/${messageID}`, method: 'PATCH', json: { content: text } })
-    if (res?.statusCode < 200 || res?.statusCode > 204) throw Error(ERROR_MESSAGE(res))
+    if (res.statusCode < 200 || res.statusCode > 204) throw Error(getErrorMessage(res))
     return true
   }
 
   patchChannel = async (channelID: string, patches: { name?: string, icon?: string }) => {
     const res = await this.fetch({ url: `channels/${channelID}`, method: 'PATCH', json: patches })
-    if (res?.statusCode < 200 || res?.statusCode > 204) throw Error(ERROR_MESSAGE(res))
+    if (res.statusCode < 200 || res.statusCode > 204) throw Error(getErrorMessage(res))
     return true
   }
 
@@ -278,7 +278,7 @@ export default class DiscordNetworkAPI {
     await this.waitUntilReady()
 
     const res = await this.fetch({ method: 'DELETE', url: `channels/${threadID}/messages/${messageID}` })
-    if (res?.statusCode < 200 || res?.statusCode > 204) throw Error(ERROR_MESSAGE(res))
+    if (res.statusCode < 200 || res.statusCode > 204) throw Error(getErrorMessage(res))
     return true
   }
 
@@ -288,7 +288,7 @@ export default class DiscordNetworkAPI {
     const res = await this.fetch({ method: 'POST', url: `channels/${threadID}/messages/${messageID}/ack`, json: { token: this.lastAckToken } })
     this.lastAckToken = res.json.token
 
-    if (res?.statusCode < 200 || res?.statusCode > 204) throw Error(ERROR_MESSAGE(res))
+    if (res.statusCode < 200 || res.statusCode > 204) throw Error(getErrorMessage(res))
     this.readStateMap.set(threadID, messageID)
   }
 
@@ -296,10 +296,11 @@ export default class DiscordNetworkAPI {
     await this.waitUntilReady()
 
     const emoji = this.allCustomEmojis?.find(e => e.displayName === reactionKey)
+    // eslint-disable-next-line no-param-reassign
     if (emoji) reactionKey = emoji.reactionKey.slice(2, -1)
 
     const res = await this.fetch({ method: 'PUT', url: `channels/${threadID}/messages/${messageID}/reactions/${encodeURIComponent(reactionKey)}/@me` })
-    if (res?.statusCode < 200 || res?.statusCode > 204) throw Error(ERROR_MESSAGE(res))
+    if (res.statusCode < 200 || res.statusCode > 204) throw Error(getErrorMessage(res))
     return true
   }
 
@@ -307,7 +308,7 @@ export default class DiscordNetworkAPI {
     await this.waitUntilReady()
 
     const res = await this.fetch({ method: 'DELETE', url: `channels/${threadID}/messages/${messageID}/reactions/${encodeURIComponent(reactionKey)}/@me` })
-    if (res?.statusCode < 200 || res?.statusCode > 204) throw Error(ERROR_MESSAGE(res))
+    if (res.statusCode < 200 || res.statusCode > 204) throw Error(getErrorMessage(res))
     return true
   }
 
@@ -334,7 +335,7 @@ export default class DiscordNetworkAPI {
 
   private getUserFriends = async () => {
     const res = await this.fetch({ method: 'GET', url: 'users/@me/relationships' })
-    if (!res?.json) throw new Error('No response')
+    if (res.statusCode < 200 || res.statusCode > 204 || !res.json) throw Error(getErrorMessage(res))
     this.userFriends = res.json
       .filter(f => f.type === 1) // Only friends
       .map(f => mapUser(f.user))
@@ -925,15 +926,6 @@ export default class DiscordNetworkAPI {
     while (!this.ready && WAIT_TILL_READY) await sleep(SLEEP_INTERVAL)
   }
 
-  private handleErrors = (json: any, statusCode: number) => {
-    // eslint-disable-next-line @typescript-eslint/no-throw-literal
-    if (statusCode === 401) throw new ReAuthError('Unauthorized')
-    if (json.message && json.code) {
-      texts.log('discord response error:', JSON.stringify(json, null, 2))
-      throw new Error('discord response error: ' + json.message)
-    }
-  }
-
   private fetch = async ({ url, headers = {}, json, ...rest }: FetchOptions & { url: string, json?: any }) => {
     try {
       const opts: FetchOptions = {
@@ -949,9 +941,9 @@ export default class DiscordNetworkAPI {
       if (json) opts.headers['Content-Type'] = 'application/json'
 
       const res = await this.httpClient.requestAsString(`${API_ENDPOINT}/${url}`, opts)
-
+      // eslint-disable-next-line @typescript-eslint/no-throw-literal
+      if (res.statusCode === 401) throw new ReAuthError('Unauthorized')
       const responseJSON = res.body?.length ? JSON.parse(res.body) : undefined
-      // if (responseJSON) this.handleErrors(responseJSON, res.statusCode)
       return {
         statusCode: res.statusCode,
         json: responseJSON,
