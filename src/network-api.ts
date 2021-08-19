@@ -252,7 +252,7 @@ export default class DiscordNetworkAPI {
     })
 
     if (res.statusCode < 200 || res.statusCode > 204 || !res.json) throw Error(getErrorMessage(res))
-    return [mapMessage(res.json, this.currentUser.id)]
+    return [mapMessage(res.json, this.currentUser.id) as Message]
   }
 
   editMessage = async (threadID: string, messageID: string, content: MessageContent, options?: MessageSendOptions): Promise<boolean> => {
@@ -707,7 +707,7 @@ export default class DiscordNetworkAPI {
               threadID: payload.channel_id,
               messageID: payload.id,
             },
-            entries: [mapMessage(payload, this.currentUser?.id)],
+            entries: [mapMessage(payload, this.currentUser.id) as Message],
           }])
         }
         break

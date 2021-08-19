@@ -1,4 +1,4 @@
-import { CurrentUser, Message, MessageActionType, MessageAttachment, MessageAttachmentType, MessageLink, MessageReaction, TextEntity, Thread, ThreadType, User } from '@textshq/platform-sdk'
+import { CurrentUser, Message, MessageActionType, MessageAttachment, MessageAttachmentType, MessageLink, MessageReaction, PartialWithID, TextEntity, Thread, ThreadType, User } from '@textshq/platform-sdk'
 import { IGNORED_MESSAGE_TYPES, MessageActivityType, MessageEmbedType, MessageType, StickerFormat, THREAD_TYPES } from './constants'
 import { mapTextAttributes } from './text-attributes'
 import type { DiscordMessage, DiscordMessageEmbed, DiscordThread, DiscordUser } from './types'
@@ -192,11 +192,7 @@ function mapAttachments(message: DiscordMessage) {
   ].filter(Boolean)
 }
 
-export function mapMessage(message: DiscordMessage, currentUserID: string, reactionsDetails?: any[]): Message | undefined {
-  if (IGNORED_MESSAGE_TYPES.has(message.type)) return
-  else if (message.type === MessageType.THREAD_STARTER_MESSAGE) message = message.referenced_message
-
-  const attachments = mapAttachments(message)
+const mapMessageLinks = (message: DiscordMessage) => {
   const links: MessageLink[] = message.embeds
     ?.filter(e => e.type === MessageEmbedType.ARTICLE || e.type === MessageEmbedType.LINK || e.type === MessageEmbedType.VIDEO || e.type === MessageEmbedType.RICH)
     .filter(e => e.url)
@@ -209,7 +205,6 @@ export function mapMessage(message: DiscordMessage, currentUserID: string, react
         summary: e.description || undefined,
       }
     })
-
   if (message.activity?.type === MessageActivityType.SPOTIFY) {
     const spotifyLink: MessageLink = {
       url: message.activity.party_id,
@@ -217,31 +212,42 @@ export function mapMessage(message: DiscordMessage, currentUserID: string, react
     }
     links.push(spotifyLink)
   }
+  return links
+}
+
+export function mapMessage(message: DiscordMessage, currentUserID: string, reactionsDetails?: any[]): Message | PartialWithID<Message> | undefined {
+  if (IGNORED_MESSAGE_TYPES.has(message.type)) return
+  else if (message.type === MessageType.THREAD_STARTER_MESSAGE) message = message.referenced_message
+
+  const attachments = mapAttachments(message)
+  const links = mapMessageLinks(message)
 
   const reactions = reactionsDetails?.flatMap<MessageReaction>(r => (r.users as any[]).map(u => mapReaction(r, u.id)))
 
-  const mapped: Message = {
+  const mapped: PartialWithID<Message> = {
     _original: JSON.stringify(message),
     id: message.id,
-    timestamp: new Date(message.timestamp),
-    editedTimestamp: message.edited_timestamp ? new Date(message.edited_timestamp) : undefined,
-    senderID: message.author?.id,
-    text: message.content,
-    isSender: message.author ? currentUserID === message.author?.id : undefined,
     linkedMessageID: message.referenced_message?.id,
     isDeleted: message.deleted,
     threadID: message.channel_id,
   }
 
-  // reactions property should only be present if they exist, or state sync message update event will remove the reactions
+  // these properties should only be present if they exist, or they'll cause issues with message update state sync events
+  if (message.author) {
+    mapped.senderID = message.author.id
+    mapped.isSender = currentUserID === message.author.id
+  }
+  if (message.content) mapped.text = message.content
+  if (message.timestamp) mapped.timestamp = new Date(message.timestamp)
+  if (message.edited_timestamp) mapped.editedTimestamp = new Date(message.edited_timestamp)
   if (reactions) mapped.reactions = reactions
-  if (attachments && attachments.length > 0) mapped.attachments = attachments
-  if (links && links.length > 0) mapped.links = links
+  if (attachments?.length > 0) mapped.attachments = attachments
+  if (links?.length > 0) mapped.links = links
   if (message.embeds?.find(e => e.type === MessageEmbedType.RICH)) Object.assign(mapped, mapRichEmbeds(message))
 
   Object.assign(mapped, mapMessageType(message))
 
-  if (mapped.text && mapped.text.length > 0) {
+  if (mapped.text?.length > 0) {
     const getUserName = (id: string): string => message.mentions.find(m => m.id === id)?.username || id
     const { text: transformedMessageText, textAttributes } = mapTextAttributes(mapped.text, getUserName)
     if (transformedMessageText && textAttributes) {
@@ -306,11 +312,14 @@ function mapMessageType(message: DiscordMessage): Partial<Message> {
         const timeLasted = (endDate.getTime() - startDate.getTime()) / 1000
 
         if (timeLasted >= 60 * 60) {
-          text = `{{${message.author.id}}} started a call, which lasted ${Math.floor((timeLasted / 60) / 60)} hour(s)`
+          const hours = Math.floor((timeLasted / 60) / 60)
+          text = `{{${message.author.id}}} started a call that lasted ${hours} hour${hours === 1 ? '' : 's'}`
         } else if (timeLasted >= 60) {
-          text = `{{${message.author.id}}} started a call, which lasted ${Math.floor(timeLasted / 60)} minute(s)`
+          const minutes = Math.floor(timeLasted / 60)
+          text = `{{${message.author.id}}} started a call that lasted ${minutes} minute${minutes === 1 ? '' : 's'}`
         } else {
-          text = `{{${message.author.id}}} started a call, which lasted ${Math.floor(timeLasted)} second(s)`
+          const seconds = Math.floor(timeLasted)
+          text = `{{${message.author.id}}} started a call that lasted ${seconds} second${seconds === 1 ? '' : 's'}`
         }
       } else {
         text = `{{${message.author.id}}} started a call`
