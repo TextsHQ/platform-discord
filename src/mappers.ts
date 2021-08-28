@@ -1,7 +1,8 @@
-import { CurrentUser, Message, MessageActionType, MessageAttachment, MessageAttachmentType, MessageLink, MessageReaction, PartialWithID, TextEntity, Thread, ThreadType, User } from '@textshq/platform-sdk'
-import { IGNORED_MESSAGE_TYPES, MessageActivityType, MessageEmbedType, MessageType, StickerFormat, THREAD_TYPES } from './constants'
+import { CurrentUser, Message, MessageActionType, MessageAttachment, MessageAttachmentType, MessageLink, MessageReaction, TextEntity, Thread, ThreadType, User, PartialWithID } from '@textshq/platform-sdk'
+import { APIUser, APIChannel, APIMessage, APIEmbed, EmbedType, MessageActivityType, APIAttachment, MessageType, APISticker } from 'discord-api-types/v9'
+import type { DiscordMessage, DiscordReactionDetails } from './types'
+import { IGNORED_MESSAGE_TYPES, StickerFormat, SUPPORTED_EMBED_TYPES, THREAD_TYPES } from './constants'
 import { mapTextAttributes } from './text-attributes'
-import type { DiscordMessage, DiscordMessageEmbed, DiscordThread, DiscordUser } from './types'
 import { getTimestampFromSnowflake, mapMimeType } from './util'
 
 const getUserAvatar = (userID: string, avatarID: string) =>
@@ -23,7 +24,7 @@ const getPNGStickerURL = (id: string) =>
 export const getEmojiURL = (emojiID: string, animated: boolean) =>
   `https://cdn.discordapp.com/emojis/${emojiID}.${animated ? 'gif' : 'png'}`
 
-export const mapReaction = (reaction: any, participantID: string): MessageReaction => {
+export const mapReaction = (reaction: DiscordReactionDetails, participantID: string): MessageReaction => {
   // reaction.emoji = { id: '352592187265122304', name: 'pat' }
   // reaction.emoji = { id: null, name: '👍' }
   const reactionKey = reaction.emoji.name || reaction.emoji.id
@@ -36,7 +37,7 @@ export const mapReaction = (reaction: any, participantID: string): MessageReacti
   }
 }
 
-export function mapUser(user: DiscordUser): User {
+export function mapUser(user: APIUser): User {
   return {
     id: user.id,
     fullName: user.username,
@@ -45,7 +46,7 @@ export function mapUser(user: DiscordUser): User {
   }
 }
 
-export function mapCurrentUser(user: DiscordUser): CurrentUser {
+export function mapCurrentUser(user: APIUser): CurrentUser {
   const mapped = mapUser(user)
   return {
     displayText: mapped.username,
@@ -53,7 +54,7 @@ export function mapCurrentUser(user: DiscordUser): CurrentUser {
   }
 }
 
-export function mapChannel(channel: any, isMuted: Boolean, guildName?: string): Thread {
+export function mapChannel(channel: APIChannel, isMuted: Boolean, guildName?: string): Thread {
   return {
     _original: JSON.stringify(channel),
     folderName: guildName,
@@ -77,7 +78,7 @@ export function mapChannel(channel: any, isMuted: Boolean, guildName?: string): 
   }
 }
 
-export function mapThread(thread: DiscordThread, lastReadMessageID?: string, currentUser?: User, userMappings?: Map<string, string>): Thread {
+export function mapThread(thread: APIChannel, lastReadMessageID?: string, currentUser?: User): Thread {
   const type: ThreadType = THREAD_TYPES[thread.type]
 
   const participants: User[] = thread.recipients?.map(mapUser)
@@ -108,9 +109,9 @@ export function mapThread(thread: DiscordThread, lastReadMessageID?: string, cur
   }
 }
 
-function mapAttachment(a): MessageAttachment {
+function mapAttachment(a: APIAttachment): MessageAttachment {
   // TODO: Improve it
-  const lowercased = (a.name || a.url).toLowerCase()
+  const lowercased = (a.filename || a.url).toLowerCase()
   let type = MessageAttachmentType.UNKNOWN
 
   let isGif = false
@@ -136,22 +137,22 @@ function mapAttachment(a): MessageAttachment {
     isVoiceNote,
     size: a.width && a.height ? { width: a.width, height: a.height } : undefined,
     srcURL: a.url,
-    posterImg: a.proxyURL,
-    fileName: a.name || undefined,
+    posterImg: a.proxy_url,
+    fileName: a.filename || undefined,
     fileSize: a.size || undefined,
   }
 }
 
-function mapAttachments(message: DiscordMessage) {
-  const mapEmbed = (embed: DiscordMessageEmbed): MessageAttachment => {
+function mapAttachments(message: APIMessage) {
+  const mapEmbed = (embed: APIEmbed): MessageAttachment => {
     message.content = message.content?.replace(embed.url, '')
 
     switch (embed.type) {
-      case MessageEmbedType.ARTICLE: {
+      case EmbedType.Article: {
         // haven't seen one in the wild
         break
       }
-      case MessageEmbedType.GIFV: return {
+      case EmbedType.GIFV: return {
         id: embed.url,
         type: MessageAttachmentType.VIDEO,
         mimeType: mapMimeType(embed.video.url),
@@ -159,7 +160,7 @@ function mapAttachments(message: DiscordMessage) {
         srcURL: embed.video.url,
         size: { width: embed.video.width, height: embed.video.height },
       }
-      case MessageEmbedType.IMAGE: {
+      case EmbedType.Image: {
         const isGif = embed.thumbnail.url.toLowerCase().endsWith('.gif')
         return {
           id: embed.url,
@@ -170,15 +171,15 @@ function mapAttachments(message: DiscordMessage) {
           size: { width: embed.thumbnail.width, height: embed.thumbnail.height },
         }
       }
-      case MessageEmbedType.LINK: {
+      case EmbedType.Link: {
         // already works ¯\_(ツ)_/¯
         break
       }
-      case MessageEmbedType.RICH: {
+      case EmbedType.Rich: {
         // handled somewhere else
         break
       }
-      case MessageEmbedType.VIDEO: {
+      case EmbedType.Video: {
         // haven't seen one in the wild
         break
       }
@@ -194,7 +195,7 @@ function mapAttachments(message: DiscordMessage) {
 
 const mapMessageLinks = (message: DiscordMessage) => {
   const links: MessageLink[] = message.embeds
-    ?.filter(e => e.type === MessageEmbedType.ARTICLE || e.type === MessageEmbedType.LINK || e.type === MessageEmbedType.VIDEO || e.type === MessageEmbedType.RICH)
+    ?.filter(e => SUPPORTED_EMBED_TYPES.has(e.type))
     .filter(e => e.url)
     .map(e => {
       return {
@@ -205,7 +206,8 @@ const mapMessageLinks = (message: DiscordMessage) => {
         summary: e.description || undefined,
       }
     })
-  if (message.activity?.type === MessageActivityType.SPOTIFY) {
+
+  if (message.activity?.type === MessageActivityType.Listen) {
     const spotifyLink: MessageLink = {
       url: message.activity.party_id,
       title: `Spotify - Listen together with ${message.author.username}`,
@@ -215,20 +217,19 @@ const mapMessageLinks = (message: DiscordMessage) => {
   return links
 }
 
-export function mapMessage(message: DiscordMessage, currentUserID: string, reactionsDetails?: any[]): Message | PartialWithID<Message> | undefined {
+export function mapMessage(message: DiscordMessage, currentUserID: string, reactionsDetails?: DiscordReactionDetails[]): Message | PartialWithID<Message> | undefined {
   if (IGNORED_MESSAGE_TYPES.has(message.type)) return
-  else if (message.type === MessageType.THREAD_STARTER_MESSAGE) message = message.referenced_message
+  else if (message.type === MessageType.ThreadStarterMessage) message = message.referenced_message
 
   const attachments = mapAttachments(message)
   const links = mapMessageLinks(message)
 
-  const reactions = reactionsDetails?.flatMap<MessageReaction>(r => (r.users as any[]).map(u => mapReaction(r, u.id)))
+  const reactions = reactionsDetails?.flatMap<MessageReaction>(r => r.users.map(u => mapReaction(r, u.id)))
 
   const mapped: PartialWithID<Message> = {
     _original: JSON.stringify(message),
     id: message.id,
     linkedMessageID: message.referenced_message?.id,
-    isDeleted: message.deleted,
     threadID: message.channel_id,
   }
 
@@ -243,9 +244,9 @@ export function mapMessage(message: DiscordMessage, currentUserID: string, react
   if (reactions) mapped.reactions = reactions
   if (attachments?.length > 0) mapped.attachments = attachments
   if (links?.length > 0) mapped.links = links
-  if (message.embeds?.find(e => e.type === MessageEmbedType.RICH)) Object.assign(mapped, mapRichEmbeds(message))
+  if (message.embeds?.find(e => e.type === EmbedType.Rich)) Object.assign(mapped, mapRichEmbeds(message))
 
-  Object.assign(mapped, mapMessageType(message))
+  Object.assign(mapped, mapMessageType(message as DiscordMessage))
 
   if (mapped.text?.length > 0) {
     const getUserName = (id: string): string => message.mentions.find(m => m.id === id)?.username || id
@@ -259,7 +260,7 @@ export function mapMessage(message: DiscordMessage, currentUserID: string, react
   return mapped
 }
 
-function mapSticker(sticker: any): MessageAttachment {
+function mapSticker(sticker: APISticker): MessageAttachment {
   const ext = {
     [StickerFormat.PNG]: 'png',
     [StickerFormat.APNG]: 'png',
@@ -278,7 +279,7 @@ function mapSticker(sticker: any): MessageAttachment {
 
 function mapMessageType(message: DiscordMessage): Partial<Message> {
   switch (message.type) {
-    case MessageType.RECIPIENT_ADD: {
+    case MessageType.RecipientAdd: {
       return {
         isAction: true,
         parseTemplate: true,
@@ -291,7 +292,7 @@ function mapMessageType(message: DiscordMessage): Partial<Message> {
       }
     }
 
-    case MessageType.RECIPIENT_REMOVE: {
+    case MessageType.RecipientRemove: {
       return {
         isAction: true,
         parseTemplate: true,
@@ -304,7 +305,7 @@ function mapMessageType(message: DiscordMessage): Partial<Message> {
       }
     }
 
-    case MessageType.CALL: {
+    case MessageType.Call: {
       let text = message.content
       if (message.call?.ended_timestamp) {
         const startDate = new Date(message.timestamp)
@@ -327,7 +328,7 @@ function mapMessageType(message: DiscordMessage): Partial<Message> {
       return { isAction: true, parseTemplate: true, text }
     }
 
-    case MessageType.CHANNEL_NAME_CHANGE: {
+    case MessageType.ChannelNameChange: {
       return {
         isAction: true,
         parseTemplate: true,
@@ -340,7 +341,7 @@ function mapMessageType(message: DiscordMessage): Partial<Message> {
       }
     }
 
-    case MessageType.CHANNEL_ICON_CHANGE: {
+    case MessageType.ChannelIconChange: {
       return {
         isAction: true,
         parseTemplate: true,
@@ -352,7 +353,7 @@ function mapMessageType(message: DiscordMessage): Partial<Message> {
       }
     }
 
-    case MessageType.CHANNEL_PINNED_MESSAGE: {
+    case MessageType.ChannelPinnedMessage: {
       return {
         isAction: true,
         parseTemplate: true,
@@ -361,7 +362,7 @@ function mapMessageType(message: DiscordMessage): Partial<Message> {
       }
     }
 
-    case MessageType.GUILD_MEMBER_JOIN: {
+    case MessageType.GuildMemberJoin: {
       return {
         isAction: true,
         parseTemplate: true,
@@ -380,14 +381,14 @@ function mapMessageType(message: DiscordMessage): Partial<Message> {
   }
 }
 
-function mapRichEmbeds(message: DiscordMessage): Partial<Message> {
+function mapRichEmbeds(message: APIMessage): Partial<Message> {
   type EmbedObject = { entity: TextEntity, text: string }
 
   // TODO: Test more rich embeds
   // TODO: Add support for `timestamp`, `color`, `footer`, `author` and `provider`
 
   // there can be only one rich embed in a message
-  const embed = message.embeds?.find(e => e.type === MessageEmbedType.RICH)
+  const embed = message.embeds?.find(e => e.type === EmbedType.Rich)
   if (!embed) return
 
   const spacing = '\n\n'
@@ -421,13 +422,17 @@ function mapRichEmbeds(message: DiscordMessage): Partial<Message> {
 
   const text = [description?.text].concat(fields?.map(f => f.text)).filter(Boolean).join(spacing)
   const entities = [description?.entity].concat(fields?.map(f => f.entity)).filter(Boolean)
+  const link: MessageLink | undefined = embed.url ? {
+    url: embed.url,
+    title: embed.title, // TODO: Test
+  } : undefined
 
   const final: Partial<Message> = {
     text,
     textAttributes: { entities },
     textHeading: embed.title,
     textFooter,
-    links: embed.url ? [embed.url] : undefined,
+    links: link ? [link] : undefined,
   }
 
   const media = embed.image ?? embed.video ?? embed.thumbnail

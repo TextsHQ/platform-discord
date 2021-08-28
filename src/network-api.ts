@@ -11,7 +11,7 @@ import { defaultPacker } from './packers'
 import { IGNORED_CHANNEL_TYPES } from './constants'
 import { generateSnowflake, sleep } from './util'
 import { ACT_AS_USER, ENABLE_GUILDS, ENABLE_DM_GUILD_MEMBERS } from './preferences'
-import type { DiscordEmoji } from './types'
+import type { DiscordEmoji, DiscordMessage, DiscordReactionDetails } from './types'
 
 const API_VERSION = 9
 const API_ENDPOINT = `https://discord.com/api/v${API_VERSION}`
@@ -29,7 +29,7 @@ export default class DiscordNetworkAPI {
 
   private httpClient = texts.createHttpClient()
 
-  // ID-to-username mappings
+  // username-to-id mappings
   private readonly userMappings = new Map<string, string>()
 
   private readonly readStateMap = new Map<string, string>()
@@ -100,7 +100,7 @@ export default class DiscordNetworkAPI {
 
     const currentUser = mapCurrentUser(res.json)
     this.currentUser = currentUser
-    if (currentUser.id && currentUser.displayText) this.userMappings.set(currentUser.id, currentUser.displayText)
+    if (currentUser.id && currentUser.displayText) this.userMappings.set(currentUser.displayText, currentUser.id)
 
     this.getUserFriends()
 
@@ -118,7 +118,7 @@ export default class DiscordNetworkAPI {
       .reverse()
       .map(thread => mapThread(thread, this.readStateMap.get(thread.id), this.currentUser))
 
-    threads.flatMap(t => t.participants.items).forEach(p => this.userMappings.set(p.id, p.username))
+    threads.flatMap(t => t.participants.items).forEach(p => this.userMappings.set(p.username, p.id))
 
     // TODO: App doesn't display empty channels
     const items = ENABLE_GUILDS ? threads.concat([...this.channelsMap?.values()].flat()) : threads
@@ -136,7 +136,7 @@ export default class DiscordNetworkAPI {
     })
 
     if (res.statusCode < 200 || res.statusCode > 204 || !res.json) throw new Error(getErrorMessage(res))
-    return mapThread(res.json, null, this.currentUser, this.userMappings)
+    return mapThread(res.json, null, this.currentUser)
   }
 
   /** https://discord.com/developers/docs/resources/channel#deleteclose-channel */
@@ -144,8 +144,8 @@ export default class DiscordNetworkAPI {
     await this.fetch({ method: 'DELETE', url: `channels/${threadID}` })
   }
 
-  getMessage = async (message: any, threadID: string) => {
-    const reactionsDetails = message.reactions
+  getMessage = async (message: DiscordMessage, threadID: string) => {
+    const reactionsDetails: DiscordReactionDetails[] | undefined = message.reactions
       ? await Promise.all(message.reactions.map(async r => {
         const emojiQuery = encodeURIComponent(r.emoji.id ? `${r.emoji.name}:${r.emoji.id}` : r.emoji.name)
         const reactedRes = await this.fetch({ method: 'GET', url: `channels/${threadID}/messages/${message.id}/reactions/${emojiQuery}` })
@@ -344,16 +344,15 @@ export default class DiscordNetworkAPI {
   }
 
   private mapMentionsAndEmojis = (text: string): string => {
-    const userMappings = Array.from(this.userMappings.values())
     const mentionRegex = /@([^#@]{3,32}#[0-9]{4})/gi
     const emojiRegex = /:([a-zA-Z0-9-]*)(~\d*)?:/gi
 
     return text
       // @ts-expect-error replaceAll
-      ?.replaceAll(mentionRegex, (_, username) => { // mentions
-        const user = userMappings.find(u => u === username)
-        if (user) return `<@!${user[0]}>`
-        return username
+      ?.replaceAll(mentionRegex, (match, username) => { // mentions
+        const userID = this.userMappings.get(username)
+        if (userID) return `<@!${userID}>`
+        return match
       })
       .replaceAll(emojiRegex, match => { // emojis
         const emoji = this.allCustomEmojis?.find(e => `:${e.displayName}:` === match)
@@ -416,7 +415,7 @@ export default class DiscordNetworkAPI {
         // const user_settings = payload.user_settings
 
         if (ACT_AS_USER) {
-          payload.users?.forEach(r => this.userMappings.set(r.id, (r.username + '#' + r.discriminator)))
+          payload.users?.forEach(r => this.userMappings.set((r.username + '#' + r.discriminator), r.id))
           payload.read_state?.entries?.forEach(p => this.readStateMap.set(p.id, p.last_message_id))
           // presences are in READY_SUPPLEMENTAL if ACT_AS_USER = true
 
@@ -434,7 +433,7 @@ export default class DiscordNetworkAPI {
             this.onGuildCustomEmojiMapUpdate()
           }
         } else {
-          payload.relationships?.forEach(r => this.userMappings.set(r.id, (r.user.username + '#' + r.user.discriminator)))
+          payload.relationships?.forEach(r => this.userMappings.set((r.user.username + '#' + r.user.discriminator), r.id))
           payload.read_state?.forEach(p => this.readStateMap.set(p.id, p.last_message_id))
           payload.presences?.forEach(p => {
             this.usersPresence[p.user.id] = { userID: p.user.id, isActive: p.status === 'online', lastActive: new Date(+p.last_modified) }
@@ -678,7 +677,7 @@ export default class DiscordNetworkAPI {
       case GatewayMessageType.MESSAGE_CREATE: {
         if (!ENABLE_GUILDS && payload.guild_id) return
 
-        payload.mentions.forEach(m => this.userMappings.set(m.id, (m.username + '#' + m.discriminator)))
+        payload.mentions.forEach(m => this.userMappings.set((m.username + '#' + m.discriminator), m.id))
 
         if (ENABLE_GUILDS && payload.author) {
           const sender = mapUser(payload.author)
