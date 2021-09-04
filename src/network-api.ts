@@ -289,7 +289,7 @@ export default class DiscordNetworkAPI {
     this.readStateMap.set(threadID, messageID)
   }
 
-  addReaction = async (threadID: string, messageID: string, reactionKey: string): Promise<boolean> => {
+  addReaction = async (threadID: string, messageID: string, reactionKey: string) => {
     await this.waitUntilReady()
 
     const emoji = this.allCustomEmojis?.find(e => e.displayName === reactionKey)
@@ -298,10 +298,9 @@ export default class DiscordNetworkAPI {
 
     const res = await this.fetch({ method: 'PUT', url: `channels/${threadID}/messages/${messageID}/reactions/${encodeURIComponent(reactionKey)}/@me` })
     if (res.statusCode < 200 || res.statusCode > 204) throw Error(getErrorMessage(res))
-    return true
   }
 
-  removeReaction = async (threadID: string, messageID: string, reactionKey: string): Promise<boolean> => {
+  removeReaction = async (threadID: string, messageID: string, reactionKey: string) => {
     await this.waitUntilReady()
 
     const emoji = this.allCustomEmojis?.find(e => e.displayName === reactionKey)
@@ -310,7 +309,6 @@ export default class DiscordNetworkAPI {
 
     const res = await this.fetch({ method: 'DELETE', url: `channels/${threadID}/messages/${messageID}/reactions/${encodeURIComponent(reactionKey)}/@me` })
     if (res.statusCode < 200 || res.statusCode > 204) throw Error(getErrorMessage(res))
-    return true
   }
 
   setTyping = async (type: ActivityType, threadID: string): Promise<void> => {
