@@ -1,6 +1,6 @@
-import { promises as fs } from 'fs'
 import path from 'path'
 import FormData from 'form-data'
+import { readFile } from 'fs/promises'
 import { uniqBy } from 'lodash'
 import { texts, CurrentUser, MessageContent, PaginationArg, Thread, Message, ServerEventType, OnServerEventCallback, ActivityType, User, InboxName, MessageSendOptions, ReAuthError, PresenceMap, Paginated, FetchOptions, ServerEvent, CustomEmojiMap } from '@textshq/platform-sdk'
 
@@ -10,7 +10,7 @@ import { GatewayCloseCode, GatewayMessageType } from './websocket/constants'
 import { defaultPacker } from './packers'
 import { IGNORED_CHANNEL_TYPES } from './constants'
 import { generateSnowflake, sleep } from './util'
-import { ACT_AS_USER, ENABLE_GUILDS, ENABLE_DM_GUILD_MEMBERS } from './preferences'
+import { ACT_AS_USER, ENABLE_GUILDS, ENABLE_DM_GUILD_MEMBERS, WAIT_TILL_READY } from './preferences'
 import type { DiscordEmoji, DiscordMessage, DiscordReactionDetails } from './types'
 
 const API_VERSION = 9
@@ -18,9 +18,6 @@ const API_ENDPOINT = `https://discord.com/api/v${API_VERSION}`
 const DEFAULT_GATEWAY = 'wss://gateway.discord.gg'
 
 const SLEEP_INTERVAL = 100
-
-const WAIT_TILL_READY = true // wait until received initial data?
-const RESTART_ON_FAIL = true // restart platform when failed?
 
 const getErrorMessage = (res: { statusCode: number, json?: any }): string => res.json?.message || `Invalid response: ${res.statusCode}`
 
@@ -83,14 +80,16 @@ export default class DiscordNetworkAPI {
   }
 
   setupWebsocket = async () => {
+    if (this.client && !this.client.ready) return
+
     const gatewayRes = await this.httpClient.requestAsString(`${API_ENDPOINT}/gateway`, { headers: { 'User-Agent': texts.constants.USER_AGENT } })
     const gatewayHost = JSON.parse(gatewayRes?.body)?.url as string ?? DEFAULT_GATEWAY
     const gatewayFullURL = `${gatewayHost}/?v=${API_VERSION}&encoding=${defaultPacker.encoding}`
 
-    this.client = new WSClient(gatewayFullURL, this.token, ENABLE_GUILDS, ACT_AS_USER, defaultPacker)
+    this.client = new WSClient(gatewayFullURL, this.token, defaultPacker)
     texts.log('[discord ws] URL:', gatewayFullURL)
-    this.client.restartOnFail = RESTART_ON_FAIL
 
+    this.client.connect()
     this.setupGatewayListeners()
   }
 
@@ -218,7 +217,7 @@ export default class DiscordNetworkAPI {
           knownLength: content.fileBuffer?.length,
         })
       } else if (content.filePath) {
-        form.append('file', await fs.readFile(content.filePath), {
+        form.append('file', await readFile(content.filePath), {
           filename: content.fileName || path.basename(content.filePath),
         })
       }

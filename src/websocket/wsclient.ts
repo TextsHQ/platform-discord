@@ -5,6 +5,7 @@ import { DiscordPresenceStatus, OPCode, GatewayMessageType, GatewayCloseCode } f
 import type { GatewayMessage } from './types'
 import type { Packer } from '../packers'
 import { sleep } from '../util'
+import { ENABLE_GUILDS, ACT_AS_USER, RESTART_ON_FAIL } from '../preferences'
 
 export default class WSClient {
   private ws?: WebSocket
@@ -17,17 +18,17 @@ export default class WSClient {
 
   private heartbeatInterval?: NodeJS.Timeout
 
+  private failedRetries = 0
+
   private constants = {
     browser: 'Chrome',
     releaseChannel: 'stable',
     buildNumber: 92358,
     capabilities: 125, // sniffed
-    intents: this.enableGuilds ? 32515 : 28672, // https://discord.com/developers/docs/topics/gateway#gateway-intents
+    intents: ENABLE_GUILDS ? 32515 : 28672, // https://discord.com/developers/docs/topics/gateway#gateway-intents
   }
 
   ready = false
-
-  restartOnFail = true
 
   onMessage?: (opcode: OPCode, message: any, type?: GatewayMessageType) => void
 
@@ -40,23 +41,28 @@ export default class WSClient {
   constructor(
     public gateway: string,
     private token: string,
-    private enableGuilds = false,
-    private actAsUser = false,
     private packer: Packer,
   ) {
-    this.connect()
+    // this.connect()
   }
 
-  connect = () => {
-    // texts.log('[discord ws] Opening gateway connection...')
+  connect = async () => {
+    texts.log('[discord ws] Opening gateway connection. Try: ', this.failedRetries)
+
+    // this.disconnect()
+
+    await sleep(Math.min(this.failedRetries, 10) * 1000)
+
     this.ws = new WebSocket(this.gateway)
     this.setupHandlers()
   }
 
   disconnect = () => {
     clearInterval(this.heartbeatInterval)
+
     this.lastSequenceNumber = null
     this.ws?.close()
+    this.ws = null
   }
 
   private setupHandlers = () => {
@@ -77,22 +83,26 @@ export default class WSClient {
           this.login()
         }
       }
+
+      this.failedRetries = 0
     })
 
-    this.ws?.on('close', (code, reason) => {
+    this.ws?.on('close', async (code, reason) => {
       this.ready = false
       this.onChangedReadyState?.(false)
-      if (this.restartOnFail && code !== GatewayCloseCode.UNKNOWN_ERROR) {
+
+      if (RESTART_ON_FAIL && code !== GatewayCloseCode.UNKNOWN_ERROR) {
         if (code === undefined) {
           this.resumeConnectionOnConnect = true
         }
 
         if (code !== GatewayCloseCode.DISCONNECTED) {
-          this.ws = null
-          this.ws = new WebSocket(this.gateway)
-          this.setupHandlers()
+          this.disconnect()
+          this.failedRetries += 1
+          await this.connect()
         }
       }
+
       this.onConnectionClosed?.(code, reason)
     })
 
@@ -194,9 +204,9 @@ export default class WSClient {
           afk: false,
         },
         compress: this.packer.encoding === 'etf',
-        capabilities: this.actAsUser ? this.constants.capabilities : undefined,
-        intents: this.actAsUser ? undefined : this.constants.intents,
-        client_state: this.actAsUser ? {
+        capabilities: ACT_AS_USER ? this.constants.capabilities : undefined,
+        intents: ACT_AS_USER ? undefined : this.constants.intents,
+        client_state: ACT_AS_USER ? {
           guild_hashes: {},
           highest_last_message_id: '0',
           read_state_version: 0,
