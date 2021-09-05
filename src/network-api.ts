@@ -321,7 +321,7 @@ export default class DiscordNetworkAPI {
   }
 
   onGuildCustomEmojiMapUpdate = () => {
-    this.allCustomEmojis = Array.from(this.guildCustomEmojiMap.values()).flat()
+    this.allCustomEmojis = Array.from(this.guildCustomEmojiMap?.values()).flat()
   }
 
   getCustomEmojis = async (): Promise<CustomEmojiMap> => {
@@ -592,26 +592,27 @@ export default class DiscordNetworkAPI {
       }
 
       case GatewayMessageType.GUILD_CREATE: {
-        const emojis = payload.emojis.map(e => ({
-          displayName: e.name,
-          reactionKey: `<:${e.name}:${e.id}>`,
-          url: getEmojiURL(e.id, e.animated),
-        }))
-        this.guildCustomEmojiMap.set(payload.id, emojis)
-        this.onGuildCustomEmojiMapUpdate()
+        if (this.guildCustomEmojiMap) {
+          const emojis = payload.emojis.map(e => ({
+            displayName: e.name,
+            reactionKey: `<:${e.name}:${e.id}>`,
+            url: getEmojiURL(e.id, e.animated),
+          }))
+          this.guildCustomEmojiMap.set(payload.id, emojis)
+          this.onGuildCustomEmojiMapUpdate()
 
-        const emojiEvent: ServerEvent = {
-          type: ServerEventType.STATE_SYNC,
-          objectIDs: {},
-          mutationType: 'upsert',
-          objectName: 'custom_emoji',
-          entries: emojis,
-        }
+          const emojiEvent: ServerEvent = {
+            type: ServerEventType.STATE_SYNC,
+            objectIDs: {},
+            mutationType: 'upsert',
+            objectName: 'custom_emoji',
+            entries: emojis,
+          }
 
-        if (!ENABLE_GUILDS) {
           this.eventCallback?.([emojiEvent])
-          return
         }
+
+        if (!ENABLE_GUILDS) return
 
         const channels = payload.channels
           .filter(c => !IGNORED_CHANNEL_TYPES.has(c.type))
@@ -629,7 +630,7 @@ export default class DiscordNetworkAPI {
           entries: [c],
         }))
 
-        this.eventCallback?.([emojiEvent, ...channelEvents])
+        this.eventCallback?.(channelEvents)
         break
       }
 
