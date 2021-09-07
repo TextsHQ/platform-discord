@@ -21,9 +21,6 @@ export default class WSClient {
   private failedRetries = 0
 
   private constants = {
-    browser: 'Chrome',
-    releaseChannel: 'stable',
-    buildNumber: 92358,
     capabilities: 125, // sniffed
     intents: ENABLE_GUILDS ? 32515 : 28672, // https://discord.com/developers/docs/topics/gateway#gateway-intents
   }
@@ -140,17 +137,8 @@ export default class WSClient {
     this.onMessage?.(message.op, message.d, message.t)
   }
 
-  private waitAndSend = async (payload: GatewayMessage) => {
-    while (this.ws.readyState === this.ws.CONNECTING) {
-      await sleep(25)
-    }
-    this.send(payload)
-  }
-
-  private send = (payload: GatewayMessage) => {
-    if (this.ws.readyState === this.ws.CONNECTING) {
-      return this.waitAndSend(payload)
-    }
+  private send = async (payload: GatewayMessage) => {
+    while (this.ws.readyState === this.ws.CONNECTING) await sleep(25)
     const packed = this.packer.pack(payload)
     this.ws.send(packed)
   }
@@ -182,30 +170,31 @@ export default class WSClient {
       op: OPCode.IDENTIFY,
       d: {
         token: this.token,
+        capabilities: ACT_AS_USER ? this.constants.capabilities : undefined,
+        intents: ACT_AS_USER ? undefined : this.constants.intents,
         properties: {
-          browser_user_agent: texts.constants.USER_AGENT,
-          browser_version: os.version(),
-          client_build_number: this.constants.buildNumber,
-          client_event_source: null,
+          os: 'Windows',
+          browser: 'Chrome',
           device: '',
-          os: os.platform(),
-          os_version: os.version(),
-          referrer: '',
-          referrer_current: '',
-          referring_domain: '',
-          referring_domain_current: '',
-          release_channel: this.constants.releaseChannel,
           system_locale: 'en-US',
+          browser_user_agent: texts.constants.USER_AGENT, // 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.159 Safari/537.36',
+          browser_version: '92.0.4515.159',
+          os_version: '10',
+          referrer: '',
+          referring_domain: '',
+          referrer_current: '',
+          referring_domain_current: '',
+          release_channel: 'stable',
+          client_build_number: 96355,
+          client_event_source: null,
         },
         presence: {
           status: DiscordPresenceStatus.ONLINE,
-          since: Date.now(),
-          activites: [],
+          since: 0,
+          activities: [],
           afk: false,
         },
         compress: this.packer.encoding === 'etf',
-        capabilities: ACT_AS_USER ? this.constants.capabilities : undefined,
-        intents: ACT_AS_USER ? undefined : this.constants.intents,
         client_state: ACT_AS_USER ? {
           guild_hashes: {},
           highest_last_message_id: '0',

@@ -1,12 +1,12 @@
 import path from 'path'
 import FormData from 'form-data'
-import { readFile } from 'fs/promises'
+import { promises as fs } from 'fs'
 import { uniqBy } from 'lodash'
 import { texts, CurrentUser, MessageContent, PaginationArg, Thread, Message, ServerEventType, OnServerEventCallback, ActivityType, User, InboxName, MessageSendOptions, ReAuthError, PresenceMap, Paginated, FetchOptions, ServerEvent, CustomEmojiMap } from '@textshq/platform-sdk'
 
 import { getEmojiURL, mapChannel, mapCurrentUser, mapMessage, mapReaction, mapThread, mapUser } from './mappers'
 import WSClient from './websocket/wsclient'
-import { GatewayCloseCode, GatewayMessageType } from './websocket/constants'
+import { GatewayCloseCode, GatewayMessageType, OPCode } from './websocket/constants'
 import { defaultPacker } from './packers'
 import { IGNORED_CHANNEL_TYPES } from './constants'
 import { generateSnowflake, sleep } from './util'
@@ -217,7 +217,7 @@ export default class DiscordNetworkAPI {
           knownLength: content.fileBuffer?.length,
         })
       } else if (content.filePath) {
-        form.append('file', await readFile(content.filePath), {
+        form.append('file', await fs.readFile(content.filePath), {
           filename: content.fileName || path.basename(content.filePath),
         })
       }
@@ -396,7 +396,7 @@ export default class DiscordNetworkAPI {
     this.client.onMessage = this.handleGatewayMessage
   }
 
-  private handleGatewayMessage = (opcode, payload, type) => {
+  private handleGatewayMessage = (opcode: OPCode, payload: any, type: GatewayMessageType) => {
     // texts.log('[discord ws]', opcode, type)
 
     switch (type) {
