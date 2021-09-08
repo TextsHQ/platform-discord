@@ -130,6 +130,11 @@ export default class WSClient {
       case OPCode.HELLO:
         this.setHeartbeatInterval(message.d.heartbeat_interval)
         break
+      case OPCode.INVALID_SESSION:
+        texts.error('[discord ws] invalid session')
+        this.disconnect()
+        this.connect()
+        break
       default:
         break
     }
@@ -170,16 +175,14 @@ export default class WSClient {
       op: OPCode.IDENTIFY,
       d: {
         token: this.token,
-        capabilities: ACT_AS_USER ? this.constants.capabilities : undefined,
-        intents: ACT_AS_USER ? undefined : this.constants.intents,
         properties: {
-          os: 'Windows',
+          os: os.platform(),
           browser: 'Chrome',
           device: '',
           system_locale: 'en-US',
-          browser_user_agent: texts.constants.USER_AGENT, // 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.159 Safari/537.36',
+          browser_user_agent: texts.constants.USER_AGENT,
           browser_version: '92.0.4515.159',
-          os_version: '10',
+          os_version: os.version(),
           referrer: '',
           referring_domain: '',
           referrer_current: '',
@@ -195,14 +198,21 @@ export default class WSClient {
           afk: false,
         },
         compress: this.packer.encoding === 'etf',
-        client_state: ACT_AS_USER ? {
-          guild_hashes: {},
-          highest_last_message_id: '0',
-          read_state_version: 0,
-          user_guild_settings_version: -1,
-        } : undefined,
       },
     }
+
+    if (ACT_AS_USER) {
+      payload.d.capabilities = this.constants.capabilities
+      payload.d.client_state = {
+        guild_hashes: {},
+        highest_last_message_id: '0',
+        read_state_version: 0,
+        user_guild_settings_version: -1,
+      }
+    } else {
+      payload.d.intents = this.constants.intents
+    }
+
     this.send(payload)
   }
 }
