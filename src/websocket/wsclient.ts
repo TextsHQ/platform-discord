@@ -171,6 +171,9 @@ export default class WSClient {
   }
 
   private login = () => {
+    const browser_user_agent = texts.constants.USER_AGENT
+    const browser_version = browser_user_agent.match(/Chrome\/([0-9.]*)/i)[1]
+
     const payload: GatewayMessage = {
       op: OPCode.IDENTIFY,
       d: {
@@ -180,9 +183,9 @@ export default class WSClient {
           browser: 'Chrome',
           device: '',
           system_locale: 'en-US',
-          browser_user_agent: texts.constants.USER_AGENT,
-          browser_version: '92.0.4515.159',
-          os_version: os.version(),
+          browser_user_agent,
+          browser_version,
+          os_version: os.release(),
           referrer: '',
           referring_domain: '',
           referrer_current: '',
