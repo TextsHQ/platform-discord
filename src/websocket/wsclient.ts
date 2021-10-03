@@ -89,14 +89,19 @@ export default class WSClient {
       this.onChangedReadyState?.(false)
 
       if (RESTART_ON_FAIL && code !== GatewayCloseCode.UNKNOWN_ERROR) {
-        if (code === undefined) {
-          this.resumeConnectionOnConnect = true
-        }
+        switch (code) {
+          case GatewayCloseCode.AUTHENTICATION_FAILED:
+            break
 
-        if (code !== GatewayCloseCode.DISCONNECTED) {
-          this.disconnect()
-          this.failedRetries += 1
-          await this.connect()
+          case GatewayCloseCode.DISCONNECTED:
+            this.disconnect()
+            this.failedRetries += 1
+            await this.connect()
+            break
+
+          case undefined:
+            this.resumeConnectionOnConnect = true
+            break
         }
       }
 

@@ -378,6 +378,7 @@ export default class DiscordNetworkAPI {
           texts.log('[discord ws] Gateway requested client reconnect.')
           break
         case GatewayCloseCode.AUTHENTICATION_FAILED:
+          this.client.disconnect()
           this.client = null
           // eslint-disable-next-line @typescript-eslint/no-throw-literal
           throw new ReAuthError('Access token invalid')
