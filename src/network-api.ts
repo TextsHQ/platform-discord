@@ -198,11 +198,6 @@ export default class DiscordNetworkAPI {
       this.eventCallback?.(authorEvents)
     }
 
-    const properties = {
-      channel_id: threadID,
-    }
-    this.sendScienceRequest(ScienceEventType.channel_opened, properties)
-
     return messages.filter(Boolean).sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
   }
 
