@@ -8,10 +8,10 @@ import { getEmojiURL, mapChannel, mapCurrentUser, mapMessage, mapReaction, mapTh
 import WSClient from './websocket/wsclient'
 import { GatewayCloseCode, GatewayMessageType, OPCode } from './websocket/constants'
 import { defaultPacker } from './packers'
-import { IGNORED_CHANNEL_TYPES } from './constants'
-import { generateSnowflake, sleep } from './util'
-import { ACT_AS_USER, ENABLE_GUILDS, ENABLE_DM_GUILD_MEMBERS, WAIT_TILL_READY } from './preferences'
-import type { DiscordEmoji, DiscordMessage, DiscordReactionDetails } from './types'
+import { IGNORED_CHANNEL_TYPES, ScienceEventType } from './constants'
+import { generateScienceClientUUID, generateSnowflake, SUPER_PROPERTIES, sleep } from './util'
+import { ACT_AS_USER, ENABLE_GUILDS, ENABLE_DM_GUILD_MEMBERS, WAIT_TILL_READY, ENABLE_DISCORD_ANALYTICS } from './preferences'
+import type { DiscordEmoji, DiscordMessage, DiscordReactionDetails, DiscordScienceEvent } from './types'
 
 const API_VERSION = 9
 const API_ENDPOINT = `https://discord.com/api/v${API_VERSION}`
@@ -46,6 +46,10 @@ export default class DiscordNetworkAPI {
 
   private lastAckToken?: string = null
 
+  private analyticsToken?: string = null
+
+  private deviceFingerprint?: string = null
+
   private gotInitialUserData = false
 
   token?: string
@@ -66,6 +70,11 @@ export default class DiscordNetworkAPI {
     if (!token) throw new Error('No token found.')
     this.token = token
     this.setupWebsocket()
+
+    if (ENABLE_DISCORD_ANALYTICS) {
+      const fingerprintRes = await this.fetch({ method: 'POST', url: 'auth/fingerprint' })
+      this.deviceFingerprint = fingerprintRes.json?.fingerprint
+    }
   }
 
   logout = async () => {
@@ -189,6 +198,11 @@ export default class DiscordNetworkAPI {
       this.eventCallback?.(authorEvents)
     }
 
+    const properties = {
+      channel_id: threadID,
+    }
+    this.sendScienceRequest(ScienceEventType.channel_opened, properties)
+
     return messages.filter(Boolean).sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
   }
 
@@ -287,6 +301,17 @@ export default class DiscordNetworkAPI {
 
     if (res.statusCode < 200 || res.statusCode > 204) throw Error(getErrorMessage(res))
     this.readStateMap.set(threadID, messageID)
+
+    const properties = {
+      channel_id: threadID,
+      guild_id: null,
+      channel_type: 1,
+      channel_size_total: 1,
+      channel_member_perms: '0',
+      channel_hidden: false,
+      location_section: 'Channel',
+    }
+    this.sendScienceRequest(ScienceEventType.ack_messages, properties)
   }
 
   addReaction = async (threadID: string, messageID: string, reactionKey: string) => {
@@ -332,12 +357,18 @@ export default class DiscordNetworkAPI {
     return Object.fromEntries(emojis)
   }
 
+  onThreadSelected = async (threadID: string) => {
+    this.sendScienceRequest(ScienceEventType.channel_opened, { channel_id: threadID })
+  }
+
   private getUserFriends = async () => {
     const res = await this.fetch({ method: 'GET', url: 'users/@me/relationships' })
     if (res.statusCode < 200 || res.statusCode > 204 || !res.json) throw Error(getErrorMessage(res))
     this.userFriends = res.json
       .filter(f => f.type === 1) // Only friends
       .map(f => mapUser(f.user))
+
+    this.sendScienceRequest(ScienceEventType.dm_list_viewed)
   }
 
   private mapMentionsAndEmojis = (text: string): string => {
@@ -411,6 +442,8 @@ export default class DiscordNetworkAPI {
       case GatewayMessageType.READY: {
         // const notes = payload.notes
         // const user_settings = payload.user_settings
+
+        if (ENABLE_DISCORD_ANALYTICS) this.analyticsToken = payload.analytics_token
 
         if (ACT_AS_USER) {
           payload.users?.forEach(r => this.userMappings.set((r.username + '#' + r.discriminator), r.id))
@@ -958,5 +991,33 @@ export default class DiscordNetworkAPI {
         throw err
       }
     }
+  }
+
+  private sendScienceRequest = (type: ScienceEventType, properties?: any) => {
+    if (!ENABLE_DISCORD_ANALYTICS) return
+
+    const event: DiscordScienceEvent = {
+      type,
+      properties: {
+        client_uuid: generateScienceClientUUID(this.currentUser?.id),
+        client_send_timestamp: Date.now(),
+        client_track_timestamp: Date.now(),
+        accessibility_support_enabled: false,
+        accessibility_features: 128,
+        ...properties,
+      },
+    }
+    const json = {
+      events: [event],
+      token: this.analyticsToken,
+    }
+
+    const headers = {
+      'X-Super-Properties': Buffer.from(JSON.stringify(SUPER_PROPERTIES)).toString('base64'),
+      'X-Fingerprint': this.deviceFingerprint,
+    }
+
+    texts.log(`[discord science] sending ${type}`)
+    this.fetch({ method: 'POST', url: 'science', json, headers })
   }
 }

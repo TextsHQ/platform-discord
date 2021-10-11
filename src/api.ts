@@ -117,4 +117,6 @@ export default class Discord implements PlatformAPI {
   }
 
   getCustomEmojis = () => this.api.getCustomEmojis()
+
+  onThreadSelected = async (threadID: string) => this.api.onThreadSelected(threadID)
 }

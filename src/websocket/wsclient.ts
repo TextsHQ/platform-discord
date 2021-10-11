@@ -4,7 +4,7 @@ import { texts } from '@textshq/platform-sdk'
 import { DiscordPresenceStatus, OPCode, GatewayMessageType, GatewayCloseCode } from './constants'
 import type { GatewayMessage } from './types'
 import type { Packer } from '../packers'
-import { sleep } from '../util'
+import { sleep, SUPER_PROPERTIES } from '../util'
 import { ENABLE_GUILDS, ACT_AS_USER, RESTART_ON_FAIL } from '../preferences'
 
 export default class WSClient {
@@ -176,29 +176,11 @@ export default class WSClient {
   }
 
   private login = () => {
-    const browser_user_agent = texts.constants.USER_AGENT
-    const browser_version = browser_user_agent.match(/Chrome\/([0-9.]*)/i)[1]
-
     const payload: GatewayMessage = {
       op: OPCode.IDENTIFY,
       d: {
         token: this.token,
-        properties: {
-          os: os.platform(),
-          browser: 'Chrome',
-          device: '',
-          system_locale: 'en-US',
-          browser_user_agent,
-          browser_version,
-          os_version: os.release(),
-          referrer: '',
-          referring_domain: '',
-          referrer_current: '',
-          referring_domain_current: '',
-          release_channel: 'stable',
-          client_build_number: 96355,
-          client_event_source: null,
-        },
+        properties: SUPER_PROPERTIES,
         presence: {
           status: DiscordPresenceStatus.ONLINE,
           since: 0,

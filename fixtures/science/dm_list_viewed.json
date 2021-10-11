@@ -1,0 +1,31 @@
+[
+  {
+    "type": "dm_list_viewed",
+    "properties": {
+      "client_track_timestamp": 1633426858661,
+      "num_users_visible": 7,
+      "num_users_visible_with_mobile_indicator": 0,
+      "accessibility_support_enabled": false,
+      "accessibility_features": 128,
+      "client_uuid": "MwAAVEqWNgv5wTnpT0PTT3wBAAALAAAA",
+      "client_send_timestamp": 1633426858895
+    }
+  },
+  {
+    "type": "dm_list_viewed",
+    "properties": {
+      "client_track_timestamp": 1633426880921,
+      "num_users_visible": 7,
+      "num_users_visible_with_mobile_indicator": 0,
+      "channel_id": "809041477476286544",
+      "channel_type": 1,
+      "channel_size_total": 1,
+      "channel_member_perms": "0",
+      "channel_hidden": false,
+      "accessibility_support_enabled": false,
+      "accessibility_features": 128,
+      "client_uuid": "MwAAVEqWNgv5wTnpT0PTT3wBAAAdAAAA",
+      "client_send_timestamp": 1633426881051
+    }
+  }
+]

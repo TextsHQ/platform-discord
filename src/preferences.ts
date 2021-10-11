@@ -12,3 +12,6 @@ export const RESTART_ON_FAIL = true
 
 // Wait with init until received initial data
 export const WAIT_TILL_READY = true
+
+// Send /science requests?
+export const ENABLE_DISCORD_ANALYTICS = false

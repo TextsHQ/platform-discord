@@ -1,0 +1,16 @@
+{
+  "type": "channel_opened",
+  "properties": {
+    "client_track_timestamp": 1633426864835,
+    "channel_is_nsfw": false,
+    "channel_id": "809041477476286544",
+    "channel_type": 1,
+    "channel_size_total": 1,
+    "channel_member_perms": "0",
+    "channel_hidden": false,
+    "accessibility_support_enabled": false,
+    "accessibility_features": 128,
+    "client_uuid": "MwAAVEqWNgv5wTnpT0PTT3wBAAATAAAA",
+    "client_send_timestamp": 1633426864998
+  }
+}

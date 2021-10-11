@@ -5,6 +5,15 @@ export enum MessageActivityType {
   SPOTIFY = 3,
 }
 
+export enum ScienceEventType {
+  dm_list_viewed = 'dm_list_viewed',
+  ready_payload_received = 'ready_payload_received',
+  channel_opened = 'channel_opened',
+  guild_viewed = 'guild_viewed',
+  ack_messages = 'ack_messages',
+  member_list_viewed = 'member_list_viewed',
+}
+
 export const SUPPORTED_EMBED_TYPES: Set<EmbedType> = new Set([
   EmbedType.Article,
   EmbedType.Link,
@@ -51,3 +60,5 @@ export const THREAD_TYPES: ThreadType[] = [
   'channel', // GUILD_PRIVATE_THREAD,
   undefined, // GUILD_STAGE_VOICE
 ]
+
+export const DISCORD_BUILD_NUMBER = 100804
