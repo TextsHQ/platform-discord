@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "dist/index.js",
   "scripts": {
-    "postinstall": "yarn tsc || true",
+    "prepack": "tsc",
     "build": "yarn tsc",
     "watch": "yarn tsc --watch",
     "lint": "eslint src --ext ts,tsx,js,jsx --cache",
