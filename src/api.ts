@@ -76,6 +76,9 @@ export default class Discord implements PlatformAPI {
   archiveThread = (threadID: string) =>
     this.api.archiveThread(threadID)
 
+  reportThread = async (type: 'spam', threadID: string, firstMessageID: string) =>
+    this.api.reportThread(threadID, firstMessageID)
+
   getMessages = async (threadID: string, pagination?: PaginationArg): Promise<Paginated<Message>> => {
     const items = await this.api.getMessages(threadID, pagination)
     return { items, hasMore: items.length > 0 }

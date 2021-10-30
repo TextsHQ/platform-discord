@@ -152,6 +152,37 @@ export default class DiscordNetworkAPI {
     await this.fetch({ method: 'DELETE', url: `channels/${threadID}` })
   }
 
+  reportThread = async (threadID: string, messageID: string) => {
+    const Referer = `https://discord.com/channels/@me/${threadID}`
+    await this.fetch({
+      url: 'reporting/menu/first_dm',
+      headers: {
+        Referer,
+      },
+      method: 'GET',
+    })
+    const res = await this.fetch({
+      method: 'POST',
+      url: 'reporting/first_dm',
+      json: {
+        id: generateSnowflake(),
+        version: '1.0',
+        variant: '1',
+        language: 'en',
+        breadcrumbs: [25], // 25 appears to be "sub_spam" report_type
+        elements: {},
+        name: 'first_dm',
+        channel_id: threadID,
+        message_id: messageID,
+      },
+      headers: {
+        Referer,
+      },
+    })
+    texts.log('reported with id', res.json?.report_id)
+    return !!res.json?.report_id
+  }
+
   getMessage = async (message: DiscordMessage, threadID: string) => {
     const reactionsDetails: DiscordReactionDetails[] | undefined = message.reactions
       ? await Promise.all(message.reactions.map(async r => {
@@ -954,7 +985,7 @@ export default class DiscordNetworkAPI {
     while (!this.ready && WAIT_TILL_READY) await sleep(SLEEP_INTERVAL)
   }
 
-  private fetch = async ({ url, headers = {}, json, ...rest }: FetchOptions & { url: string, json?: any }): Promise<{ statusCode: number; json?: any }> => {
+  private fetch = async ({ url, headers = {}, json, ...rest }: FetchOptions & { url: string, json?: any }): Promise<{ statusCode: number, json?: any }> => {
     try {
       const opts: FetchOptions = {
         // TODO: timeout: 10000,
