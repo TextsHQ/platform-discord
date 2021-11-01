@@ -41,8 +41,8 @@ export default class DiscordNetworkAPI {
   private readonly usersPresence: PresenceMap = {}
 
   private readonly emojiShortcuts = {
-    emojis: new Map(Object.values(_emojis).flat().flatMap(a => a.names.map(b => [b, a.surrogates]))),
-    shortcuts: new Map(_emojiShortcuts.flatMap(a => a.shortcuts.map(b => [b, a.emoji]))),
+    emojis: new Map<string, string>(_emojis as Iterable<[string, string]>),
+    shortcuts: new Map<string, string>(_emojiShortcuts as Iterable<[string, string]>),
   }
 
   // key is guild id
