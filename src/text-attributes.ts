@@ -70,7 +70,7 @@ export function mapTextAttributes(src: string, getUserName: (id: string) => stri
       const closingIndex = findClosingIndex(input, curToken)
       if (closingIndex > 0) {
         // A valid closingIndex is found, it's a valid token!
-        const content = input.slice(0, closingIndex).join('')
+        const content = input.slice(0, closingIndex).join('').replace(/^\s+|\s+$/g, '')
         // See if we can find nested entities.
         let nestedAttributes = { text: '', textAttributes: undefined }
         if (!['<', '`', '```'].includes(curToken)) {
@@ -143,6 +143,7 @@ export function mapTextAttributes(src: string, getUserName: (id: string) => stri
             entity.strikethrough = true
             break
           case '```':
+            // TODO: Check snippet language
             entity.code = true
             entity.pre = true
             break
