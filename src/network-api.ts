@@ -13,6 +13,9 @@ import { generateScienceClientUUID, generateSnowflake, SUPER_PROPERTIES, sleep }
 import { ACT_AS_USER, ENABLE_GUILDS, ENABLE_DM_GUILD_MEMBERS, WAIT_TILL_READY, ENABLE_DISCORD_ANALYTICS } from './preferences'
 import type { DiscordEmoji, DiscordMessage, DiscordReactionDetails, DiscordScienceEvent } from './types'
 
+import _emojis from './resources/emojis.json'
+import _emojiShortcuts from './resources/shortcuts.json'
+
 const API_VERSION = 9
 const API_ENDPOINT = `https://discord.com/api/v${API_VERSION}`
 const DEFAULT_GATEWAY = 'wss://gateway.discord.gg'
@@ -36,6 +39,11 @@ export default class DiscordNetworkAPI {
   private readonly sendMessageNonces = new Set<string>()
 
   private readonly usersPresence: PresenceMap = {}
+
+  private readonly emojiShortcuts = {
+    emojis: new Map(Object.values(_emojis).flat().flatMap(a => a.names.map(b => [b, a.surrogates]))),
+    shortcuts: new Map(_emojiShortcuts.flatMap(a => a.shortcuts.map(b => [b, a.emoji]))),
+  }
 
   // key is guild id
   private guildCustomEmojiMap?: Map<string, DiscordEmoji[]>
@@ -192,7 +200,9 @@ export default class DiscordNetworkAPI {
         return users ? { emoji: r.emoji, users } : null
       }))
       : undefined
-    return mapMessage(message, this.currentUser.id, reactionsDetails)
+    const mapped = mapMessage(message, this.currentUser.id, reactionsDetails)
+    if (mapped.text) mapped.text = this.mapMentionsAndEmojis(mapped.text, false)
+    return mapped
   }
 
   getMessages = async (threadID: string, pagination?: PaginationArg) => {
@@ -397,22 +407,24 @@ export default class DiscordNetworkAPI {
     this.sendScienceRequest(ScienceEventType.dm_list_viewed)
   }
 
-  private mapMentionsAndEmojis = (text: string): string => {
+  private mapMentionsAndEmojis = (text: string, mapMentions: boolean = true): string => {
     const mentionRegex = /@([^#@]{3,32}#[0-9]{4})/gi
-    const emojiRegex = /:([a-zA-Z0-9-]*)(~\d*)?:/gi
+    const emojiRegex = /:([a-zA-Z0-9-_]*)(~\d*)?:/gi
 
     return text
-      // @ts-expect-error replaceAll
-      ?.replaceAll(mentionRegex, (match, username) => { // mentions
+      ?.replace(mentionRegex, (match, username) => { // mentions
+        if (!mapMentions) return match
         const userID = this.userMappings.get(username)
         if (userID) return `<@!${userID}>`
         return match
       })
-      .replaceAll(emojiRegex, match => { // emojis
+      .replace(emojiRegex, match => { // emojis
         const emoji = this.allCustomEmojis?.find(e => `:${e.displayName}:` === match)
         if (emoji) return emoji.reactionKey
         return match
       })
+      // TODO: this.emojiShortcuts.shortcuts
+      .replace(emojiRegex, (matched, shortcut) => this.emojiShortcuts.emojis.get(shortcut) ?? matched) // emoji shortcuts
   }
 
   private setupGatewayListeners = () => {

@@ -1,4 +1,3 @@
-import os from 'os'
 import WebSocket, { MessageEvent } from 'ws'
 import { texts } from '@textshq/platform-sdk'
 import { DiscordPresenceStatus, OPCode, GatewayMessageType, GatewayCloseCode } from './constants'

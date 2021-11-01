@@ -106,6 +106,7 @@ export default class Discord implements PlatformAPI {
     if (!messageID) {
       const ogThreadJSON = texts.getOriginalObject('discord', this.accountID, ['thread', threadID])
       const ogThread = JSON.parse(ogThreadJSON)
+      // eslint-disable-next-line no-param-reassign
       messageID = ogThread.last_message_id
     }
     return this.api.sendReadReceipt(threadID, messageID)

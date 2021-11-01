@@ -11,8 +11,8 @@ const getUserAvatar = (userID: string, avatarID: string) =>
 const getThreadIcon = (threadID: string, iconID: string) =>
   `https://cdn.discordapp.com/channel-icons/${threadID}/${iconID}.png`
 
-const getGuildIcon = (guildID: string, iconID: string) =>
-  `https://cdn.discordapp.com/icons/${guildID}/${iconID}.png`
+/* const getGuildIcon = (guildID: string, iconID: string) =>
+  `https://cdn.discordapp.com/icons/${guildID}/${iconID}.png` */
 
 const getLottieStickerURL = (id: string, asset: string) =>
   (asset ? `https://discord.com/stickers/${id}/${asset}.json` : `https://discord.com/stickers/${id}.json`)
@@ -145,6 +145,7 @@ function mapAttachment(a: APIAttachment): MessageAttachment {
 
 function mapAttachments(message: APIMessage) {
   const mapEmbed = (embed: APIEmbed): MessageAttachment => {
+    // eslint-disable-next-line no-param-reassign
     message.content = message.content?.replace(embed.url, '')
 
     switch (embed.type) {
@@ -219,6 +220,7 @@ const mapMessageLinks = (message: DiscordMessage) => {
 
 export function mapMessage(message: DiscordMessage, currentUserID: string, reactionsDetails?: DiscordReactionDetails[]): Message | PartialWithID<Message> | undefined {
   if (IGNORED_MESSAGE_TYPES.has(message.type)) return
+  // eslint-disable-next-line no-param-reassign
   else if (message.type === MessageType.ThreadStarterMessage) message = message.referenced_message
 
   const attachments = mapAttachments(message)
@@ -231,6 +233,7 @@ export function mapMessage(message: DiscordMessage, currentUserID: string, react
     id: message.id,
     linkedMessageID: message.referenced_message?.id,
     threadID: message.channel_id,
+    text: message.content,
   }
 
   // these properties should only be present if they exist, or they'll cause issues with message update state sync events
@@ -238,7 +241,6 @@ export function mapMessage(message: DiscordMessage, currentUserID: string, react
     mapped.senderID = message.author.id
     mapped.isSender = currentUserID === message.author.id
   }
-  if (message.content) mapped.text = message.content
   if (message.timestamp) mapped.timestamp = new Date(message.timestamp)
   if (message.edited_timestamp) mapped.editedTimestamp = new Date(message.edited_timestamp)
   if (reactions) mapped.reactions = reactions
@@ -250,9 +252,9 @@ export function mapMessage(message: DiscordMessage, currentUserID: string, react
 
   if (mapped.text?.length > 0) {
     const getUserName = (id: string): string => message.mentions.find(m => m.id === id)?.username || id
-    const { text: transformedMessageText, textAttributes } = mapTextAttributes(mapped.text, getUserName)
-    if (transformedMessageText && textAttributes) {
-      mapped.text = transformedMessageText
+    const { text, textAttributes } = mapTextAttributes(mapped.text, getUserName)
+    if (text && textAttributes) {
+      mapped.text = text
       mapped.textAttributes = textAttributes
     }
   }
