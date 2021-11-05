@@ -2,7 +2,7 @@ import path from 'path'
 import FormData from 'form-data'
 import { promises as fs } from 'fs'
 import { uniqBy } from 'lodash'
-import { texts, CurrentUser, MessageContent, PaginationArg, Thread, Message, ServerEventType, OnServerEventCallback, ActivityType, User, InboxName, MessageSendOptions, ReAuthError, PresenceMap, Paginated, FetchOptions, ServerEvent, CustomEmojiMap } from '@textshq/platform-sdk'
+import { texts, CurrentUser, MessageContent, PaginationArg, Thread, Message, ServerEventType, OnServerEventCallback, ActivityType, User, InboxName, MessageSendOptions, ReAuthError, PresenceMap, Paginated, FetchOptions, ServerEvent, CustomEmojiMap, UserPresence } from '@textshq/platform-sdk'
 
 import { getEmojiURL, mapChannel, mapCurrentUser, mapMessage, mapReaction, mapThread, mapUser } from './mappers'
 import WSClient from './websocket/wsclient'
@@ -38,12 +38,12 @@ export default class DiscordNetworkAPI {
 
   private readonly sendMessageNonces = new Set<string>()
 
-  private readonly usersPresence: PresenceMap = {}
-
-  private readonly emojiShortcuts = {
+  private emojiShortcuts = {
     emojis: new Map<string, string>(_emojis as Iterable<[string, string]>),
     shortcuts: new Map<string, string>(_emojiShortcuts as Iterable<[string, string]>),
   }
+
+  private usersPresence: PresenceMap = {}
 
   // key is guild id
   private guildCustomEmojiMap?: Map<string, DiscordEmoji[]>
@@ -504,8 +504,15 @@ export default class DiscordNetworkAPI {
         } else {
           payload.relationships?.forEach(r => this.userMappings.set((r.user.username + '#' + r.user.discriminator), r.id))
           payload.read_state?.forEach(p => this.readStateMap.set(p.id, p.last_message_id))
-          payload.presences?.forEach(p => {
-            this.usersPresence[p.user.id] = { userID: p.user.id, isActive: p.status === 'online', lastActive: new Date(+p.last_modified) }
+
+          this.usersPresence = payload.presences?.map(p => {
+            const obj = {
+              userID: p.user_id,
+              isActive: p.status !== 'offline',
+              status: p.activities?.length > 0 ? 'custom' : p.status,
+              customStatus: p.activities?.length > 0 ? (p.activities[0].state ?? p.activities[0].name) : undefined,
+            }
+            return [p.user_id, obj]
           })
         }
 
@@ -536,8 +543,14 @@ export default class DiscordNetworkAPI {
       }
 
       case GatewayMessageType.READY_SUPPLEMENTAL: {
-        payload.merged_presences.friends?.forEach(p => {
-          this.usersPresence[p.user_id] = { userID: p.user_id, isActive: p.status === 'online', lastActive: new Date(+p.last_modified) }
+        this.usersPresence = payload.merged_presences.friends.map(p => {
+          const obj = {
+            userID: p.user_id,
+            isActive: p.status !== 'offline',
+            status: p.activities?.length > 0 ? 'custom' : p.status,
+            customStatus: p.activities?.length > 0 ? (p.activities[0].state ?? p.activities[0].name) : undefined,
+          }
+          return [p.user_id, obj]
         })
         break
       }
@@ -881,15 +894,19 @@ export default class DiscordNetworkAPI {
       case GatewayMessageType.PRESENCE_UPDATE: {
         if (payload.guild_id) return
 
-        this.usersPresence[payload.user.id] = { userID: payload.user.id, isActive: payload.status === 'online', lastActive: new Date(payload.last_modified) }
+        const presence: UserPresence = {
+          userID: payload.user.id,
+          isActive: payload.status !== 'offline',
+          status: payload.activities?.length > 0 ? 'custom' : payload.status,
+          customStatus: payload.activities?.length > 0 ? (payload.activities[0].state ?? payload.activities[0].name) : undefined,
+        }
+        this.usersPresence[payload.user.id] = presence
+
         this.eventCallback?.([{
           type: ServerEventType.USER_PRESENCE_UPDATED,
-          presence: {
-            userID: payload.user.id,
-            isActive: payload.status === 'online',
-            lastActive: new Date(),
-          },
+          presence,
         }])
+
         break
       }
 
