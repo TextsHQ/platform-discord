@@ -1,6 +1,3 @@
-// Spoof actual Discord user instead of a bot
-export const ACT_AS_USER = true
-
 // Enable guilds support?
 export const ENABLE_GUILDS = false
 

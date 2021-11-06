@@ -4,13 +4,13 @@ import { promises as fs } from 'fs'
 import { uniqBy } from 'lodash'
 import { texts, CurrentUser, MessageContent, PaginationArg, Thread, Message, ServerEventType, OnServerEventCallback, ActivityType, User, InboxName, MessageSendOptions, ReAuthError, PresenceMap, Paginated, FetchOptions, ServerEvent, CustomEmojiMap, UserPresence } from '@textshq/platform-sdk'
 
-import { getEmojiURL, mapChannel, mapCurrentUser, mapMessage, mapReaction, mapThread, mapUser } from './mappers'
+import { getEmojiURL, mapChannel, mapCurrentUser, mapMessage, mapPresence, mapReaction, mapThread, mapUser } from './mappers'
 import WSClient from './websocket/wsclient'
 import { GatewayCloseCode, GatewayMessageType, OPCode } from './websocket/constants'
 import { defaultPacker } from './packers'
 import { IGNORED_CHANNEL_TYPES, ScienceEventType } from './constants'
 import { generateScienceClientUUID, generateSnowflake, SUPER_PROPERTIES, sleep } from './util'
-import { ACT_AS_USER, ENABLE_GUILDS, ENABLE_DM_GUILD_MEMBERS, WAIT_TILL_READY, ENABLE_DISCORD_ANALYTICS } from './preferences'
+import { ENABLE_GUILDS, ENABLE_DM_GUILD_MEMBERS, WAIT_TILL_READY, ENABLE_DISCORD_ANALYTICS } from './preferences'
 import type { DiscordEmoji, DiscordMessage, DiscordReactionDetails, DiscordScienceEvent } from './types'
 
 import _emojis from './resources/emojis.json'
@@ -29,11 +29,6 @@ export default class DiscordNetworkAPI {
 
   private httpClient = texts.createHttpClient()
 
-  // username-to-id mappings
-  private readonly userMappings = new Map<string, string>()
-
-  private readonly readStateMap = new Map<string, string>()
-
   private readonly channelsMap? = ENABLE_GUILDS ? new Map<string, Thread[]>() : undefined
 
   private readonly sendMessageNonces = new Set<string>()
@@ -42,6 +37,11 @@ export default class DiscordNetworkAPI {
     emojis: new Map<string, string>(_emojis as Iterable<[string, string]>),
     shortcuts: new Map<string, string>(_emojiShortcuts as Iterable<[string, string]>),
   }
+
+  // username-to-id mappings
+  private userMappings = new Map<string, string>()
+
+  private readStateMap = new Map<string, string>()
 
   private usersPresence: PresenceMap = {}
 
@@ -483,41 +483,26 @@ export default class DiscordNetworkAPI {
 
         if (ENABLE_DISCORD_ANALYTICS) this.analyticsToken = payload.analytics_token
 
-        if (ACT_AS_USER) {
-          payload.users?.forEach(r => this.userMappings.set((r.username + '#' + r.discriminator), r.id))
-          payload.read_state?.entries?.forEach(p => this.readStateMap.set(p.id, p.last_message_id))
-          // presences are in READY_SUPPLEMENTAL if ACT_AS_USER = true
+        this.userMappings = new Map(payload.users?.map(r => [(r.username + '#' + r.discriminator), r.id]))
+        this.readStateMap = new Map(payload.read_state?.entries.map(s => [s.id, s.last_message_id]))
+        // presences are in READY_SUPPLEMENTAL if ACT_AS_USER = true
 
-          if (payload.user.premium_type && payload.user.premium_type !== 0) {
-            // User has nitro, so store emojis
-            this.guildCustomEmojiMap = new Map<string, DiscordEmoji[]>()
-            payload.guilds.forEach(g => {
-              const emojis = g.emojis.map(e => ({
-                displayName: e.name,
-                reactionKey: `<:${e.name}:${e.id}>`,
-                url: getEmojiURL(e.id, e.animated),
-              }))
-              this.guildCustomEmojiMap.set(g.id, emojis)
-            })
-            this.onGuildCustomEmojiMapUpdate()
-          }
-        } else {
-          payload.relationships?.forEach(r => this.userMappings.set((r.user.username + '#' + r.user.discriminator), r.id))
-          payload.read_state?.forEach(p => this.readStateMap.set(p.id, p.last_message_id))
-
-          this.usersPresence = payload.presences?.map(p => {
-            const obj = {
-              userID: p.user_id,
-              isActive: p.status !== 'offline',
-              status: p.activities?.length > 0 ? 'custom' : p.status,
-              customStatus: p.activities?.length > 0 ? (p.activities[0].state ?? p.activities[0].name) : undefined,
-            }
-            return [p.user_id, obj]
+        if (payload.user.premium_type && payload.user.premium_type !== 0) {
+          // User has nitro, so store emojis
+          this.guildCustomEmojiMap = new Map<string, DiscordEmoji[]>()
+          payload.guilds.forEach(g => {
+            const emojis = g.emojis.map(e => ({
+              displayName: e.name,
+              reactionKey: `<:${e.name}:${e.id}>`,
+              url: getEmojiURL(e.id, e.animated),
+            }))
+            this.guildCustomEmojiMap.set(g.id, emojis)
           })
+          this.onGuildCustomEmojiMapUpdate()
         }
 
         if (ENABLE_GUILDS) {
-          const mutedChannels = (ACT_AS_USER ? payload.user_guild_settings.entries : payload.user_guild_settings)
+          const mutedChannels = payload.user_guild_settings.entries
             ?.flatMap(g => g.channel_overrides)
             .filter(g => g.muted)
             .map(g => g.channel_id)
@@ -543,15 +528,7 @@ export default class DiscordNetworkAPI {
       }
 
       case GatewayMessageType.READY_SUPPLEMENTAL: {
-        this.usersPresence = payload.merged_presences.friends.map(p => {
-          const obj = {
-            userID: p.user_id,
-            isActive: p.status !== 'offline',
-            status: p.activities?.length > 0 ? 'custom' : p.status,
-            customStatus: p.activities?.length > 0 ? (p.activities[0].state ?? p.activities[0].name) : undefined,
-          }
-          return [p.user_id, obj]
-        })
+        this.usersPresence = Object.fromEntries(payload.merged_presences.friends?.map(p => [p.user_id, mapPresence(p.user_id, p)]))
         break
       }
 
@@ -894,12 +871,7 @@ export default class DiscordNetworkAPI {
       case GatewayMessageType.PRESENCE_UPDATE: {
         if (payload.guild_id) return
 
-        const presence: UserPresence = {
-          userID: payload.user.id,
-          isActive: payload.status !== 'offline',
-          status: payload.activities?.length > 0 ? 'custom' : payload.status,
-          customStatus: payload.activities?.length > 0 ? (payload.activities[0].state ?? payload.activities[0].name) : undefined,
-        }
+        const presence: UserPresence = mapPresence(payload.user.id, payload)
         this.usersPresence[payload.user.id] = presence
 
         this.eventCallback?.([{

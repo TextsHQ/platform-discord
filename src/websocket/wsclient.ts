@@ -4,7 +4,7 @@ import { DiscordPresenceStatus, OPCode, GatewayMessageType, GatewayCloseCode } f
 import type { GatewayMessage } from './types'
 import type { Packer } from '../packers'
 import { sleep, SUPER_PROPERTIES } from '../util'
-import { ENABLE_GUILDS, ACT_AS_USER, RESTART_ON_FAIL } from '../preferences'
+import { ENABLE_GUILDS, RESTART_ON_FAIL } from '../preferences'
 
 export default class WSClient {
   private ws?: WebSocket
@@ -21,7 +21,6 @@ export default class WSClient {
 
   private constants = {
     capabilities: 125, // sniffed
-    intents: ENABLE_GUILDS ? 32515 : 28672, // https://discord.com/developers/docs/topics/gateway#gateway-intents
   }
 
   ready = false
@@ -187,19 +186,14 @@ export default class WSClient {
           afk: false,
         },
         compress: this.packer.encoding === 'etf',
+        capabilities: this.constants.capabilities,
+        client_state: {
+          guild_hashes: {},
+          highest_last_message_id: '0',
+          read_state_version: 0,
+          user_guild_settings_version: -1,
+        },
       },
-    }
-
-    if (ACT_AS_USER) {
-      payload.d.capabilities = this.constants.capabilities
-      payload.d.client_state = {
-        guild_hashes: {},
-        highest_last_message_id: '0',
-        read_state_version: 0,
-        user_guild_settings_version: -1,
-      }
-    } else {
-      payload.d.intents = this.constants.intents
     }
 
     this.send(payload)

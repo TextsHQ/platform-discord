@@ -1,5 +1,5 @@
-import { CurrentUser, Message, MessageActionType, MessageAttachment, MessageAttachmentType, MessageLink, MessageReaction, TextEntity, Thread, ThreadType, User, PartialWithID } from '@textshq/platform-sdk'
-import { APIUser, APIChannel, APIMessage, APIEmbed, EmbedType, MessageActivityType, APIAttachment, MessageType, APISticker } from 'discord-api-types/v9'
+import { CurrentUser, Message, MessageActionType, MessageAttachment, MessageAttachmentType, MessageLink, MessageReaction, TextEntity, Thread, ThreadType, User, PartialWithID, UserPresence } from '@textshq/platform-sdk'
+import { APIUser, APIChannel, APIMessage, APIEmbed, EmbedType, MessageActivityType, APIAttachment, MessageType, APISticker, GatewayPresenceUpdateData, PresenceUpdateStatus } from 'discord-api-types/v9'
 import type { DiscordMessage, DiscordReactionDetails } from './types'
 import { IGNORED_MESSAGE_TYPES, StickerFormat, SUPPORTED_EMBED_TYPES, THREAD_TYPES } from './constants'
 import { mapTextAttributes } from './text-attributes'
@@ -34,6 +34,16 @@ export const mapReaction = (reaction: DiscordReactionDetails, participantID: str
     imgURL: reaction.emoji.id ? getEmojiURL(reaction.emoji.id, reaction.emoji.animated) : undefined,
     participantID,
     emoji: true,
+  }
+}
+
+export const mapPresence = (userID: string, presence: GatewayPresenceUpdateData): UserPresence => {
+  const activity = presence.activities?.length > 0 ? presence.activities[0] as any : undefined
+  return {
+    userID,
+    isActive: presence.status !== PresenceUpdateStatus.Invisible && presence.status !== PresenceUpdateStatus.Offline,
+    status: activity ? 'custom' : (presence.status as UserPresence['status']),
+    customStatus: activity?.state ?? activity?.name,
   }
 }
 
