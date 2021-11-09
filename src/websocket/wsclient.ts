@@ -93,8 +93,6 @@ export default class WSClient {
 
           case GatewayCloseCode.DISCONNECTED:
             this.disconnect()
-            this.failedRetries += 1
-            await this.connect()
             break
 
           case undefined:

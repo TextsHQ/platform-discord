@@ -10,7 +10,7 @@ import { GatewayCloseCode, GatewayMessageType, OPCode } from './websocket/consta
 import { defaultPacker } from './packers'
 import { IGNORED_CHANNEL_TYPES, ScienceEventType } from './constants'
 import { generateScienceClientUUID, generateSnowflake, SUPER_PROPERTIES, sleep } from './util'
-import { ENABLE_GUILDS, ENABLE_DM_GUILD_MEMBERS, WAIT_TILL_READY, ENABLE_DISCORD_ANALYTICS } from './preferences'
+import { ENABLE_GUILDS, ENABLE_DM_GUILD_MEMBERS, ENABLE_DISCORD_ANALYTICS } from './preferences'
 import type { DiscordEmoji, DiscordMessage, DiscordReactionDetails, DiscordScienceEvent } from './types'
 
 import _emojis from './resources/emojis.json'
@@ -29,8 +29,6 @@ export default class DiscordNetworkAPI {
 
   private httpClient = texts.createHttpClient()
 
-  private readonly channelsMap? = ENABLE_GUILDS ? new Map<string, Thread[]>() : undefined
-
   private readonly sendMessageNonces = new Set<string>()
 
   private emojiShortcuts = {
@@ -43,12 +41,14 @@ export default class DiscordNetworkAPI {
 
   private readStateMap = new Map<string, string>()
 
-  private usersPresence: PresenceMap = {}
+  private channelsMap? = ENABLE_GUILDS ? new Map<string, Thread[]>() : undefined
 
   // key is guild id
   private guildCustomEmojiMap?: Map<string, DiscordEmoji[]>
 
   private allCustomEmojis?: DiscordEmoji[]
+
+  private usersPresence: PresenceMap = {}
 
   private mutedChannels = new Set<string>()
 
@@ -467,7 +467,7 @@ export default class DiscordNetworkAPI {
   }
 
   private handleGatewayMessage = (opcode: OPCode, payload: any, type: GatewayMessageType) => {
-    // texts.log('[discord ws]', opcode, type)
+    texts.log('[discord ws]', opcode, type)
 
     switch (type) {
       // * Documented
@@ -489,15 +489,17 @@ export default class DiscordNetworkAPI {
 
         if (payload.user.premium_type && payload.user.premium_type !== 0) {
           // User has nitro, so store emojis
-          this.guildCustomEmojiMap = new Map<string, DiscordEmoji[]>()
-          payload.guilds.forEach(g => {
+          const allEmojis = payload.guilds.map(g => {
             const emojis = g.emojis.map(e => ({
               displayName: e.name,
               reactionKey: `<:${e.name}:${e.id}>`,
               url: getEmojiURL(e.id, e.animated),
             }))
-            this.guildCustomEmojiMap.set(g.id, emojis)
+
+            return [g.id, emojis]
           })
+          this.guildCustomEmojiMap = new Map<string, DiscordEmoji[]>(allEmojis)
+
           this.onGuildCustomEmojiMapUpdate()
         }
 
@@ -508,18 +510,19 @@ export default class DiscordNetworkAPI {
             .map(g => g.channel_id)
           this.mutedChannels = new Set(mutedChannels)
 
-          payload.guilds.forEach(guild => {
-            const guildID: string = guild.id
-            const guildName: string = guild.name
+          const allChannels = payload.guilds.map(g => {
+            const guildID: string = g.id
+            const guildName: string = g.name
             // const guildJoinDate: Date = new Date(guild.joined_at)
             // const guildIconID: string | undefined = guild.icon
 
-            const channels = guild.channels.concat(guild.threads)
+            const channels = g.channels.concat(g.threads)
               .filter(c => !IGNORED_CHANNEL_TYPES.has(c.type))
               .map(c => mapChannel(c, this.mutedChannels.has(c.id), guildName))
 
-            this.channelsMap.set(guildID, channels)
+            return [guildID, channels]
           })
+          this.channelsMap = new Map(allChannels)
         }
 
         this.gotInitialUserData = true
@@ -979,11 +982,11 @@ export default class DiscordNetworkAPI {
   }
 
   private waitForInitialData = async () => {
-    while (!this.gotInitialUserData && WAIT_TILL_READY) await sleep(SLEEP_INTERVAL)
+    while (!this.gotInitialUserData) await sleep(SLEEP_INTERVAL)
   }
 
   private waitUntilReady = async () => {
-    while (!this.ready && WAIT_TILL_READY) await sleep(SLEEP_INTERVAL)
+    while (!this.ready) await sleep(SLEEP_INTERVAL)
   }
 
   private fetch = async ({ url, headers = {}, json, ...rest }: FetchOptions & { url: string, json?: any }): Promise<{ statusCode: number, json?: any }> => {
