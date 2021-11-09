@@ -162,22 +162,23 @@ export default class DiscordNetworkAPI {
 
   reportThread = async (threadID: string, messageID: string) => {
     const Referer = `https://discord.com/channels/@me/${threadID}`
-    await this.fetch({
+    const res1 = await this.fetch({
       url: 'reporting/menu/first_dm',
       headers: {
         Referer,
       },
       method: 'GET',
     })
-    const res = await this.fetch({
+    const breadcrumb = Object.values<any>(res1.json.nodes).find(n => n.report_type === 'sub_spam')?.id
+    const res2 = await this.fetch({
       method: 'POST',
       url: 'reporting/first_dm',
       json: {
-        id: generateSnowflake(),
+        id: String(generateSnowflake()),
         version: '1.0',
         variant: '1',
         language: 'en',
-        breadcrumbs: [25], // 25 appears to be "sub_spam" report_type
+        breadcrumbs: [breadcrumb],
         elements: {},
         name: 'first_dm',
         channel_id: threadID,
@@ -187,8 +188,17 @@ export default class DiscordNetworkAPI {
         Referer,
       },
     })
-    texts.log('reported with id', res.json?.report_id)
-    return !!res.json?.report_id
+    const success = !!res2.json?.report_id
+    texts.log('[discord] reported thread', res1.statusCode, res1.json, res2.statusCode, res2.json)
+    if (success) {
+      this.eventCallback([{
+        type: ServerEventType.TOAST,
+        toast: {
+          text: 'Reported thread to Discord',
+        },
+      }])
+    }
+    return success
   }
 
   getMessage = async (message: DiscordMessage, threadID: string) => {
