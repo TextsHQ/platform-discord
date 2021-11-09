@@ -156,11 +156,22 @@ export default class DiscordNetworkAPI {
   }
 
   /** https://discord.com/developers/docs/resources/channel#deleteclose-channel */
-  archiveThread = async (threadID: string) => {
+  closeThread = async (threadID: string) => {
     await this.fetch({ method: 'DELETE', url: `channels/${threadID}` })
   }
 
-  reportThread = async (threadID: string, messageID: string) => {
+  blockUser = async (userID: string) => {
+    const res = await this.fetch({
+      method: 'PUT',
+      url: `users/@me/relationships/${userID}`,
+      json: { type: 2 },
+    })
+    return res.statusCode === 204
+  }
+
+  reportThread = async (threadID: string, _messageID: string) => {
+    // todo review: this getMessages call is untested
+    const messageID = _messageID || await this.getMessages(threadID, { direction: 'after', cursor: '0' }).then(m => m[0].id)
     const Referer = `https://discord.com/channels/@me/${threadID}`
     const res1 = await this.fetch({
       url: 'reporting/menu/first_dm',
@@ -189,12 +200,33 @@ export default class DiscordNetworkAPI {
       },
     })
     const success = !!res2.json?.report_id
+    // 400 {
+    //   message: 'Validation error: 1 validation error for MessageReportSubmission\n' +
+    //     'message_id\n' +
+    //     '  none is not an allowed value (type=type_error.none.not_allowed)',
+    //     code: 0
+    // }
     texts.log('[discord] reported thread', res1.statusCode, res1.json, res2.statusCode, res2.json)
     if (success) {
+      // this.blockUser(userID).then(result => texts.log('block user', userID, result))
+      this.closeThread(threadID)
       this.eventCallback([{
         type: ServerEventType.TOAST,
         toast: {
           text: 'Reported thread to Discord',
+        },
+      }, {
+        type: ServerEventType.STATE_SYNC,
+        mutationType: 'delete',
+        objectName: 'thread',
+        objectIDs: {},
+        entries: [threadID],
+      }])
+    } else {
+      this.eventCallback([{
+        type: ServerEventType.TOAST,
+        toast: {
+          text: `Something went wrong while reporting thread: ${res2.json.message}`,
         },
       }])
     }
@@ -215,7 +247,7 @@ export default class DiscordNetworkAPI {
     return mapped
   }
 
-  getMessages = async (threadID: string, pagination?: PaginationArg) => {
+  getMessages = async (threadID: string, pagination?: PaginationArg, limit = 50) => {
     if (!this.currentUser) throw new Error('No current user')
     await this.waitUntilReady()
 
@@ -225,7 +257,7 @@ export default class DiscordNetworkAPI {
     }
 
     const paginationQuery = options.before ? `before=${options.before}` : options.after ? `after=${options.after}` : ''
-    const res = await this.fetch({ method: 'GET', url: `channels/${threadID}/messages?limit=50&${paginationQuery}` })
+    const res = await this.fetch({ method: 'GET', url: `channels/${threadID}/messages?limit=${limit}&${paginationQuery}` })
     if (res.statusCode < 200 || res.statusCode > 204 || !res.json) throw new Error(getErrorMessage(res))
 
     const messages: Message[] = await Promise.all(res.json.map(m => this.getMessage(m, threadID)))

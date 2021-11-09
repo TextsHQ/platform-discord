@@ -73,8 +73,8 @@ export default class Discord implements PlatformAPI {
   createThread = (userIDs: string[], title?: string) =>
     this.api.createThread(userIDs, title)
 
-  archiveThread = (threadID: string) =>
-    this.api.archiveThread(threadID)
+  deleteThread = (threadID: string) =>
+    this.api.closeThread(threadID)
 
   reportThread = async (type: 'spam', threadID: string, firstMessageID: string) =>
     this.api.reportThread(threadID, firstMessageID)
