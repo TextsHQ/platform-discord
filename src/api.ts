@@ -1,7 +1,6 @@
-import { PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Message, InboxName, MessageContent, PaginationArg, ActivityType, MessageSendOptions, texts, LoginCreds, Thread, AccountInfo, ServerEventType } from '@textshq/platform-sdk'
+import { PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Message, InboxName, MessageContent, PaginationArg, ActivityType, MessageSendOptions, texts, LoginCreds, Thread, AccountInfo, ServerEventType, Pref } from '@textshq/platform-sdk'
 import DiscordNetworkAPI from './network-api'
-
-export const getDataURI = (buffer: Buffer, mimeType: string = '') => `data:${mimeType};base64,${buffer.toString('base64')}`
+import { getDataURI } from './util'
 
 const POLLING_INTERVAL = 10_000
 
@@ -12,7 +11,7 @@ export default class Discord implements PlatformAPI {
 
   private pollingInterval?: NodeJS.Timeout
 
-  init = async (session: any, { accountID }: AccountInfo) => {
+  init = async (session: string, { accountID }: AccountInfo, prefs: Record<string, Pref>) => {
     this.accountID = accountID
     if (!session) return
     await this.api.login(session)
@@ -45,7 +44,7 @@ export default class Discord implements PlatformAPI {
   }
 
   // TODO: Implement searchMessages
-  /* searchMessages = async (typed: string, pagination?: PaginationArg, threadID?: string) => {
+  /* searchMessages = (typed: string, pagination?: PaginationArg, threadID?: string) => {
   } */
 
   getPresence = () => this.api.getUsersPresence()
@@ -69,7 +68,7 @@ export default class Discord implements PlatformAPI {
 
   deleteThread = (threadID: string) => this.api.closeThread(threadID)
 
-  reportThread = async (type: 'spam', threadID: string, firstMessageID: string) => this.api.reportThread(threadID, firstMessageID)
+  reportThread = (type: 'spam', threadID: string, firstMessageID: string) => this.api.reportThread(threadID, firstMessageID)
 
   sendMessage = (threadID: string, content: MessageContent, options?: MessageSendOptions) => this.api.sendMessage(threadID, content, options)
 
@@ -93,41 +92,42 @@ export default class Discord implements PlatformAPI {
     return this.api.sendReadReceipt(threadID, messageID)
   }
 
-  onThreadSelected = async (threadID: string) => this.api.onThreadSelected(threadID)
+  onThreadSelected = (threadID?: string) => this.api.onThreadSelected(threadID)
 
   onResumeFromSleep = async () => {
     texts.log('[discord] Resumed from sleep')
     await this.api.connect(true)
-    this.api.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH_ALL }])
+    if (this.api.lastFocusedThread) this.api.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: this.api.lastFocusedThread }])
   }
 
   startPolling = async () => {
     texts.log(`[discord] Starting polling, interval: ${POLLING_INTERVAL}`)
 
-    const action = async () => {
+    const action = async (): Promise<boolean> => {
       texts.log('[discord] Polling...')
       try {
         const user = await this.api.getCurrentUser()
         if (user) {
           texts.log('[discord] Poll successful!')
           await this.stopPolling()
+          return true
         }
       } catch (error) {
         texts.log('[discord] Poll failed!', error)
       }
+      return false
     }
-    this.pollingInterval = setInterval(action, POLLING_INTERVAL)
-    await action()
+    const success = await action()
+    if (!success) this.pollingInterval = setInterval(action, POLLING_INTERVAL)
   }
 
   stopPolling = async () => {
-    if (!this.pollingInterval) return
     texts.log('[discord] Stopping polling')
 
     clearInterval(this.pollingInterval)
     this.pollingInterval = null
 
     await this.api.connect(true)
-    this.api.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH_ALL }])
+    if (this.api.lastFocusedThread) this.api.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: this.api.lastFocusedThread }])
   }
 }

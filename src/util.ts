@@ -26,6 +26,8 @@ export const SUPER_PROPERTIES = {
 
 export const sleep = (timeout: number) => new Promise(resolve => setTimeout(resolve, timeout))
 
+export const getDataURI = (buffer: Buffer, mimeType: string = '') => `data:${mimeType};base64,${buffer.toString('base64')}`
+
 export function getTimestampFromSnowflake(snowflake?: string): Date | undefined {
   if (!snowflake) return
   const int = BigInt.asUintN(64, BigInt(snowflake))

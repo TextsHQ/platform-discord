@@ -39,8 +39,7 @@ export default class WSClient {
   }
 
   connect = async () => {
-    if (this.ws && (this.ws.readyState === WebSocket.CONNECTING || this.ws.readyState === WebSocket.OPEN)) return
-
+    if (this.ws?.readyState === WebSocket.CONNECTING || this.ws?.readyState === WebSocket.OPEN) return
     texts.log('[discord ws] Opening gateway connection...')
 
     this.ws = new WebSocket(this.gateway)

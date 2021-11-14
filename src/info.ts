@@ -46,6 +46,8 @@ const info: PlatformInfo = {
     Attribute.SUPPORTS_CUSTOM_EMOJIS,
     Attribute.SUPPORTS_REPORT_THREAD,
     Attribute.SUPPORTS_DELETE_THREAD,
+    Attribute.SUPPORTS_STOP_TYPING_INDICATOR,
+    Attribute.SUBSCRIBE_TO_THREAD_SELECTION,
   ]),
   attachments: {
     recordedAudioMimeType: 'audio/ogg',
@@ -53,6 +55,13 @@ const info: PlatformInfo = {
     supportsCaption: true,
   },
   maxGroupTitleLength: 100,
+  prefs: {
+    enable_guilds: {
+      label: 'Enable guilds',
+      type: 'checkbox',
+      default: false,
+    },
+  },
 }
 
 export default info

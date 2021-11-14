@@ -74,6 +74,8 @@ export default class DiscordNetworkAPI {
 
   userFriends: User[] = []
 
+  lastFocusedThread?: string
+
   login = async (token: string) => {
     if (!token) throw new Error('No token found.')
     this.token = token
@@ -97,26 +99,22 @@ export default class DiscordNetworkAPI {
   }
 
   connect = async (force: boolean = false) => {
-    if (this.client) {
+    if (this.client && this.client.ready) {
       if (force) this.client.disconnect()
       else return
     }
 
     texts.log('[discord] Setting up ws...')
 
-    if (this.client) {
-      texts.log('[discord] Has saved client, using it')
-      await this.client.connect()
-    } else {
+    if (!this.client) {
       const gatewayRes = await this.httpClient.requestAsString(`${API_ENDPOINT}/gateway`, { headers: { 'User-Agent': texts.constants.USER_AGENT } })
       const gatewayHost = JSON.parse(gatewayRes?.body)?.url as string ?? DEFAULT_GATEWAY
       const gatewayURL = `${gatewayHost}/?v=${API_VERSION}&encoding=${defaultPacker.encoding}`
-      texts.log(`[discord] URL: ${gatewayURL}`)
-
+      // texts.log(`[discord] URL: ${gatewayURL}`)
       this.client = new WSClient(gatewayURL, this.token, defaultPacker)
-      await this.client.connect()
     }
 
+    await this.client.connect()
     this.setupGatewayListeners()
   }
 
@@ -441,8 +439,9 @@ export default class DiscordNetworkAPI {
     return Object.fromEntries(emojis)
   }
 
-  onThreadSelected = async (threadID: string) => {
-    this.sendScienceRequest(ScienceEventType.channel_opened, { channel_id: threadID })
+  onThreadSelected = async (threadID?: string) => {
+    this.lastFocusedThread = threadID
+    await this.sendScienceRequest(ScienceEventType.channel_opened, { channel_id: threadID })
   }
 
   private onGuildCustomEmojiMapUpdate = () => {
@@ -1071,7 +1070,7 @@ export default class DiscordNetworkAPI {
     }
   }
 
-  private sendScienceRequest = (type: ScienceEventType, properties?: any) => {
+  private sendScienceRequest = async (type: ScienceEventType, properties?: any) => {
     if (!ENABLE_DISCORD_ANALYTICS) return
 
     const event: DiscordScienceEvent = {
@@ -1096,6 +1095,6 @@ export default class DiscordNetworkAPI {
     }
 
     texts.log(`[discord science] sending ${type}`)
-    this.fetch({ method: 'POST', url: 'science', json, headers })
+    await this.fetch({ method: 'POST', url: 'science', json, headers })
   }
 }
