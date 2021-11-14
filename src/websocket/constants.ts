@@ -88,6 +88,7 @@ export enum GatewayMessageType {
 }
 
 export enum GatewayCloseCode {
+  MANUAL_DISCONNECT = 1000,
   RECONNECT_REQUESTED = 1001,
   DISCONNECTED = 1005,
   ADDRESS_NOT_FOUND = 1006,

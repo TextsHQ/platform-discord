@@ -4,7 +4,6 @@ import { DiscordPresenceStatus, OPCode, GatewayMessageType, GatewayCloseCode } f
 import type { GatewayMessage } from './types'
 import type { Packer } from '../packers'
 import { sleep, SUPER_PROPERTIES } from '../util'
-import { ENABLE_GUILDS, RESTART_ON_FAIL } from '../preferences'
 
 export default class WSClient {
   private ws?: WebSocket
@@ -17,15 +16,13 @@ export default class WSClient {
 
   private heartbeatInterval?: NodeJS.Timeout
 
-  private failedRetries = 0
-
   private constants = {
     capabilities: 125, // sniffed
   }
 
-  ready = false
+  ready: boolean = false
 
-  onMessage?: (opcode: OPCode, message: any, type?: GatewayMessageType) => void
+  onMessage?: (opcode: OPCode, data: any, type?: GatewayMessageType) => void
 
   onChangedReadyState?: (ready: boolean) => void
 
@@ -42,111 +39,99 @@ export default class WSClient {
   }
 
   connect = async () => {
-    texts.log('[discord ws] Opening gateway connection. Try: ', this.failedRetries)
+    if (this.ws && (this.ws.readyState === WebSocket.CONNECTING || this.ws.readyState === WebSocket.OPEN)) return
 
-    // this.disconnect()
-
-    await sleep(Math.min(this.failedRetries, 10) * 1000)
+    texts.log('[discord ws] Opening gateway connection...')
 
     this.ws = new WebSocket(this.gateway)
     this.setupHandlers()
   }
 
   disconnect = () => {
+    if (!this.ws) return
+    texts.log('[discord ws] Disconnecting')
     clearInterval(this.heartbeatInterval)
-
     this.lastSequenceNumber = null
-    this.ws?.close()
+    this.ws?.close(GatewayCloseCode.MANUAL_DISCONNECT)
     this.ws = null
+    this.setReadyState(false)
   }
 
   private setupHandlers = () => {
-    this.ws?.on('open', () => {
-      if (!this.ready) {
-        if (this.resumeConnectionOnConnect) {
-          this.resumeConnectionOnConnect = false
-          const payload: GatewayMessage = {
-            op: OPCode.RESUME,
-            d: {
-              token: this.token,
-              session_id: this.sessionID,
-              seq: this.lastSequenceNumber,
-            },
-          }
-          this.send(payload)
-        } else {
-          this.login()
-        }
-      }
-
-      this.failedRetries = 0
+    this.ws.on('open', async () => {
+      texts.log('[discord ws] Connection open')
+      if (!this.ready) await this.login()
     })
 
-    this.ws?.on('close', async (code, reason) => {
-      this.ready = false
-      this.onChangedReadyState?.(false)
+    this.ws.on('close', async (code, reason) => {
+      texts.log(`[discord ws] Connection closed. Code: ${code}, reason: ${reason}`)
+      this.setReadyState(false)
 
-      if (RESTART_ON_FAIL && code !== GatewayCloseCode.UNKNOWN_ERROR) {
-        switch (code) {
-          case GatewayCloseCode.AUTHENTICATION_FAILED:
-            break
+      switch (code) {
+        case GatewayCloseCode.DISCONNECTED:
+        case GatewayCloseCode.ADDRESS_NOT_FOUND:
+          this.disconnect()
+          break
 
-          case GatewayCloseCode.DISCONNECTED:
-            this.disconnect()
-            break
+        case GatewayCloseCode.RECONNECT_REQUESTED:
+          texts.log('[discord ws] Gateway requested client reconnect.')
+          this.disconnect()
+          this.connect()
+          break
 
-          case undefined:
-            this.resumeConnectionOnConnect = true
-            break
-        }
+        // case undefined:
+        default:
+          // this.resumeConnectionOnConnect = true
+          break
       }
 
       this.onConnectionClosed?.(code, reason)
     })
 
-    this.ws?.on('error', error => this.onError?.(error))
+    this.ws.on('error', error => this.onError?.(error))
 
-    this.ws?.on('unexpected-response', (request, response) => {
+    this.ws.on('unexpected-response', (request, response) => {
       texts.log('[discord ws] Unexpected response: ' + request, response)
     })
 
     this.ws.onmessage = this.wsOnMessage
   }
 
-  private processMessage = (message: GatewayMessage) => {
+  private setReadyState = (ready: boolean) => {
+    if (ready === this.ready) return
+    this.ready = ready
+    this.onChangedReadyState?.(ready)
+  }
+
+  private processMessage = async (message: GatewayMessage) => {
     this.lastSequenceNumber = message.s
+    // console.log('>', message.op, message.t)
 
     switch (message.op) {
       case OPCode.DISPATCH:
-        if (!this.ready && message.t === GatewayMessageType.READY) {
+        if (message.t === GatewayMessageType.READY) {
           this.sessionID = message.d.session_id
-          this.ready = true
-          this.onChangedReadyState?.(true)
         }
 
+        this.setReadyState(true)
+        this.onMessage?.(message.op, message.d, message.t)
         break
       case OPCode.HEARTBEAT:
         this.sendHeartbeat()
         break
       case OPCode.HELLO:
-        this.setHeartbeatInterval(message.d.heartbeat_interval)
+        texts.log(`[discord ws] Heartbeat interval: ${message.d.heartbeat_interval}`)
+        this.heartbeatInterval = setInterval(this.sendHeartbeat, message.d.heartbeat_interval)
+        this.setReadyState(true)
         break
       case OPCode.INVALID_SESSION:
-        texts.error('[discord ws] invalid session')
+        texts.error('[discord ws] Invalid session')
         this.disconnect()
-        this.connect()
+        await this.connect()
         break
       default:
         break
     }
-
-    this.onMessage?.(message.op, message.d, message.t)
-  }
-
-  private send = async (payload: GatewayMessage) => {
-    while (this.ws.readyState === this.ws.CONNECTING) await sleep(25)
-    const packed = this.packer.pack(payload)
-    this.ws.send(packed)
   }
 
   private wsOnMessage = (event: MessageEvent) => {
@@ -154,46 +139,65 @@ export default class WSClient {
       const unpacked = this.packer.unpack(event.data)
       if (unpacked) this.processMessage(unpacked as GatewayMessage)
     } catch (e) {
-      texts.error('[discord ws] error unpacking:', e, event)
+      texts.error('[discord ws] Error unpacking:', e, event)
       this.onError?.(e)
     }
   }
 
-  private sendHeartbeat = () => {
+  private sendHeartbeat = async () => {
     // texts.log('[discord ws] Sending heartbeat')
     if (this.ws.readyState === this.ws.CONNECTING) return
     const payload: GatewayMessage = { op: OPCode.HEARTBEAT, d: this.lastSequenceNumber }
-    this.send(payload)
+    await this.send(payload)
   }
 
-  private setHeartbeatInterval = (interval: number) => {
-    texts.log('[discord ws] Heartbeat interval set to', interval)
-    this.heartbeatInterval = setInterval(this.sendHeartbeat, interval)
-  }
+  private login = async () => {
+    if (this.ready) return
 
-  private login = () => {
-    const payload: GatewayMessage = {
-      op: OPCode.IDENTIFY,
-      d: {
-        token: this.token,
-        properties: SUPER_PROPERTIES,
-        presence: {
-          status: DiscordPresenceStatus.ONLINE,
-          since: 0,
-          activities: [],
-          afk: false,
+    if (this.resumeConnectionOnConnect) {
+      const payload: GatewayMessage = {
+        op: OPCode.RESUME,
+        d: {
+          token: this.token,
+          session_id: this.sessionID,
+          seq: this.lastSequenceNumber,
         },
-        compress: this.packer.encoding === 'etf',
-        capabilities: this.constants.capabilities,
-        client_state: {
-          guild_hashes: {},
-          highest_last_message_id: '0',
-          read_state_version: 0,
-          user_guild_settings_version: -1,
+      }
+      await this.send(payload)
+      this.resumeConnectionOnConnect = false
+    } else {
+      const payload: GatewayMessage = {
+        op: OPCode.IDENTIFY,
+        d: {
+          token: this.token,
+          properties: SUPER_PROPERTIES,
+          presence: {
+            status: DiscordPresenceStatus.ONLINE,
+            since: 0,
+            activities: [],
+            afk: false,
+          },
+          compress: this.packer.encoding === 'etf',
+          capabilities: this.constants.capabilities,
+          client_state: {
+            guild_hashes: {},
+            highest_last_message_id: '0',
+            read_state_version: 0,
+            user_guild_settings_version: -1,
+          },
         },
-      },
+      }
+
+      await this.send(payload)
     }
+  }
 
-    this.send(payload)
+  private send = async (payload: GatewayMessage) => {
+    // console.log('<', payload)
+
+    if (!this.ws) return
+    while (this.ws.readyState === WebSocket.CONNECTING) await sleep(25)
+    const packed = this.packer.pack(payload)
+    this.ws.send(packed)
   }
 }

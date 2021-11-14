@@ -1,8 +1,9 @@
-import { PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Message, InboxName, MessageContent, PaginationArg, ActivityType, MessageSendOptions, texts, LoginCreds, Thread, AccountInfo } from '@textshq/platform-sdk'
+import { PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Message, InboxName, MessageContent, PaginationArg, ActivityType, MessageSendOptions, texts, LoginCreds, Thread, AccountInfo, ServerEventType } from '@textshq/platform-sdk'
 import DiscordNetworkAPI from './network-api'
 
-export const getDataURI = (buffer: Buffer, mimeType: string = '') =>
-  `data:${mimeType};base64,${buffer.toString('base64')}`
+export const getDataURI = (buffer: Buffer, mimeType: string = '') => `data:${mimeType};base64,${buffer.toString('base64')}`
+
+const POLLING_INTERVAL = 10_000
 
 export default class Discord implements PlatformAPI {
   private accountID: string
@@ -22,6 +23,8 @@ export default class Discord implements PlatformAPI {
 
   dispose = () => this.api.dispose()
 
+  getCurrentUser = () => this.api.getCurrentUser()
+
   login = async ({ jsCodeResult }: LoginCreds): Promise<LoginResult> => {
     if (!jsCodeResult) return { type: 'error', errorMessage: 'Token was empty' }
     await this.api.login(jsCodeResult)
@@ -30,77 +33,55 @@ export default class Discord implements PlatformAPI {
 
   logout = () => this.api.logout()
 
-  startPolling = async () => {
-    if (this.pollingInterval) return
-
-    texts.log('Starting polling')
-    this.api.ready = false
-
-    this.pollingInterval = setInterval(async () => {
-      const currentUser = await this.api.getCurrentUser()
-      if (currentUser) this.stopPolling()
-    }, 10_000)
-  }
-
-  stopPolling = () => {
-    if (!this.pollingInterval) return
-    texts.log('Stopping polling')
-    clearInterval(this.pollingInterval)
-    this.pollingInterval = null
-    this.api.ready = true
-    this.api.setupWebsocket()
-    // this.api.refresh()
-  }
-
   serializeSession = () => this.api.token
 
   subscribeToEvents = (onEvent: OnServerEventCallback) => {
     this.api.eventCallback = onEvent
   }
 
-  getCurrentUser = () => this.api.getCurrentUser()
-
   searchUsers = (typed: string) => {
     const typedLower = typed.toLowerCase()
     return typed ? this.api.userFriends.filter(u => u.username.toLowerCase().includes(typedLower)) : this.api.userFriends
   }
 
+  // TODO: Implement searchMessages
+  /* searchMessages = async (typed: string, pagination?: PaginationArg, threadID?: string) => {
+  } */
+
   getPresence = () => this.api.getUsersPresence()
 
-  getThreads = (inboxName: InboxName, pagination?: PaginationArg) =>
-    this.api.getThreads(inboxName, pagination)
-
-  createThread = (userIDs: string[], title?: string) =>
-    this.api.createThread(userIDs, title)
-
-  deleteThread = (threadID: string) =>
-    this.api.closeThread(threadID)
-
-  reportThread = async (type: 'spam', threadID: string, firstMessageID: string) =>
-    this.api.reportThread(threadID, firstMessageID)
+  getThreads = (inboxName: InboxName, pagination?: PaginationArg) => this.api.getThreads(inboxName, pagination)
 
   getMessages = async (threadID: string, pagination?: PaginationArg): Promise<Paginated<Message>> => {
     const items = await this.api.getMessages(threadID, pagination)
     return { items, hasMore: items.length > 0 }
   }
 
-  sendMessage = (threadID: string, content: MessageContent, options?: MessageSendOptions) =>
-    this.api.sendMessage(threadID, content, options)
+  createThread = (userIDs: string[], title?: string) => this.api.createThread(userIDs, title)
 
-  editMessage = (threadID: string, messageID: string, content: MessageContent, options?: MessageSendOptions) =>
-    this.api.editMessage(threadID, messageID, content, options)
+  updateThread = (threadID: string, updates: Partial<Thread>) => {
+    if ('title' in updates) return this.api.patchChannel(threadID, { name: updates.title })
+  }
 
-  deleteMessage = (threadID: string, messageID: string, forEveryone?: boolean) =>
-    this.api.deleteMessage(threadID, messageID, forEveryone)
+  changeThreadImage = async (threadID: string, imageBuffer: Buffer, mimeType: string) => {
+    await this.api.patchChannel(threadID, { icon: getDataURI(imageBuffer, mimeType) })
+  }
 
-  addReaction = (threadID: string, messageID: string, reactionKey: string) =>
-    this.api.addReaction(threadID, messageID, reactionKey)
+  deleteThread = (threadID: string) => this.api.closeThread(threadID)
 
-  removeReaction = (threadID: string, messageID: string, reactionKey: string) =>
-    this.api.removeReaction(threadID, messageID, reactionKey)
+  reportThread = async (type: 'spam', threadID: string, firstMessageID: string) => this.api.reportThread(threadID, firstMessageID)
 
-  sendActivityIndicator = (type: ActivityType, threadID: string) =>
-    this.api.setTyping(type, threadID)
+  sendMessage = (threadID: string, content: MessageContent, options?: MessageSendOptions) => this.api.sendMessage(threadID, content, options)
+
+  editMessage = (threadID: string, messageID: string, content: MessageContent, options?: MessageSendOptions) => this.api.editMessage(threadID, messageID, content, options)
+
+  deleteMessage = (threadID: string, messageID: string, forEveryone?: boolean) => this.api.deleteMessage(threadID, messageID, forEveryone)
+
+  addReaction = (threadID: string, messageID: string, reactionKey: string) => this.api.addReaction(threadID, messageID, reactionKey)
+
+  removeReaction = (threadID: string, messageID: string, reactionKey: string) => this.api.removeReaction(threadID, messageID, reactionKey)
+
+  sendActivityIndicator = (type: ActivityType, threadID: string) => this.api.setTyping(type, threadID)
 
   sendReadReceipt = (threadID: string, messageID: string) => {
     if (!messageID) {
@@ -112,15 +93,41 @@ export default class Discord implements PlatformAPI {
     return this.api.sendReadReceipt(threadID, messageID)
   }
 
-  updateThread = (threadID: string, updates: Partial<Thread>) => {
-    if ('title' in updates) return this.api.patchChannel(threadID, { name: updates.title })
-  }
-
-  changeThreadImage = async (threadID: string, imageBuffer: Buffer, mimeType: string) => {
-    await this.api.patchChannel(threadID, { icon: getDataURI(imageBuffer, mimeType) })
-  }
-
-  getCustomEmojis = () => this.api.getCustomEmojis()
-
   onThreadSelected = async (threadID: string) => this.api.onThreadSelected(threadID)
+
+  onResumeFromSleep = async () => {
+    texts.log('[discord] Resumed from sleep')
+    await this.api.connect(true)
+    this.api.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH_ALL }])
+  }
+
+  startPolling = async () => {
+    texts.log(`[discord] Starting polling, interval: ${POLLING_INTERVAL}`)
+
+    const action = async () => {
+      texts.log('[discord] Polling...')
+      try {
+        const user = await this.api.getCurrentUser()
+        if (user) {
+          texts.log('[discord] Poll successful!')
+          await this.stopPolling()
+        }
+      } catch (error) {
+        texts.log('[discord] Poll failed!', error)
+      }
+    }
+    this.pollingInterval = setInterval(action, POLLING_INTERVAL)
+    await action()
+  }
+
+  stopPolling = async () => {
+    if (!this.pollingInterval) return
+    texts.log('[discord] Stopping polling')
+
+    clearInterval(this.pollingInterval)
+    this.pollingInterval = null
+
+    await this.api.connect(true)
+    this.api.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH_ALL }])
+  }
 }

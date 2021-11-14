@@ -62,7 +62,7 @@ export default class DiscordNetworkAPI {
 
   token?: string
 
-  eventCallback?: OnServerEventCallback
+  eventCallback: OnServerEventCallback
 
   startPolling?: () => void
 
@@ -77,7 +77,7 @@ export default class DiscordNetworkAPI {
   login = async (token: string) => {
     if (!token) throw new Error('No token found.')
     this.token = token
-    this.setupWebsocket()
+    this.connect()
 
     if (ENABLE_DISCORD_ANALYTICS) {
       const fingerprintRes = await this.fetch({ method: 'POST', url: 'auth/fingerprint' })
@@ -96,17 +96,27 @@ export default class DiscordNetworkAPI {
     this.client = null
   }
 
-  setupWebsocket = async () => {
-    if (this.client && !this.client.ready) return
+  connect = async (force: boolean = false) => {
+    if (this.client) {
+      if (force) this.client.disconnect()
+      else return
+    }
 
-    const gatewayRes = await this.httpClient.requestAsString(`${API_ENDPOINT}/gateway`, { headers: { 'User-Agent': texts.constants.USER_AGENT } })
-    const gatewayHost = JSON.parse(gatewayRes?.body)?.url as string ?? DEFAULT_GATEWAY
-    const gatewayFullURL = `${gatewayHost}/?v=${API_VERSION}&encoding=${defaultPacker.encoding}`
+    texts.log('[discord] Setting up ws...')
 
-    this.client = new WSClient(gatewayFullURL, this.token, defaultPacker)
-    texts.log('[discord ws] URL:', gatewayFullURL)
+    if (this.client) {
+      texts.log('[discord] Has saved client, using it')
+      await this.client.connect()
+    } else {
+      const gatewayRes = await this.httpClient.requestAsString(`${API_ENDPOINT}/gateway`, { headers: { 'User-Agent': texts.constants.USER_AGENT } })
+      const gatewayHost = JSON.parse(gatewayRes?.body)?.url as string ?? DEFAULT_GATEWAY
+      const gatewayURL = `${gatewayHost}/?v=${API_VERSION}&encoding=${defaultPacker.encoding}`
+      texts.log(`[discord] URL: ${gatewayURL}`)
 
-    this.client.connect()
+      this.client = new WSClient(gatewayURL, this.token, defaultPacker)
+      await this.client.connect()
+    }
+
     this.setupGatewayListeners()
   }
 
@@ -118,7 +128,7 @@ export default class DiscordNetworkAPI {
     this.currentUser = currentUser
     if (currentUser.id && currentUser.displayText) this.userMappings.set(currentUser.displayText, currentUser.id)
 
-    this.getUserFriends()
+    await this.getUserFriends()
 
     return currentUser
   }
@@ -278,7 +288,7 @@ export default class DiscordNetworkAPI {
         objectIDs: { threadID },
         entries,
       }]
-      this.eventCallback?.(authorEvents)
+      this.eventCallback(authorEvents)
     }
 
     return messages.filter(Boolean).sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
@@ -423,10 +433,6 @@ export default class DiscordNetworkAPI {
     return this.usersPresence
   }
 
-  onGuildCustomEmojiMapUpdate = () => {
-    this.allCustomEmojis = Array.from(this.guildCustomEmojiMap?.values()).flat()
-  }
-
   getCustomEmojis = async (): Promise<CustomEmojiMap> => {
     await this.waitForInitialData()
     if (!this.allCustomEmojis) return {}
@@ -437,6 +443,10 @@ export default class DiscordNetworkAPI {
 
   onThreadSelected = async (threadID: string) => {
     this.sendScienceRequest(ScienceEventType.channel_opened, { channel_id: threadID })
+  }
+
+  private onGuildCustomEmojiMapUpdate = () => {
+    this.allCustomEmojis = Array.from(this.guildCustomEmojiMap?.values()).flat()
   }
 
   private getUserFriends = async () => {
@@ -470,23 +480,19 @@ export default class DiscordNetworkAPI {
   }
 
   private setupGatewayListeners = () => {
-    if (!this.client) throw new Error('[discord ws] not initialized!')
+    if (!this.client) throw new Error('[discord] Client not initialized!')
 
     this.client.onChangedReadyState = ready => {
-      texts.log('[discord ws] Connection state: ' + ready)
+      texts.log(`[discord] Client connection state: ${ready}`)
       this.ready = ready
     }
 
     this.client.onConnectionClosed = (code, reason) => {
-      texts.log('[discord ws] Connection to websocket closed with code', code + '. Reason:', reason)
       this.ready = false
 
       switch (code) {
         case GatewayCloseCode.ADDRESS_NOT_FOUND:
           this.startPolling?.()
-          break
-        case GatewayCloseCode.RECONNECT_REQUESTED:
-          texts.log('[discord ws] Gateway requested client reconnect.')
           break
         case GatewayCloseCode.AUTHENTICATION_FAILED:
           this.client.disconnect()
@@ -494,7 +500,7 @@ export default class DiscordNetworkAPI {
           // eslint-disable-next-line @typescript-eslint/no-throw-literal
           throw new ReAuthError('Access token invalid')
         case GatewayCloseCode.SESSION_TIMED_OUT:
-          texts.log('[discord ws] Gateway session timed out.')
+          texts.log('[discord] Gateway session timed out')
           break
         default:
           break
@@ -508,8 +514,8 @@ export default class DiscordNetworkAPI {
     this.client.onMessage = this.handleGatewayMessage
   }
 
-  private handleGatewayMessage = (opcode: OPCode, payload: any, type: GatewayMessageType) => {
-    texts.log('[discord ws]', opcode, type)
+  private handleGatewayMessage = (opcode: OPCode, data: any, type: GatewayMessageType) => {
+    // texts.log('[discord]', opcode, type)
 
     switch (type) {
       // * Documented
@@ -520,18 +526,18 @@ export default class DiscordNetworkAPI {
       }
 
       case GatewayMessageType.READY: {
-        // const notes = payload.notes
-        // const user_settings = payload.user_settings
+        // const notes = data.notes
+        // const user_settings = data.user_settings
 
-        if (ENABLE_DISCORD_ANALYTICS) this.analyticsToken = payload.analytics_token
+        if (ENABLE_DISCORD_ANALYTICS) this.analyticsToken = data.analytics_token
 
-        this.userMappings = new Map(payload.users?.map(r => [(r.username + '#' + r.discriminator), r.id]))
-        this.readStateMap = new Map(payload.read_state?.entries.map(s => [s.id, s.last_message_id]))
+        this.userMappings = new Map(data.users?.map(r => [(r.username + '#' + r.discriminator), r.id]))
+        this.readStateMap = new Map(data.read_state?.entries.map(s => [s.id, s.last_message_id]))
         // presences are in READY_SUPPLEMENTAL if ACT_AS_USER = true
 
-        if (payload.user.premium_type && payload.user.premium_type !== 0) {
+        if (data.user.premium_type && data.user.premium_type !== 0) {
           // User has nitro, so store emojis
-          const allEmojis = payload.guilds.map(g => {
+          const allEmojis = data.guilds.map(g => {
             const emojis = g.emojis.map(e => ({
               displayName: e.name,
               reactionKey: `<:${e.name}:${e.id}>`,
@@ -546,13 +552,13 @@ export default class DiscordNetworkAPI {
         }
 
         if (ENABLE_GUILDS) {
-          const mutedChannels = payload.user_guild_settings.entries
+          const mutedChannels = data.user_guild_settings.entries
             ?.flatMap(g => g.channel_overrides)
             .filter(g => g.muted)
             .map(g => g.channel_id)
           this.mutedChannels = new Set(mutedChannels)
 
-          const allChannels = payload.guilds.map(g => {
+          const allChannels = data.guilds.map(g => {
             const guildID: string = g.id
             const guildName: string = g.name
             // const guildJoinDate: Date = new Date(guild.joined_at)
@@ -573,42 +579,42 @@ export default class DiscordNetworkAPI {
       }
 
       case GatewayMessageType.READY_SUPPLEMENTAL: {
-        this.usersPresence = Object.fromEntries(payload.merged_presences.friends?.map(p => [p.user_id, mapPresence(p.user_id, p)]))
+        this.usersPresence = Object.fromEntries(data.merged_presences.friends?.map(p => [p.user_id, mapPresence(p.user_id, p)]))
         break
       }
 
       case GatewayMessageType.RESUMED: {
         // TODO: RESUMED
-        texts.log(type, payload)
+        texts.log(type, data)
         break
       }
 
       case GatewayMessageType.RECONNECT: {
         // TODO: RECONNECT
-        texts.log(type, payload)
+        texts.log(type, data)
         break
       }
 
       case GatewayMessageType.INVALID_SESSION: {
         // TODO: INVALID_SESSION
-        texts.log(type, payload)
+        texts.log(type, data)
         break
       }
 
       case GatewayMessageType.CHANNEL_CREATE: {
-        if (!ENABLE_GUILDS && payload.guild_id) return
+        if (!ENABLE_GUILDS && data.guild_id) return
 
-        const channel = mapChannel(payload, this.mutedChannels.has(payload.id))
-        const channels = this.channelsMap?.get(payload.guild_id)?.concat([channel])
+        const channel = mapChannel(data, this.mutedChannels.has(data.id))
+        const channels = this.channelsMap?.get(data.guild_id)?.concat([channel])
         if (channels) {
-          this.channelsMap?.set(payload.guild_id, channels)
+          this.channelsMap?.set(data.guild_id, channels)
 
-          this.eventCallback?.([{
+          this.eventCallback([{
             type: ServerEventType.STATE_SYNC,
             mutationType: 'upsert',
             objectName: 'thread',
             objectIDs: {
-              threadID: payload.id,
+              threadID: data.id,
             },
             entries: [channel],
           }])
@@ -617,24 +623,24 @@ export default class DiscordNetworkAPI {
       }
 
       case GatewayMessageType.CHANNEL_UPDATE: {
-        if (!ENABLE_GUILDS && payload.guild_id) return
+        if (!ENABLE_GUILDS && data.guild_id) return
 
-        const channels = this.channelsMap?.get(payload.guild_id)
-        const index = channels.findIndex(c => c.id === payload.id)
+        const channels = this.channelsMap?.get(data.guild_id)
+        const index = channels.findIndex(c => c.id === data.id)
         if (index < 0) return
 
         const channel = channels[index]
-        const newChannel = mapChannel(payload, this.mutedChannels.has(payload.id))
+        const newChannel = mapChannel(data, this.mutedChannels.has(data.id))
         Object.assign(channel, newChannel)
         channels[index] = channel
-        this.channelsMap?.set(payload.guild_id, channels)
+        this.channelsMap?.set(data.guild_id, channels)
 
-        this.eventCallback?.([{
+        this.eventCallback([{
           type: ServerEventType.STATE_SYNC,
           mutationType: 'update',
           objectName: 'thread',
           objectIDs: {
-            threadID: payload.id,
+            threadID: data.id,
           },
           entries: [channel],
         }])
@@ -642,70 +648,70 @@ export default class DiscordNetworkAPI {
       }
 
       case GatewayMessageType.CHANNEL_DELETE: {
-        if (!ENABLE_GUILDS && payload.guild_id) return
+        if (!ENABLE_GUILDS && data.guild_id) return
 
-        this.eventCallback?.([{
+        this.eventCallback([{
           type: ServerEventType.STATE_SYNC,
           mutationType: 'delete',
           objectName: 'thread',
           objectIDs: {
-            threadID: payload.id,
+            threadID: data.id,
           },
-          entries: [payload.id],
+          entries: [data.id],
         }])
         break
       }
 
       case GatewayMessageType.CHANNEL_PINS_UPDATE: {
         // TODO: CHANNEL_PINS_UPDATE
-        texts.log(type, payload)
+        texts.log(type, data)
         break
       }
 
       case GatewayMessageType.THREAD_CREATE: {
         // TODO: THREAD_CREATE
-        texts.log(type, payload)
+        texts.log(type, data)
         break
       }
 
       case GatewayMessageType.THREAD_UPDATE: {
         // TODO: THREAD_UPDATE
-        texts.log(type, payload)
+        texts.log(type, data)
         break
       }
 
       case GatewayMessageType.THREAD_DELETE: {
         // TODO: THREAD_DELETE
-        texts.log(type, payload)
+        texts.log(type, data)
         break
       }
 
       case GatewayMessageType.THREAD_LIST_SYNC: {
         // TODO: THREAD_LIST_SYNC
-        texts.log(type, payload)
+        texts.log(type, data)
         break
       }
 
       case GatewayMessageType.THREAD_MEMBER_UPDATE: {
         // TODO: THREAD_MEMBER_UPDATE
-        texts.log(type, payload)
+        texts.log(type, data)
         break
       }
 
       case GatewayMessageType.THREAD_MEMBERS_UPDATE: {
         // TODO: THREAD_MEMBERS_UPDATE
-        texts.log(type, payload)
+        texts.log(type, data)
         break
       }
 
       case GatewayMessageType.GUILD_CREATE: {
         if (this.guildCustomEmojiMap) {
-          const emojis = payload.emojis.map(e => ({
+          const emojis = data.emojis.map(e => ({
             displayName: e.name,
             reactionKey: `<:${e.name}:${e.id}>`,
             url: getEmojiURL(e.id, e.animated),
           }))
-          this.guildCustomEmojiMap.set(payload.id, emojis)
+          this.guildCustomEmojiMap.set(data.id, emojis)
           this.onGuildCustomEmojiMapUpdate()
 
           const emojiEvent: ServerEvent = {
@@ -716,16 +722,16 @@ export default class DiscordNetworkAPI {
             entries: emojis,
           }
 
-          this.eventCallback?.([emojiEvent])
+          this.eventCallback([emojiEvent])
         }
 
         if (!ENABLE_GUILDS) return
 
-        const channels = payload.channels
+        const channels = data.channels
           .filter(c => !IGNORED_CHANNEL_TYPES.has(c.type))
-          .map(c => mapChannel(c, this.mutedChannels.has(c.id)), payload.name)
+          .map(c => mapChannel(c, this.mutedChannels.has(c.id)), data.name)
 
-        this.channelsMap?.set(payload.id, channels)
+        this.channelsMap?.set(data.id, channels)
 
         const channelEvents: ServerEvent[] = channels.map(c => ({
           type: ServerEventType.STATE_SYNC,
@@ -737,18 +743,18 @@ export default class DiscordNetworkAPI {
           entries: [c],
         }))
 
-        this.eventCallback?.(channelEvents)
+        this.eventCallback(channelEvents)
         break
       }
 
       case GatewayMessageType.GUILD_DELETE: {
-        this.guildCustomEmojiMap?.delete(payload.id)
+        this.guildCustomEmojiMap?.delete(data.id)
         this.onGuildCustomEmojiMapUpdate()
         // TODO: State sync
 
         if (!ENABLE_GUILDS) return
 
-        const channelIDs = this.channelsMap.get(payload.id).map(c => c.id)
+        const channelIDs = this.channelsMap.get(data.id).map(c => c.id)
         const events: ServerEvent[] = channelIDs.map(id => ({
           type: ServerEventType.STATE_SYNC,
           mutationType: 'delete',
@@ -758,21 +764,21 @@ export default class DiscordNetworkAPI {
           },
           entries: [id],
         }))
-        this.eventCallback?.(events)
+        this.eventCallback(events)
 
-        this.channelsMap.delete(payload.id)
+        this.channelsMap.delete(data.id)
         break
       }
 
       case GatewayMessageType.GUILD_EMOJIS_UPDATE: {
         if (!this.guildCustomEmojiMap) return
 
-        const emojis = payload.emojis.map(e => ({
+        const emojis = data.emojis.map(e => ({
           displayName: e.name,
           reactionKey: `<:${e.name}:${e.id}>`,
           url: getEmojiURL(e.id, e.animated),
         }))
-        this.guildCustomEmojiMap.set(payload.guild_id, emojis)
+        this.guildCustomEmojiMap.set(data.guild_id, emojis)
         this.onGuildCustomEmojiMapUpdate()
         // TODO: State sync
 
@@ -780,133 +786,133 @@ export default class DiscordNetworkAPI {
       }
 
       case GatewayMessageType.MESSAGE_CREATE: {
-        if (!ENABLE_GUILDS && payload.guild_id) return
+        if (!ENABLE_GUILDS && data.guild_id) return
 
-        payload.mentions.forEach(m => this.userMappings.set((m.username + '#' + m.discriminator), m.id))
+        data.mentions.forEach(m => this.userMappings.set((m.username + '#' + m.discriminator), m.id))
 
-        if (ENABLE_GUILDS && payload.author) {
-          const sender = mapUser(payload.author)
-          this.eventCallback?.([{
+        if (ENABLE_GUILDS && data.author) {
+          const sender = mapUser(data.author)
+          this.eventCallback([{
             type: ServerEventType.STATE_SYNC,
             mutationType: 'upsert',
             objectName: 'participant',
             objectIDs: {
-              threadID: payload.channel_id,
+              threadID: data.channel_id,
             },
             entries: [sender],
           }])
         }
 
-        if (this.sendMessageNonces.has(payload.nonce)) {
-          this.sendMessageNonces.delete(payload.nonce)
+        if (this.sendMessageNonces.has(data.nonce)) {
+          this.sendMessageNonces.delete(data.nonce)
         } else {
           // only send upsert message if message was sent from another client/device
           // this is to prevent 2 messages from showing for a split second in somecases
           // (prevents sending ServerEvent before sendMessage() resolves)
-          this.eventCallback?.([{
+          this.eventCallback([{
             type: ServerEventType.STATE_SYNC,
             mutationType: 'upsert',
             objectName: 'message',
             objectIDs: {
-              threadID: payload.channel_id,
-              messageID: payload.id,
+              threadID: data.channel_id,
+              messageID: data.id,
             },
-            entries: [mapMessage(payload, this.currentUser.id) as Message],
+            entries: [mapMessage(data, this.currentUser.id) as Message],
           }])
         }
         break
       }
 
       case GatewayMessageType.MESSAGE_UPDATE: {
-        if (!ENABLE_GUILDS && payload.guild_id) return
+        if (!ENABLE_GUILDS && data.guild_id) return
 
-        // when ACT_AS_USER = false, discord sends this event with payload.content === ''
-        this.eventCallback?.([{
+        // when ACT_AS_USER = false, discord sends this event with data.content === ''
+        this.eventCallback([{
           type: ServerEventType.STATE_SYNC,
           mutationType: 'update',
           objectName: 'message',
-          objectIDs: { threadID: payload.channel_id },
-          entries: [mapMessage(payload, this.currentUser.id)],
+          objectIDs: { threadID: data.channel_id },
+          entries: [mapMessage(data, this.currentUser.id)],
         }])
         break
       }
 
       case GatewayMessageType.MESSAGE_DELETE: {
-        if (!ENABLE_GUILDS && payload.guild_id) return
+        if (!ENABLE_GUILDS && data.guild_id) return
 
-        this.eventCallback?.([{
+        this.eventCallback([{
           type: ServerEventType.STATE_SYNC,
           mutationType: 'delete',
           objectName: 'message',
           objectIDs: {
-            threadID: payload.channel_id,
-            messageID: payload.id,
+            threadID: data.channel_id,
+            messageID: data.id,
           },
-          entries: [payload.id],
+          entries: [data.id],
         }])
         break
       }
 
       case GatewayMessageType.MESSAGE_DELETE_BULK: {
-        if (!ENABLE_GUILDS && payload.guild_id) return
+        if (!ENABLE_GUILDS && data.guild_id) return
 
-        this.eventCallback?.([{
+        this.eventCallback([{
           type: ServerEventType.STATE_SYNC,
           mutationType: 'delete',
           objectName: 'message',
           objectIDs: {
-            threadID: payload.channel_id,
+            threadID: data.channel_id,
           },
-          entries: payload.ids,
+          entries: data.ids,
         }])
         break
       }
 
       case GatewayMessageType.MESSAGE_REACTION_ADD: {
-        if (!ENABLE_GUILDS && payload.guild_id) return
+        if (!ENABLE_GUILDS && data.guild_id) return
 
-        this.eventCallback?.([{
+        this.eventCallback([{
           type: ServerEventType.STATE_SYNC,
           mutationType: 'upsert',
           objectName: 'message_reaction',
           objectIDs: {
-            threadID: payload.channel_id,
-            messageID: payload.message_id,
+            threadID: data.channel_id,
+            messageID: data.message_id,
           },
-          entries: [mapReaction(payload, payload.user_id)],
+          entries: [mapReaction(data, data.user_id)],
         }])
         break
       }
 
       case GatewayMessageType.MESSAGE_REACTION_REMOVE:
       case GatewayMessageType.MESSAGE_REACTION_REMOVE_EMOJI: {
-        if (!ENABLE_GUILDS && payload.guild_id) return
+        if (!ENABLE_GUILDS && data.guild_id) return
 
-        this.eventCallback?.([{
+        this.eventCallback([{
           type: ServerEventType.STATE_SYNC,
           mutationType: 'delete',
           objectName: 'message_reaction',
           objectIDs: {
-            threadID: payload.channel_id,
-            messageID: payload.message_id,
+            threadID: data.channel_id,
+            messageID: data.message_id,
           },
-          entries: [`${payload.user_id}${payload.emoji.name || payload.emoji.id}`],
+          entries: [`${data.user_id}${data.emoji.name || data.emoji.id}`],
         }])
         break
       }
 
       case GatewayMessageType.MESSAGE_REACTION_REMOVE_ALL: {
-        if (!ENABLE_GUILDS && payload.guild_id) return
+        if (!ENABLE_GUILDS && data.guild_id) return
 
-        this.eventCallback?.([{
+        this.eventCallback([{
           type: ServerEventType.STATE_SYNC,
           mutationType: 'update',
           objectName: 'message',
           objectIDs: {
-            threadID: payload.channel_id,
+            threadID: data.channel_id,
           },
           entries: [{
-            id: payload.message_id,
+            id: data.message_id,
             reactions: [],
           }],
         }])
@@ -914,12 +920,12 @@ export default class DiscordNetworkAPI {
       }
 
       case GatewayMessageType.PRESENCE_UPDATE: {
-        if (payload.guild_id) return
+        if (data.guild_id) return
 
-        const presence: UserPresence = mapPresence(payload.user.id, payload)
-        this.usersPresence[payload.user.id] = presence
+        const presence: UserPresence = mapPresence(data.user.id, data)
+        this.usersPresence[data.user.id] = presence
 
-        this.eventCallback?.([{
+        this.eventCallback([{
           type: ServerEventType.USER_PRESENCE_UPDATED,
           presence,
         }])
@@ -928,21 +934,21 @@ export default class DiscordNetworkAPI {
       }
 
       case GatewayMessageType.TYPING_START: {
-        if (!ENABLE_GUILDS && payload.guild_id) return
+        if (!ENABLE_GUILDS && data.guild_id) return
 
-        this.eventCallback?.([{
+        this.eventCallback([{
           type: ServerEventType.USER_ACTIVITY,
           activityType: ActivityType.TYPING,
           durationMs: 10_000,
-          participantID: payload.user_id,
-          threadID: payload.channel_id,
+          participantID: data.user_id,
+          threadID: data.channel_id,
         }])
         break
       }
 
       case GatewayMessageType.USER_UPDATE: {
         // TODO: USER_UPDATE
-        texts.log(type, payload)
+        texts.log(type, data)
         break
       }
 
@@ -950,15 +956,15 @@ export default class DiscordNetworkAPI {
 
       case GatewayMessageType.CHANNEL_UNREAD_UPDATE: {
         // TODO: CHANNEL_UNREAD_UPDATE
-        texts.log(type, payload)
+        texts.log(type, data)
         break
       }
 
       case GatewayMessageType.MESSAGE_ACK: {
-        if (!ENABLE_GUILDS && payload.guild_id) return
+        if (!ENABLE_GUILDS && data.guild_id) return
 
-        const threadID = payload.channel_id
-        this.eventCallback?.([{
+        const threadID = data.channel_id
+        this.eventCallback([{
           type: ServerEventType.STATE_SYNC,
           mutationType: 'update',
           objectName: 'thread',
@@ -971,15 +977,15 @@ export default class DiscordNetworkAPI {
       }
 
       case GatewayMessageType.RELATIONSHIP_ADD: {
-        if (!this.userFriends.find(f => f.id === payload.id)) {
-          const user = mapUser(payload.user)
+        if (!this.userFriends.find(f => f.id === data.id)) {
+          const user = mapUser(data.user)
           this.userFriends.push(user)
         }
         break
       }
 
       case GatewayMessageType.RELATIONSHIP_REMOVE: {
-        const index = this.userFriends.findIndex(f => f.id === payload.id)
+        const index = this.userFriends.findIndex(f => f.id === data.id)
         if (index >= 0) this.userFriends.splice(index, 1)
         break
       }
@@ -1017,7 +1023,7 @@ export default class DiscordNetworkAPI {
       }
 
       default: {
-        texts.log('[discord ws] Unhandled', opcode, type, payload)
+        texts.log('[discord] Unhandled', opcode, type, data)
         break
       }
     }
