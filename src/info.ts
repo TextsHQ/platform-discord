@@ -56,11 +56,11 @@ const info: PlatformInfo = {
   },
   maxGroupTitleLength: 100,
   prefs: {
-    enable_guilds: {
-      label: 'Enable guilds',
-      type: 'checkbox',
-      default: false,
-    },
+    // enable_guilds: {
+    //   label: 'Enable guilds',
+    //   type: 'checkbox',
+    //   default: false,
+    // },
   },
 }
 
