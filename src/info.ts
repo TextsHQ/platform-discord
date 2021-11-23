@@ -12,7 +12,7 @@ const info: PlatformInfo = {
     </svg>
   `,
   loginMode: 'browser',
-  browserLogin: {
+  browserLogins: [{
     loginURL: 'https://discord.com/login',
     windowWidth: 950,
     windowHeight: 650,
@@ -30,7 +30,7 @@ const info: PlatformInfo = {
         }
       }, 200)
     `,
-  },
+  }],
   deletionMode: MessageDeletionMode.DELETE_FOR_EVERYONE,
   reactions: {
     supported: {},
