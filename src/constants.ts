@@ -1,5 +1,9 @@
-import type { ThreadType } from '@textshq/platform-sdk'
+import { texts, ThreadType } from '@textshq/platform-sdk'
 import { MessageType, ChannelType, EmbedType } from 'discord-api-types/v9'
+import { USER_AGENT as DISCORD_USER_AGENT } from './discord-constants'
+import { usesErlpack } from './packers'
+
+export const USER_AGENT = usesErlpack ? DISCORD_USER_AGENT : texts.constants.USER_AGENT
 
 export enum MessageActivityType {
   SPOTIFY = 3,
@@ -60,5 +64,3 @@ export const THREAD_TYPES: ThreadType[] = [
   'channel', // GUILD_PRIVATE_THREAD,
   undefined, // GUILD_STAGE_VOICE
 ]
-
-export const DISCORD_BUILD_NUMBER = 100804

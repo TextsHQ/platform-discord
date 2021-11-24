@@ -3,7 +3,8 @@ import { texts } from '@textshq/platform-sdk'
 import { DiscordPresenceStatus, OPCode, GatewayMessageType, GatewayCloseCode } from './constants'
 import type { GatewayMessage } from './types'
 import type { Packer } from '../packers'
-import { sleep, SUPER_PROPERTIES } from '../util'
+import { sleep } from '../util'
+import { SUPER_PROPERTIES } from '../discord-constants'
 
 export default class WSClient {
   private ws?: WebSocket

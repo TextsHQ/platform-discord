@@ -3,7 +3,7 @@ import type { ScienceEventType } from './constants'
 
 export type DiscordMessage = APIMessage & {
   call?: {
-    participants: string[],
+    participants: string[]
     ended_timestamp?: string
   }
 }

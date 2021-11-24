@@ -8,10 +8,11 @@ import { getEmojiURL, mapChannel, mapCurrentUser, mapMessage, mapPresence, mapRe
 import WSClient from './websocket/wsclient'
 import { GatewayCloseCode, GatewayMessageType, OPCode } from './websocket/constants'
 import { defaultPacker } from './packers'
-import { IGNORED_CHANNEL_TYPES, ScienceEventType } from './constants'
-import { generateScienceClientUUID, generateSnowflake, SUPER_PROPERTIES, sleep } from './util'
+import { generateScienceClientUUID, generateSnowflake, sleep } from './util'
 import { ENABLE_GUILDS, ENABLE_DM_GUILD_MEMBERS, ENABLE_DISCORD_ANALYTICS } from './preferences'
 import type { DiscordEmoji, DiscordMessage, DiscordReactionDetails, DiscordScienceEvent } from './types'
+import { IGNORED_CHANNEL_TYPES, ScienceEventType, USER_AGENT } from './constants'
+import { SUPER_PROPERTIES } from './discord-constants'
 
 import _emojis from './resources/emojis.json'
 import _emojiShortcuts from './resources/shortcuts.json'
@@ -20,7 +21,7 @@ const API_VERSION = 9
 const API_ENDPOINT = `https://discord.com/api/v${API_VERSION}`
 const DEFAULT_GATEWAY = 'wss://gateway.discord.gg'
 
-const SLEEP_INTERVAL = 100
+const SLEEP_TIME = 100
 
 const getErrorMessage = (res: { statusCode: number, json?: any }): string => res.json?.message || `Invalid response: ${res.statusCode}`
 
@@ -98,7 +99,7 @@ export default class DiscordNetworkAPI {
     this.client = null
   }
 
-  connect = async (force: boolean = false) => {
+  connect = async (force = false) => {
     if (this.client && this.client.ready) {
       if (force) this.client.disconnect()
       else return
@@ -107,7 +108,7 @@ export default class DiscordNetworkAPI {
     texts.log('[discord] Setting up ws...')
 
     if (!this.client) {
-      const gatewayRes = await this.httpClient.requestAsString(`${API_ENDPOINT}/gateway`, { headers: { 'User-Agent': texts.constants.USER_AGENT } })
+      const gatewayRes = await this.httpClient.requestAsString(`${API_ENDPOINT}/gateway`, { headers: { 'User-Agent': USER_AGENT } })
       const gatewayHost = JSON.parse(gatewayRes?.body)?.url as string ?? DEFAULT_GATEWAY
       const gatewayURL = `${gatewayHost}/?v=${API_VERSION}&encoding=${defaultPacker.encoding}`
       // texts.log(`[discord] URL: ${gatewayURL}`)
@@ -458,7 +459,7 @@ export default class DiscordNetworkAPI {
     this.sendScienceRequest(ScienceEventType.dm_list_viewed)
   }
 
-  private mapMentionsAndEmojis = (text: string, mapMentions: boolean = true): string => {
+  private mapMentionsAndEmojis = (text: string, mapMentions = true): string => {
     const mentionRegex = /@([^#@]{3,32}#[0-9]{4})/gi
     const emojiRegex = /:([a-zA-Z0-9-_]*)(~\d*)?:/gi
 
@@ -1029,11 +1030,11 @@ export default class DiscordNetworkAPI {
   }
 
   private waitForInitialData = async () => {
-    while (!this.gotInitialUserData) await sleep(SLEEP_INTERVAL)
+    while (!this.gotInitialUserData) await sleep(SLEEP_TIME)
   }
 
   private waitUntilReady = async () => {
-    while (!this.ready) await sleep(SLEEP_INTERVAL)
+    while (!this.ready) await sleep(SLEEP_TIME)
   }
 
   private fetch = async ({ url, headers = {}, json, ...rest }: FetchOptions & { url: string, json?: any }): Promise<{ statusCode: number, json?: any }> => {
@@ -1043,7 +1044,7 @@ export default class DiscordNetworkAPI {
         ...rest,
         body: json ? JSON.stringify(json) : rest.body,
         headers: {
-          'User-Agent': texts.constants.USER_AGENT,
+          'User-Agent': USER_AGENT,
           Authorization: this.token,
           ...headers,
         },

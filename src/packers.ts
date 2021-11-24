@@ -22,14 +22,6 @@ export const etfPacker: Packer = {
   unpack: erlpack?.unpack,
 }
 
-const COMPRESS_JSON = false
-function decodeData(data: string | Buffer) {
-  if (typeof data === 'string') return data
-  const buffer = COMPRESS_JSON ? zlib.deflateSync(data) : data
-  const ab = new TextDecoder()
-  return ab.decode(buffer)
-}
-
 export const jsonPacker: Packer = {
   encoding: 'json',
   pack: JSON.stringify,
@@ -39,4 +31,13 @@ export const jsonPacker: Packer = {
   },
 }
 
+const COMPRESS_JSON = false
+function decodeData(data: string | Buffer) {
+  if (typeof data === 'string') return data
+  const buffer = COMPRESS_JSON ? zlib.deflateSync(data) : data
+  const ab = new TextDecoder()
+  return ab.decode(buffer)
+}
+
 export const defaultPacker = erlpack ? etfPacker : jsonPacker
+export const usesErlpack = !!erlpack

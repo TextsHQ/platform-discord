@@ -1,32 +1,8 @@
-import { texts } from '@textshq/platform-sdk'
-import os from 'os'
-import { DISCORD_BUILD_NUMBER } from './constants'
-
-const DISCORD_EPOCH = 1420070400000
-
-// @ts-expect-error bigint notation
-const DISCORD_EPOCH_BI = 1420070400000n
-
-export const SUPER_PROPERTIES = {
-  os: os.platform() === 'darwin' ? 'Mac OS X' : 'Windows',
-  browser: 'Chrome',
-  device: '',
-  system_locale: 'en-US',
-  browser_user_agent: texts.constants.USER_AGENT,
-  browser_version: texts.constants.USER_AGENT.match(/Chrome\/([0-9.]*)/i)[1],
-  os_version: os.release(),
-  referrer: '',
-  referring_domain: '',
-  referrer_current: '',
-  referring_domain_current: '',
-  release_channel: 'stable',
-  client_build_number: DISCORD_BUILD_NUMBER,
-  client_event_source: null,
-}
+import { EPOCH as DISCORD_EPOCH } from './discord-constants'
 
 export const sleep = (timeout: number) => new Promise(resolve => setTimeout(resolve, timeout))
 
-export const getDataURI = (buffer: Buffer, mimeType: string = '') => `data:${mimeType};base64,${buffer.toString('base64')}`
+export const getDataURI = (buffer: Buffer, mimeType = '') => `data:${mimeType};base64,${buffer.toString('base64')}`
 
 export function getTimestampFromSnowflake(snowflake?: string): Date | undefined {
   if (!snowflake) return
