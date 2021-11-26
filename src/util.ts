@@ -1,4 +1,4 @@
-import { EPOCH as DISCORD_EPOCH } from './discord-constants'
+import { EPOCH as DISCORD_EPOCH, EPOCH_BI as DISCORD_EPOCH_BI } from './discord-constants'
 
 export const sleep = (timeout: number) => new Promise(resolve => setTimeout(resolve, timeout))
 
