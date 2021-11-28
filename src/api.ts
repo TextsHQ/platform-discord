@@ -13,7 +13,11 @@ export default class Discord implements PlatformAPI {
 
   init = async (session: string, { accountID }: AccountInfo, prefs: Record<string, Pref>) => {
     this.accountID = accountID
-    if (!session) return
+    if (!session) {
+      texts.error('No session in init()!')
+      return
+    }
+
     await this.api.login(session)
 
     this.api.startPolling = this.startPolling
@@ -40,11 +44,13 @@ export default class Discord implements PlatformAPI {
 
   searchUsers = (typed: string) => {
     const typedLower = typed.toLowerCase()
-    return typed ? this.api.userFriends.filter(u => u.username.toLowerCase().includes(typedLower)) : this.api.userFriends
+    return typedLower ? this.api.userFriends.filter(u => u.username.toLowerCase().includes(typedLower)) : this.api.userFriends
   }
 
-  // TODO: Implement searchMessages
   /* searchMessages = (typed: string, pagination?: PaginationArg, threadID?: string) => {
+    if (!threadID) return { items: [], hasMore: false }
+    const typedLower = typed.toLowerCase()
+    return this.api.searchMessages(typedLower, threadID, pagination)
   } */
 
   getPresence = () => this.api.getUsersPresence()
@@ -96,13 +102,12 @@ export default class Discord implements PlatformAPI {
 
   onResumeFromSleep = async () => {
     texts.log('[discord] Resumed from sleep')
-    await this.api.connect(true)
+    await this.api.connect(true, true)
     if (this.api.lastFocusedThread) this.api.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: this.api.lastFocusedThread }])
   }
 
   startPolling = async () => {
     texts.log(`[discord] Starting polling, interval: ${POLLING_INTERVAL}`)
-
     const action = async (): Promise<boolean> => {
       texts.log('[discord] Polling...')
       try {
@@ -127,7 +132,7 @@ export default class Discord implements PlatformAPI {
     clearInterval(this.pollingInterval)
     this.pollingInterval = null
 
-    await this.api.connect(true)
+    await this.api.connect(true, true)
     if (this.api.lastFocusedThread) this.api.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: this.api.lastFocusedThread }])
   }
 }

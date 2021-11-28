@@ -1,6 +1,6 @@
 import { EPOCH as DISCORD_EPOCH, EPOCH_BI as DISCORD_EPOCH_BI } from './discord-constants'
 
-export const sleep = (timeout: number) => new Promise(resolve => setTimeout(resolve, timeout))
+export const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
 export const getDataURI = (buffer: Buffer, mimeType = '') => `data:${mimeType};base64,${buffer.toString('base64')}`
 

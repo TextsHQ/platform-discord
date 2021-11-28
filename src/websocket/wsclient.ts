@@ -13,15 +13,15 @@ export default class WSClient {
 
   private lastSequenceNumber?: number | undefined
 
-  private resumeConnectionOnConnect = false
+  private heartbeatInterval?: number
 
-  private heartbeatInterval?: NodeJS.Timeout
+  private heartbeatTimer?: NodeJS.Timer
 
-  private constants = {
-    capabilities: 125, // sniffed
-  }
+  private lastHeartbeatAck?: number
 
-  ready: boolean = false
+  ready = false
+
+  resumeOnConnect = false
 
   onMessage?: (opcode: OPCode, data: any, type?: GatewayMessageType) => void
 
@@ -47,13 +47,12 @@ export default class WSClient {
     this.setupHandlers()
   }
 
-  disconnect = () => {
-    if (!this.ws) return
+  disconnect = (code: GatewayCloseCode = GatewayCloseCode.MANUAL_DISCONNECT, cleanup = true) => {
     texts.log('[discord ws] Disconnecting')
     clearInterval(this.heartbeatInterval)
     this.lastSequenceNumber = null
-    this.ws?.close(GatewayCloseCode.MANUAL_DISCONNECT)
-    this.ws = null
+    this.ws?.close(code)
+    if (cleanup) this.ws = null
     this.setReadyState(false)
   }
 
@@ -81,7 +80,7 @@ export default class WSClient {
 
         // case undefined:
         default:
-          // this.resumeConnectionOnConnect = true
+          // this.resumeOnConnect = true
           break
       }
 
@@ -94,7 +93,15 @@ export default class WSClient {
       texts.log('[discord ws] Unexpected response: ' + request, response)
     })
 
-    this.ws.onmessage = this.wsOnMessage
+    this.ws.on('message', data => {
+      try {
+        const unpacked = this.packer.unpack(data)
+        if (unpacked) this.processMessage(unpacked as GatewayMessage)
+      } catch (e) {
+        texts.error('[discord ws] Error unpacking:', e, data)
+        this.onError?.(e)
+      }
+    })
   }
 
   private setReadyState = (ready: boolean) => {
@@ -105,7 +112,6 @@ export default class WSClient {
 
   private processMessage = async (message: GatewayMessage) => {
     this.lastSequenceNumber = message.s
-    // console.log('>', message.op, message.t)
 
     switch (message.op) {
       case OPCode.DISPATCH:
@@ -118,16 +124,21 @@ export default class WSClient {
         break
       case OPCode.HEARTBEAT:
         this.sendHeartbeat()
-        break
-      case OPCode.HELLO:
-        texts.log(`[discord ws] Heartbeat interval: ${message.d.heartbeat_interval}`)
-        this.heartbeatInterval = setInterval(this.sendHeartbeat, message.d.heartbeat_interval)
-        this.setReadyState(true)
+        this.heartbeatTimer?.refresh()
         break
       case OPCode.INVALID_SESSION:
         texts.error('[discord ws] Invalid session')
         this.disconnect()
         await this.connect()
+        break
+      case OPCode.HELLO:
+        texts.log(`[discord ws] Heartbeat interval: ${message.d.heartbeat_interval}`)
+        this.heartbeatInterval = message.d.heartbeat_interval
+        this.heartbeatTimer = setInterval(this.sendHeartbeat, message.d.heartbeat_interval)
+        this.setReadyState(true)
+        break
+      case OPCode.HEARTBEAT_ACK:
+        this.lastHeartbeatAck = Date.now()
         break
       default:
         break
@@ -135,26 +146,25 @@ export default class WSClient {
   }
 
   private wsOnMessage = (event: MessageEvent) => {
-    try {
-      const unpacked = this.packer.unpack(event.data)
-      if (unpacked) this.processMessage(unpacked as GatewayMessage)
-    } catch (e) {
-      texts.error('[discord ws] Error unpacking:', e, event)
-      this.onError?.(e)
-    }
+
   }
 
   private sendHeartbeat = async () => {
-    // texts.log('[discord ws] Sending heartbeat')
     if (this.ws.readyState === this.ws.CONNECTING) return
+
+    if (this.lastHeartbeatAck + (this.heartbeatInterval * 1.1) < Date.now()) {
+      // Connection zombified, terminate & resume
+      this.disconnect(GatewayCloseCode.RECONNECT_REQUESTED)
+      this.resumeOnConnect = true
+      await this.connect()
+    }
+
     const payload: GatewayMessage = { op: OPCode.HEARTBEAT, d: this.lastSequenceNumber }
     await this.send(payload)
   }
 
   private login = async () => {
-    if (this.ready) return
-
-    if (this.resumeConnectionOnConnect) {
+    if (this.resumeOnConnect) {
       const payload: GatewayMessage = {
         op: OPCode.RESUME,
         d: {
@@ -164,7 +174,7 @@ export default class WSClient {
         },
       }
       await this.send(payload)
-      this.resumeConnectionOnConnect = false
+      this.resumeOnConnect = false
     } else {
       const payload: GatewayMessage = {
         op: OPCode.IDENTIFY,
@@ -178,7 +188,7 @@ export default class WSClient {
             afk: false,
           },
           compress: this.packer.encoding === 'etf',
-          capabilities: this.constants.capabilities,
+          capabilities: 125, // sniffed
           client_state: {
             guild_hashes: {},
             highest_last_message_id: '0',

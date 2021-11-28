@@ -99,7 +99,7 @@ export default class DiscordNetworkAPI {
     this.client = null
   }
 
-  connect = async (force = false) => {
+  connect = async (force = false, resume = false) => {
     if (this.client && this.client.ready) {
       if (force) this.client.disconnect()
       else return
@@ -115,6 +115,7 @@ export default class DiscordNetworkAPI {
       this.client = new WSClient(gatewayURL, this.token, defaultPacker)
     }
 
+    this.client.resumeOnConnect = resume
     await this.client.connect()
     this.setupGatewayListeners()
   }
@@ -363,6 +364,15 @@ export default class DiscordNetworkAPI {
     const res = await this.fetch({ url: `channels/${threadID}/messages/${messageID}`, method: 'PATCH', json: { content: text } })
     if (res.statusCode < 200 || res.statusCode > 204) throw Error(getErrorMessage(res))
     return true
+  }
+
+  searchMessages = async (typed: string, threadID: string, pagination?: PaginationArg): Promise<Paginated<Message>> => {
+    await this.waitUntilReady()
+
+    const res = await this.fetch({ url: `channels/${threadID}/messages/search?content=${encodeURIComponent(typed)}`, method: 'GET' })
+    if (res.statusCode < 200 || res.statusCode > 204) throw Error(getErrorMessage(res))
+    const messages: Message[] = await Promise.all(res.json?.messages?.flat().map(m => this.getMessage(m, threadID)))
+    return { items: messages, hasMore: false }
   }
 
   patchChannel = async (channelID: string, patches: { name?: string, icon?: string }) => {

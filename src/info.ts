@@ -47,6 +47,7 @@ const info: PlatformInfo = {
     Attribute.SUPPORTS_REPORT_THREAD,
     Attribute.SUPPORTS_DELETE_THREAD,
     Attribute.SUPPORTS_STOP_TYPING_INDICATOR,
+    // Attribute.SUPPORTS_SEARCH,
     Attribute.SUBSCRIBE_TO_THREAD_SELECTION,
   ]),
   attachments: {
