@@ -158,6 +158,10 @@ const flatCases = [
             replaceWithMedia: {
               mediaType: 'img',
               srcURL: 'https://cdn.discordapp.com/emojis/123.gif',
+              size: {
+                width: 16,
+                height: 16,
+              },
             },
           },
         ],

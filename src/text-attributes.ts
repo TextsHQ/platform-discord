@@ -5,6 +5,12 @@
 
 import type { TextEntity } from '@textshq/platform-sdk'
 
+const TOKENS = {
+  1: ['*', '_', '`', '<'],
+  2: ['**', '__', '~~', '||'],
+  3: ['***', '```'],
+}
+
 const getClosingToken = (token: string): string => (token === '<' ? '>' : token)
 
 // A mention can be
@@ -70,7 +76,7 @@ export function mapTextAttributes(src: string, getUserName: (id: string) => stri
       const closingIndex = findClosingIndex(input, curToken)
       if (closingIndex > 0) {
         // A valid closingIndex is found, it's a valid token!
-        const content = input.slice(0, closingIndex).join('').replace(/^\s+|\s+$/g, '')
+        const content = input.slice(0, closingIndex).join('') // .replace(/^\s+|\s+$/g, '')
         // See if we can find nested entities.
         let nestedAttributes = { text: '', textAttributes: undefined }
         if (!['<', '`', '```'].includes(curToken)) {
@@ -125,6 +131,11 @@ export function mapTextAttributes(src: string, getUserName: (id: string) => stri
           output += content
         }
         switch (curToken) {
+          case '```':
+            // TODO: Check snippet language
+            entity.code = true
+            entity.pre = true
+            break
           case '***':
             entity.bold = true
             entity.italic = true
@@ -135,17 +146,15 @@ export function mapTextAttributes(src: string, getUserName: (id: string) => stri
           case '__':
             entity.underline = true
             break
-          case '*':
-          case '_':
-            entity.italic = true
-            break
           case '~~':
             entity.strikethrough = true
             break
-          case '```':
-            // TODO: Check snippet language
-            entity.code = true
-            entity.pre = true
+          case '||':
+            // TODO: entity.spoiler = true
+            break
+          case '*':
+          case '_':
+            entity.italic = true
             break
           case '`':
             entity.code = true
@@ -166,21 +175,20 @@ export function mapTextAttributes(src: string, getUserName: (id: string) => stri
         curToken = null
       }
     }
+
     // Always start from the first char.
-    const c1 = input[0]
-    const first2 = input.slice(0, 2).join('')
-    const first3 = input.slice(0, 3).join('')
-    if (['***', '```'].includes(first3)) {
-      curToken = first3
-      input = input.slice(curToken.length)
-    } else if (['**', '__', '~~'].includes(first2)) {
-      curToken = first2
-      input = input.slice(curToken.length)
-    } else if (['*', '_', '`', '<'].includes(c1)) {
-      curToken = c1
-      input = input.slice(curToken.length)
+    let token = input.slice(0, 3).join('')
+    if (TOKENS[3].includes(token)) {
+      curToken = token
+      input = input.slice(3)
+    } else if (token = input.slice(0, 2).join(''), TOKENS[2].includes(token)) {
+      curToken = token
+      input = input.slice(2)
+    } else if (token = input[0], TOKENS[1].includes(token)) {
+      curToken = token
+      input = input.slice(1)
     } else {
-      output += c1
+      output += input[0]
       input = input.slice(1)
     }
   }
