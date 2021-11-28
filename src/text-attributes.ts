@@ -150,7 +150,7 @@ export function mapTextAttributes(src: string, getUserName: (id: string) => stri
             entity.strikethrough = true
             break
           case '||':
-            // TODO: entity.spoiler = true
+            entity.spoiler = true
             break
           case '*':
           case '_':
