@@ -203,8 +203,6 @@ export default class WSClient {
   }
 
   private send = async (payload: GatewayMessage) => {
-    // console.log('<', payload)
-
     if (!this.ws) return
     while (this.ws.readyState === WebSocket.CONNECTING) await sleep(25)
     const packed = this.packer.pack(payload)
