@@ -1,4 +1,4 @@
-import { CurrentUser, Message, MessageActionType, MessageAttachment, MessageAttachmentType, MessageLink, MessageReaction, TextEntity, Thread, ThreadType, User, PartialWithID, UserPresence, Tweet } from '@textshq/platform-sdk'
+import { CurrentUser, Message, MessageActionType, MessageAttachment, MessageAttachmentType, MessageLink, MessageReaction, TextEntity, Thread, ThreadType, User, PartialWithID, UserPresence, Tweet, texts } from '@textshq/platform-sdk'
 import { APIUser, APIChannel, APIMessage, APIEmbed, EmbedType, MessageActivityType, APIAttachment, MessageType, APISticker, GatewayPresenceUpdateData, PresenceUpdateStatus } from 'discord-api-types/v9'
 import type { DiscordMessage, DiscordReactionDetails } from './types'
 import { IGNORED_MESSAGE_TYPES, StickerFormat, SUPPORTED_EMBED_TYPES, THREAD_TYPES } from './constants'
@@ -445,15 +445,15 @@ function mapMessageEmbeds(message: DiscordMessage): Partial<Message> {
 
   // TODO: Article embed (shows up as unknown)
   const handleArticleEmbed = (embed: APIEmbed) => {
-    console.log(embed)
+    texts.log(embed)
   }
 
   const handleGifvEmbed = (embed: APIEmbed) => {
-    console.log(embed)
+    texts.log(embed)
   }
 
   const handleImageEmbed = (embed: APIEmbed) => {
-    console.log(embed)
+    texts.log(embed)
   }
 
   const handleLinkEmbed = (embed: APIEmbed) => {
@@ -494,7 +494,7 @@ function mapMessageEmbeds(message: DiscordMessage): Partial<Message> {
   }
 
   const handleVideoEmbed = (embed: APIEmbed) => {
-    console.log(embed)
+    texts.log(embed)
   }
 
   message.embeds.forEach(embed => {
@@ -528,11 +528,11 @@ function mapMessageEmbeds(message: DiscordMessage): Partial<Message> {
 
   switch (message.activity?.type) {
     case MessageActivityType.Join: {
-      console.log(message.activity)
+      texts.log(message.activity)
       break
     }
     case MessageActivityType.JoinRequest: {
-      console.log(message.activity)
+      texts.log(message.activity)
       break
     }
     case MessageActivityType.Listen: {
@@ -544,7 +544,7 @@ function mapMessageEmbeds(message: DiscordMessage): Partial<Message> {
       break
     }
     case MessageActivityType.Spectate: {
-      console.log(message.activity)
+      texts.log(message.activity)
       break
     }
   }
