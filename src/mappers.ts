@@ -82,7 +82,7 @@ export function mapChannel(channel: APIChannel, isMuted: Boolean, guildName?: st
     type: 'channel', // 'channel' | 'broadcast'
     // createdAt: guildJoinDate,
     description: channel.topic ?? undefined,
-    timestamp: channel.last_message_id ? getTimestampFromSnowflake(channel.last_message_id) : undefined,
+    timestamp: getTimestampFromSnowflake(channel.last_message_id),
     messages: {
       items: [],
       hasMore: true,
@@ -218,7 +218,6 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
     const [,, domain, path] = urlRegex.exec(embed.url) ?? []
     switch (domain?.toLowerCase()) {
       case 'twitter.com': {
-        // TODO: Discord treats tweet images as multiple embeds with images
         const [user,, tweetID] = path.split('/')
         if (tweetID) {
           const tweet: Tweet = {
@@ -246,13 +245,62 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
         }
         break
       }
+      default: {
+        let text = message.content
+        if (embed.title) text += `\n**${embed.title}**\n`
+        if (embed.description) text += `\n${embed.description}`
+        if (embed.fields?.length > 0) {
+          const fields = embed.fields.map(f => `**${f.name}**\n${f.value}`)
+          text += '\n\n' + fields.join('\n\n')
+        }
+        final.text = text.trim()
+
+        if (embed.url) {
+          const link: MessageLink = {
+            url: embed.url,
+            title: embed.title,
+          }
+          final.links.push(link)
+        }
+
+        const image = embed.image ?? embed.thumbnail
+        if (image) {
+          const attachment: MessageAttachment = {
+            id: image.url,
+            type: MessageAttachmentType.IMG,
+            srcURL: image.url,
+            size: image.width && image.height ? { width: image.width, height: image.height } : undefined,
+          }
+          final.attachments.push(attachment)
+        }
+        break
+      }
     }
   }
 
   const handleVideoEmbed = (embed: APIEmbed) => {
-    texts.log(embed)
+    if (embed.provider?.name.toLowerCase() === 'youtube') {
+      const link: MessageLink = {
+        url: embed.url,
+        img: embed.thumbnail?.url,
+        imgSize: embed.thumbnail?.width && embed.thumbnail?.height ? { width: embed.thumbnail.width, height: embed.thumbnail.height } : undefined,
+        title: embed.title,
+        summary: embed.description,
+      }
+      final.links.push(link)
+    } else {
+      const attachment: MessageAttachment = {
+        id: embed.url,
+        type: MessageAttachmentType.VIDEO,
+        mimeType: mapMimeType(embed.video.url),
+        srcURL: embed.video.url,
+        size: { width: embed.video.width, height: embed.video.height },
+      }
+      final.attachments.push(attachment)
+    }
   }
 
+  // TODO: Reduce embeds by id/url (tweet images are treated as multiple embeds with images)
   message.embeds?.forEach(embed => {
     switch (embed.type) {
       case EmbedType.Article: {
@@ -305,7 +353,6 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
     }
   }
 
-  // TODO: Switch to message.sticker_items
   const stickers: MessageAttachment[] = [...(message.stickers || []), ...(message.sticker_items || [])]?.map(sticker => {
     const ext = {
       [StickerFormat.PNG]: 'png',
@@ -322,7 +369,7 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
       size: { width: 160, height: 160 },
     }
   })
-  const attachments = (message.attachments as APIAttachment[])?.map(a => {
+  const attachments = (message.attachments as APIAttachment[] ?? []).map(a => {
     // TODO: Improve it
     const lowercased = (a.filename || a.url).toLowerCase()
     let type = MessageAttachmentType.UNKNOWN
@@ -356,8 +403,11 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
     }
   })
 
-  final.attachments = final.attachments.concat(attachments).concat(stickers).filter(Boolean)
+  final.attachments = [...final.attachments, ...attachments, ...stickers].filter(Boolean)
   final.tweets = uniqBy(final.tweets, 'id')
+
+  // const urls = [...final.tweets?.map(t => t.url), ...final.attachments?.map(a => a.id), ...final.links?.map(l => l.url)]
+  // if (urls.length === 1 && urls[0] === message.content) final.text = ''
 
   return final
 }
