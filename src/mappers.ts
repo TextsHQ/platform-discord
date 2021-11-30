@@ -220,6 +220,25 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
       case 'twitter.com': {
         const [user,, tweetID] = path.split('/')
         if (tweetID) {
+          // Tweet URL
+          /*
+              Discord treats every tweet image as standalone rich embed.
+              We're searching for all of them later, so discard every standalone rich embed with only image/video.
+          */
+          if ((embed.image || embed.video) && !(embed.title || embed.description || embed.footer || embed.color)) return
+
+          const images = [embed.image, ...(message.embeds?.filter(e => e.url === embed.url && (e.image || e.video) && !e.timestamp).map(e => e.image))].filter(Boolean).map(image => ({
+            id: image.url,
+            srcURL: image.url,
+            type: MessageAttachmentType.IMG,
+            size: image?.width && image?.height ? { width: image.width, height: image.height } : undefined,
+          }))
+          const video = embed.video ? {
+            id: embed.video.url,
+            srcURL: embed.thumbnail.url,
+            type: MessageAttachmentType.IMG,
+            size: embed.thumbnail?.width && embed.thumbnail?.height ? { width: embed.thumbnail.width, height: embed.thumbnail.height } : undefined,
+          } : undefined
           const tweet: Tweet = {
             id: tweetID,
             user: {
@@ -230,9 +249,11 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
             text: embed.description,
             timestamp: embed.timestamp ? new Date(embed.timestamp) : undefined,
             url: embed.url,
+            attachments: [...images, video].filter(Boolean),
           }
           final.tweets.push(tweet)
         } else {
+          // general Twitter URL
           const image = embed.image ?? embed.thumbnail
           const link: MessageLink = {
             url: embed.url,
@@ -300,7 +321,6 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
     }
   }
 
-  // TODO: Reduce embeds by id/url (tweet images are treated as multiple embeds with images)
   message.embeds?.forEach(embed => {
     switch (embed.type) {
       case EmbedType.Article: {
@@ -393,7 +413,6 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
       id: a.id,
       type,
       isGif,
-      // isSticker?: boolean,
       isVoiceNote,
       size: a.width && a.height ? { width: a.width, height: a.height } : undefined,
       srcURL: a.url,
@@ -405,9 +424,14 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
 
   final.attachments = [...final.attachments, ...attachments, ...stickers].filter(Boolean)
   final.tweets = uniqBy(final.tweets, 'id')
+  if (final.tweets?.length > 0) {
+    // TODO: Check if this works every time (can there be a tweet & attachment/link?)
+    final.attachments = undefined
+    final.links = undefined
+  }
 
-  // const urls = [...final.tweets?.map(t => t.url), ...final.attachments?.map(a => a.id), ...final.links?.map(l => l.url)]
-  // if (urls.length === 1 && urls[0] === message.content) final.text = ''
+  const attachmentURLs = final.attachments?.map(a => a.id)
+  if (attachmentURLs?.length === 1 && attachmentURLs[0] === message.content) final.text = ''
 
   return final
 }
