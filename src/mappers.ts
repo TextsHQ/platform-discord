@@ -1,4 +1,4 @@
-import { CurrentUser, Message, MessageActionType, MessageAttachment, MessageAttachmentType, MessageLink, MessageReaction, TextEntity, Thread, ThreadType, User, PartialWithID, UserPresence } from '@textshq/platform-sdk'
+import { CurrentUser, Message, MessageActionType, MessageAttachment, MessageAttachmentType, MessageLink, MessageReaction, TextEntity, Thread, ThreadType, User, PartialWithID, UserPresence, Tweet } from '@textshq/platform-sdk'
 import { APIUser, APIChannel, APIMessage, APIEmbed, EmbedType, MessageActivityType, APIAttachment, MessageType, APISticker, GatewayPresenceUpdateData, PresenceUpdateStatus } from 'discord-api-types/v9'
 import type { DiscordMessage, DiscordReactionDetails } from './types'
 import { IGNORED_MESSAGE_TYPES, StickerFormat, SUPPORTED_EMBED_TYPES, THREAD_TYPES } from './constants'
@@ -204,37 +204,13 @@ function mapAttachments(message: APIMessage) {
   ].filter(Boolean)
 }
 
-const mapMessageLinks = (message: DiscordMessage) => {
-  const links: MessageLink[] = message.embeds
-    ?.filter(e => SUPPORTED_EMBED_TYPES.has(e.type))
-    .filter(e => e.url)
-    .map(e => {
-      return {
-        url: e.url,
-        img: e.thumbnail?.url || e.image?.url,
-        imgSize: { width: e.thumbnail?.width || e.image?.width, height: e.thumbnail?.height || e.image?.height },
-        title: e.title || e.author?.name || e.url!,
-        summary: e.description || undefined,
-      }
-    })
-
-  if (message.activity?.type === MessageActivityType.Listen) {
-    const spotifyLink: MessageLink = {
-      url: message.activity.party_id,
-      title: `Spotify - Listen together with ${message.author.username}`,
-    }
-    links.push(spotifyLink)
-  }
-  return links
-}
-
 export function mapMessage(message: DiscordMessage, currentUserID: string, reactionsDetails?: DiscordReactionDetails[]): Message | PartialWithID<Message> | undefined {
   if (IGNORED_MESSAGE_TYPES.has(message.type)) return
   // eslint-disable-next-line no-param-reassign
   else if (message.type === MessageType.ThreadStarterMessage) message = message.referenced_message
 
   const attachments = mapAttachments(message)
-  const links = mapMessageLinks(message)
+  const embeds = mapMessageEmbeds(message)
 
   const reactions = reactionsDetails?.flatMap<MessageReaction>(r => r.users.map(u => mapReaction(r, u.id)))
 
@@ -255,9 +231,7 @@ export function mapMessage(message: DiscordMessage, currentUserID: string, react
   if (message.edited_timestamp) mapped.editedTimestamp = new Date(message.edited_timestamp)
   if (reactions) mapped.reactions = reactions
   if (attachments?.length > 0) mapped.attachments = attachments
-  if (links?.length > 0) mapped.links = links
-  if (message.embeds?.find(e => e.type === EmbedType.Rich)) Object.assign(mapped, mapRichEmbeds(message))
-
+  Object.assign(mapped, mapMessageEmbeds(message))
   Object.assign(mapped, mapMessageType(message as DiscordMessage))
 
   if (mapped.text?.length > 0) {
@@ -393,8 +367,10 @@ function mapMessageType(message: DiscordMessage): Partial<Message> {
   }
 }
 
-function mapRichEmbeds(message: APIMessage): Partial<Message> {
+/* function mapRichEmbeds(message: APIMessage): Partial<Message> {
   type EmbedObject = { entity: TextEntity, text: string }
+
+  console.log(message.embeds)
 
   // TODO: Test more rich embeds
   // TODO: Add support for `timestamp`, `color`, `footer`, `author` and `provider`
@@ -456,6 +432,121 @@ function mapRichEmbeds(message: APIMessage): Partial<Message> {
       srcURL: media.url,
       size: { width: media.width, height: media.height },
     }]
+  }
+
+  return final
+} */
+
+function mapMessageEmbeds(message: DiscordMessage): Partial<Message> {
+  const final: Partial<Message> = {
+    tweets: [],
+    links: [],
+  }
+
+  // TODO: Article embed (shows up as unknown)
+  const handleArticleEmbed = (embed: APIEmbed) => {
+    console.log(embed)
+  }
+
+  const handleGifvEmbed = (embed: APIEmbed) => {
+    console.log(embed)
+  }
+
+  const handleImageEmbed = (embed: APIEmbed) => {
+    console.log(embed)
+  }
+
+  const handleLinkEmbed = (embed: APIEmbed) => {
+    const imgWidth = embed.thumbnail?.width ?? embed.image?.width
+    const imgHeight = embed.thumbnail?.height ?? embed.image?.height
+    const link: MessageLink = {
+      url: embed.url,
+      img: embed.thumbnail?.url || embed.image?.url,
+      imgSize: imgWidth && imgHeight ? { width: imgWidth, height: imgHeight } : undefined,
+      title: embed.title || embed.author?.name,
+      summary: embed.description || undefined,
+    }
+    final.links.push(link)
+  }
+
+  const urlRegex = /https?:\/\/(www\.)?([-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6})\b\/([-a-zA-Z0-9()!@:%_+.~#?&/=]*)/gi
+  const handleRichEmbed = (embed: APIEmbed) => {
+    const [,, domain, path] = urlRegex.exec(embed.url)
+    switch (domain.toLowerCase()) {
+      case 'twitter.com': {
+        const [user,, tweetID] = path.split('/')
+        if (!tweetID) return
+        const tweet: Tweet = {
+          id: tweetID,
+          user: {
+            imgURL: embed.author?.icon_url,
+            name: user,
+            username: embed.author?.name,
+          },
+          text: embed.description,
+          timestamp: new Date(embed.timestamp),
+          url: embed.url,
+        }
+        final.tweets.push(tweet)
+        break
+      }
+    }
+  }
+
+  const handleVideoEmbed = (embed: APIEmbed) => {
+    console.log(embed)
+  }
+
+  message.embeds.forEach(embed => {
+    switch (embed.type) {
+      case EmbedType.Article: {
+        handleArticleEmbed(embed)
+        break
+      }
+      case EmbedType.GIFV: {
+        handleGifvEmbed(embed)
+        break
+      }
+      case EmbedType.Image: {
+        handleImageEmbed(embed)
+        break
+      }
+      case EmbedType.Link: {
+        handleLinkEmbed(embed)
+        break
+      }
+      case EmbedType.Rich: {
+        handleRichEmbed(embed)
+        break
+      }
+      case EmbedType.Video: {
+        handleVideoEmbed(embed)
+        break
+      }
+    }
+  })
+
+  switch (message.activity?.type) {
+    case MessageActivityType.Join: {
+      console.log(message.activity)
+      break
+    }
+    case MessageActivityType.JoinRequest: {
+      console.log(message.activity)
+      break
+    }
+    case MessageActivityType.Listen: {
+      const link: MessageLink = {
+        url: message.activity.party_id,
+        title: `Spotify - Listen together with ${message.author.username}`,
+      }
+      final.links.push(link)
+      break
+    }
+    case MessageActivityType.Spectate: {
+      console.log(message.activity)
+      break
+    }
   }
 
   return final

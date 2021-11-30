@@ -150,7 +150,7 @@ export default class WSClient {
   }
 
   private sendHeartbeat = async () => {
-    if (this.ws.readyState === this.ws.CONNECTING) return
+    if (!this.ws || this.ws?.readyState === WebSocket.CONNECTING) return
 
     if (this.lastHeartbeatAck + (this.heartbeatInterval * 1.1) < Date.now()) {
       // Connection zombified, terminate & resume
