@@ -15,8 +15,8 @@ const getThreadIcon = (threadID: string, iconID: string) =>
 /* const getGuildIcon = (guildID: string, iconID: string) =>
   `https://cdn.discordapp.com/icons/${guildID}/${iconID}.png` */
 
-const getLottieStickerURL = (id: string, asset: string) =>
-  (asset ? `https://discord.com/stickers/${id}/${asset}.json` : `https://discord.com/stickers/${id}.json`)
+const getLottieStickerURL = (id: string) =>
+  `https://discord.com/stickers/${id}.json`
 
 // adding &passthrough=false makes it a regular png instead of apng
 const getPNGStickerURL = (id: string) =>
@@ -306,7 +306,7 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
   }
 
   // TODO: Switch to message.sticker_items
-  const stickers: MessageAttachment[] = (message.stickers)?.map(sticker => {
+  const stickers: MessageAttachment[] = [...(message.stickers || []), ...(message.sticker_items || [])]?.map(sticker => {
     const ext = {
       [StickerFormat.PNG]: 'png',
       [StickerFormat.APNG]: 'png',
@@ -317,7 +317,7 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
       type: MessageAttachmentType.IMG,
       mimeType: ext === 'json' ? 'image/lottie' : `image/${ext}`,
       isSticker: true,
-      srcURL: ext === 'json' ? getLottieStickerURL(sticker.id, sticker.asset) : getPNGStickerURL(sticker.id),
+      srcURL: ext === 'json' ? getLottieStickerURL(sticker.id) : getPNGStickerURL(sticker.id),
       fileName: sticker.name,
       size: { width: 160, height: 160 },
     }
