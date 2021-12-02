@@ -179,7 +179,7 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
   const handleGifvEmbed = (embed: APIEmbed) => {
     const attachment: MessageAttachment = {
       id: embed.url,
-      type: MessageAttachmentType.VIDEO,
+      type: MessageAttachmentType.IMG,
       mimeType: mapMimeType(embed.video.url),
       isGif: true,
       srcURL: embed.video.url,
@@ -189,14 +189,14 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
   }
 
   const handleImageEmbed = (embed: APIEmbed) => {
-    const isGif = embed.thumbnail.url.toLowerCase().endsWith('.gif')
+    const image = embed.image ?? embed.thumbnail
     const attachment: MessageAttachment = {
       id: embed.url,
-      type: isGif ? MessageAttachmentType.VIDEO : MessageAttachmentType.IMG,
-      mimeType: mapMimeType(embed.thumbnail.url),
-      isGif,
-      srcURL: embed.thumbnail.url,
-      size: { width: embed.thumbnail.width, height: embed.thumbnail.height },
+      type: MessageAttachmentType.IMG,
+      mimeType: mapMimeType(image.url),
+      isGif: image.url.toLowerCase().endsWith('.gif'),
+      srcURL: image.proxy_url ?? image.url,
+      size: { width: image.width, height: image.height },
     }
     final.attachments.push(attachment)
   }
@@ -229,7 +229,7 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
 
           const images = [embed.image, ...(message.embeds?.filter(e => e.url === embed.url && (e.image || e.video) && !e.timestamp).map(e => e.image))].filter(Boolean).map(image => ({
             id: image.url,
-            srcURL: image.url,
+            srcURL: image.proxy_url ?? image.url,
             type: MessageAttachmentType.IMG,
             size: image?.width && image?.height ? { width: image.width, height: image.height } : undefined,
           }))
@@ -257,7 +257,7 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
           const image = embed.image ?? embed.thumbnail
           const link: MessageLink = {
             url: embed.url,
-            img: image?.url,
+            img: image?.proxy_url ?? image?.url,
             imgSize: image?.width && image?.height ? { width: image.width, height: image.height } : undefined,
             title: embed.title,
             summary: embed.description,
@@ -390,36 +390,47 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
     }
   })
   const attachments = (message.attachments as APIAttachment[] ?? []).map(a => {
-    // TODO: Improve it
-    const lowercased = (a.filename || a.url).toLowerCase()
-    let type = MessageAttachmentType.UNKNOWN
-
-    let isGif = false
-    let isVoiceNote = false
-
-    if (lowercased.endsWith('.png') || lowercased.endsWith('.jpg') || lowercased.endsWith('.jpeg')) {
-      type = MessageAttachmentType.IMG
-    } else if (lowercased.endsWith('.gif') || lowercased.endsWith('.gifv')) {
-      type = MessageAttachmentType.IMG
-      isGif = true
-    } else if (lowercased.endsWith('.mp4') || lowercased.endsWith('.mov') || lowercased.endsWith('.webm')) {
-      type = MessageAttachmentType.VIDEO
-    } else if (lowercased.endsWith('.mp3') || lowercased.endsWith('.flac') || lowercased.endsWith('.wav') || lowercased.endsWith('.ogg')) {
-      type = MessageAttachmentType.AUDIO
-      isVoiceNote = true
-    }
-
-    return {
+    const attachment: MessageAttachment = {
       id: a.id,
-      type,
-      isGif,
-      isVoiceNote,
+      type: MessageAttachmentType.UNKNOWN,
+      isGif: false,
+      isVoiceNote: false,
       size: a.width && a.height ? { width: a.width, height: a.height } : undefined,
       srcURL: a.url,
       posterImg: a.proxy_url,
       fileName: a.filename || undefined,
       fileSize: a.size || undefined,
     }
+    const extension = (a.filename || a.url).toLowerCase().split('.').pop()
+
+    // TODO: Improve this
+    switch (extension) {
+      case 'png':
+      case 'jpg':
+      case 'jpeg':
+      case 'webp':
+        attachment.type = MessageAttachmentType.IMG
+        break
+      case 'gif':
+      case 'gifv':
+        attachment.type = MessageAttachmentType.IMG
+        attachment.isGif = true
+        break
+      case 'mp4':
+      case 'mov':
+      case 'webm':
+        attachment.type = MessageAttachmentType.VIDEO
+        break
+      case 'mp3':
+      case 'flac':
+      case 'wav':
+      case 'ogg':
+        attachment.type = MessageAttachmentType.AUDIO
+        attachment.isVoiceNote = true
+        break
+    }
+
+    return attachment
   })
 
   final.attachments = [...final.attachments, ...attachments, ...stickers].filter(Boolean)
