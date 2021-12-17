@@ -6,5 +6,6 @@ rules:
   prefer-destructuring: off
   no-nested-ternary: off
   no-else-return: off
+  no-param-reassign: off
 parserOptions:
   project: ./tsconfig.json

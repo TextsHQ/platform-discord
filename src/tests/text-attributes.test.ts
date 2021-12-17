@@ -248,10 +248,8 @@ const nestedCases = [
 
 const cases = [flatCases, nestedCases].flat()
 
-const getUserName = (id: string): string => {
-  return {
-    1234: 'user1',
-  }[id]
+const getUserName = (id: string): string | undefined => {
+  return { 1234: 'user1' }[id]
 }
 
 test('text attributes', () => {

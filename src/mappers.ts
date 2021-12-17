@@ -22,7 +22,7 @@ const getLottieStickerURL = (id: string) =>
 const getPNGStickerURL = (id: string) =>
   `https://media.discordapp.net/stickers/${id}.png?size=512`
 
-export const getEmojiURL = (emojiID: string, animated: boolean) =>
+export const getEmojiURL = (emojiID: string, animated?: boolean) =>
   `https://cdn.discordapp.com/emojis/${emojiID}.${animated ? 'gif' : 'png'}`
 
 export const parseTweetURL = (url: string): { username: string, tweetID: string } | undefined => {
@@ -44,7 +44,7 @@ export const mapReaction = (reaction: DiscordReactionDetails, participantID: str
 }
 
 export const mapPresence = (userID: string, presence: GatewayPresenceUpdateData): UserPresence => {
-  const activity = presence.activities?.length > 0 ? presence.activities[0] as any : undefined
+  const activity = presence.activities?.length > 0 ? presence.activities?.[0] as any : undefined
   return {
     userID,
     isActive: presence.status !== PresenceUpdateStatus.Invisible && presence.status !== PresenceUpdateStatus.Offline,
@@ -82,7 +82,7 @@ export function mapChannel(channel: APIChannel, isMuted: Boolean, guildName?: st
     type: 'channel', // 'channel' | 'broadcast'
     // createdAt: guildJoinDate,
     description: channel.topic ?? undefined,
-    timestamp: getTimestampFromSnowflake(channel.last_message_id),
+    timestamp: getTimestampFromSnowflake(channel.last_message_id ?? undefined),
     messages: {
       items: [],
       hasMore: true,
@@ -95,21 +95,22 @@ export function mapChannel(channel: APIChannel, isMuted: Boolean, guildName?: st
 }
 
 export function mapThread(thread: APIChannel, lastReadMessageID?: string, currentUser?: User): Thread {
-  const type: ThreadType = THREAD_TYPES[thread.type]
+  const type: ThreadType | undefined = THREAD_TYPES[thread.type]
 
   const participants: User[] = thread.recipients?.map(mapUser) ?? []
   participants.sort((a, b) => ((a.username ?? '') < (b.username ?? '') ? 1 : -1))
   if (currentUser) participants.push(currentUser)
 
-  const timestamp = getTimestampFromSnowflake(thread.last_message_id)
+  const timestamp = getTimestampFromSnowflake(thread.last_message_id ?? undefined)
   const lastMessageTimestamp = getTimestampFromSnowflake(lastReadMessageID)
 
   return {
     _original: JSON.stringify(thread),
     id: thread.id,
     title: thread.name,
-    isUnread: timestamp > lastMessageTimestamp,
+    isUnread: (timestamp ?? 0) > (lastMessageTimestamp ?? 0),
     isReadOnly: thread.recipients?.[0]?.system ?? false,
+    // @ts-expect-error
     type,
     imgURL: thread.icon ? getThreadIcon(thread.id, thread.icon) : undefined,
     description: thread.topic ?? undefined,
@@ -122,15 +123,17 @@ export function mapThread(thread: APIChannel, lastReadMessageID?: string, curren
       hasMore: false,
       items: participants,
     },
+    extra: {
+      lastMessageID: thread.last_message_id,
+    },
   }
 }
 
-export function mapMessage(message: DiscordMessage, currentUserID: string, reactionsDetails?: DiscordReactionDetails[]): Message | PartialWithID<Message> | undefined {
+export function mapMessage(message: DiscordMessage, currentUserID?: string, reactionsDetails?: (DiscordReactionDetails | undefined)[]): Message | PartialWithID<Message> | undefined {
   if (IGNORED_MESSAGE_TYPES.has(message.type)) return
-  // eslint-disable-next-line no-param-reassign
   else if (message.type === MessageType.ThreadStarterMessage && message.referenced_message) message = message.referenced_message
 
-  const reactions = reactionsDetails?.flatMap<MessageReaction>(r => r.users.map(u => mapReaction(r, u.id)))
+  const reactions: MessageReaction[] | undefined = reactionsDetails?.flatMap<MessageReaction | undefined>(r => r?.users.map(u => mapReaction(r, u.id))).filter(Boolean) as (MessageReaction[] | undefined)
 
   const mapped: PartialWithID<Message> = {
     _original: JSON.stringify(message),
@@ -154,6 +157,7 @@ export function mapMessage(message: DiscordMessage, currentUserID: string, react
 
   if (mapped.text && mapped.text.length > 0) {
     const getUserName = (id: string): string => message.mentions.find(m => m.id === id)?.username || id
+    // @ts-expect-error
     const { text, textAttributes } = mapTextAttributes(mapped.text, getUserName)
     if (text && textAttributes) {
       mapped.text = text
@@ -185,7 +189,7 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
       srcURL: embed.video.url,
       size: { width: embed.video.width, height: embed.video.height },
     }
-    final.attachments.push(attachment)
+    final.attachments!.push(attachment)
   }
 
   const handleImageEmbed = (embed: APIEmbed) => {
@@ -198,7 +202,7 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
       srcURL: image.proxy_url ?? image.url,
       size: { width: image.width, height: image.height },
     }
-    final.attachments.push(attachment)
+    final.attachments!.push(attachment)
   }
 
   const handleLinkEmbed = (embed: APIEmbed) => {
@@ -210,7 +214,7 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
       title: embed.title || embed.author?.name,
       summary: embed.description || undefined,
     }
-    final.links.push(link)
+    final.links!.push(link)
   }
 
   const urlRegex = /https?:\/\/(www\.)?([-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6})\b\/([-a-zA-Z0-9()!@:%_+.~#?&/=]*)/gi
@@ -251,7 +255,7 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
             url: embed.url,
             attachments: [...images, video].filter(Boolean),
           }
-          final.tweets.push(tweet)
+          final.tweets!.push(tweet)
         } else {
           // general Twitter URL
           const image = embed.image ?? embed.thumbnail
@@ -262,7 +266,7 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
             title: embed.title,
             summary: embed.description,
           }
-          final.links.push(link)
+          final.links!.push(link)
         }
         break
       }
@@ -270,7 +274,7 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
         let text = message.content
         if (embed.title) text += `\n**${embed.title}**\n`
         if (embed.description) text += `\n${embed.description}`
-        if (embed.fields?.length > 0) {
+        if (embed.fields && embed.fields.length > 0) {
           const fields = embed.fields.map(f => `**${f.name}**\n${f.value}`)
           text += '\n\n' + fields.join('\n\n')
         }
@@ -281,7 +285,7 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
             url: embed.url,
             title: embed.title,
           }
-          final.links.push(link)
+          final.links!.push(link)
         }
 
         const image = embed.image ?? embed.thumbnail
@@ -292,7 +296,7 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
             srcURL: image.url,
             size: image.width && image.height ? { width: image.width, height: image.height } : undefined,
           }
-          final.attachments.push(attachment)
+          final.attachments!.push(attachment)
         }
         break
       }
@@ -300,7 +304,7 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
   }
 
   const handleVideoEmbed = (embed: APIEmbed) => {
-    if (embed.provider?.name.toLowerCase() === 'youtube') {
+    if (embed.provider?.name?.toLowerCase() === 'youtube') {
       const link: MessageLink = {
         url: embed.url,
         img: embed.thumbnail?.url,
@@ -308,7 +312,7 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
         title: embed.title,
         summary: embed.description,
       }
-      final.links.push(link)
+      final.links!.push(link)
     } else {
       const attachment: MessageAttachment = {
         id: embed.url,
@@ -317,7 +321,7 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
         srcURL: embed.video.url,
         size: { width: embed.video.width, height: embed.video.height },
       }
-      final.attachments.push(attachment)
+      final.attachments!.push(attachment)
     }
   }
 
@@ -364,7 +368,7 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
         url: message.activity.party_id,
         title: `Listen together with ${message.author.username}`,
       }
-      final.links.push(link)
+      final.links!.push(link)
       break
     }
     case MessageActivityType.Spectate: {
@@ -433,7 +437,7 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
     return attachment
   })
 
-  final.attachments = [...final.attachments, ...attachments, ...stickers].filter(Boolean)
+  final.attachments = [...final.attachments!, ...attachments, ...stickers].filter(Boolean)
   final.tweets = uniqBy(final.tweets, 'id')
   if (final.tweets?.length > 0) {
     // TODO: Check if this works every time (can there be a tweet & attachment/link?)
@@ -447,7 +451,7 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
   return final
 }
 
-function mapMessageType(message: DiscordMessage): Partial<Message> {
+function mapMessageType(message: DiscordMessage): Partial<Message> | undefined {
   switch (message.type) {
     case MessageType.RecipientAdd: {
       return {
@@ -457,7 +461,7 @@ function mapMessageType(message: DiscordMessage): Partial<Message> {
         action: {
           type: MessageActionType.THREAD_PARTICIPANTS_REMOVED,
           participantIDs: message.mentions.map(m => m.id),
-          actorParticipantID: null,
+          actorParticipantID: message.author.id,
         },
       }
     }
@@ -470,7 +474,7 @@ function mapMessageType(message: DiscordMessage): Partial<Message> {
         action: {
           type: MessageActionType.THREAD_PARTICIPANTS_REMOVED,
           participantIDs: message.mentions.map(m => m.id),
-          actorParticipantID: null,
+          actorParticipantID: message.author.id,
         },
       }
     }
@@ -506,7 +510,7 @@ function mapMessageType(message: DiscordMessage): Partial<Message> {
         action: {
           type: MessageActionType.THREAD_TITLE_UPDATED,
           title: message.content,
-          actorParticipantID: null,
+          actorParticipantID: message.author.id,
         },
       }
     }
@@ -518,7 +522,7 @@ function mapMessageType(message: DiscordMessage): Partial<Message> {
         text: `{{${message.author.id}}} updated group icon`,
         action: {
           type: MessageActionType.THREAD_IMG_CHANGED,
-          actorParticipantID: null,
+          actorParticipantID: message.author.id,
         },
       }
     }
@@ -527,7 +531,7 @@ function mapMessageType(message: DiscordMessage): Partial<Message> {
       return {
         isAction: true,
         parseTemplate: true,
-        linkedMessageID: message.message_reference.message_id,
+        linkedMessageID: message.message_reference?.message_id,
         text: `{{${message.author.id}}} pinned a message`,
       }
     }
@@ -540,13 +544,13 @@ function mapMessageType(message: DiscordMessage): Partial<Message> {
         action: {
           type: MessageActionType.THREAD_PARTICIPANTS_ADDED,
           participantIDs: [message.author.id],
-          actorParticipantID: null,
+          actorParticipantID: message.author.id,
         },
       }
     }
 
     default: {
-      break
+      return undefined
     }
   }
 }

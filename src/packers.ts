@@ -12,25 +12,25 @@ try {
 export type Packer = {
   encoding: string
   pack: (data: any) => any
-  unpack: (data: WSData) => any
+  unpack: (data: any) => any
 }
 
-export const etfPacker: Packer = {
+const etfPacker: Packer = {
   encoding: 'etf',
-  pack: erlpack?.pack,
-  unpack: erlpack?.unpack,
+  pack: erlpack!.pack,
+  unpack: erlpack!.unpack,
 }
 
 const COMPRESS_JSON = false
-export const jsonPacker: Packer = {
+const jsonPacker: Packer = {
   encoding: 'json',
   pack: JSON.stringify,
-  unpack: (data: string | Buffer) => {
+  unpack: (data: WSData) => {
     // const str = decodeData(data)
     if (typeof data === 'string') return data
-    const buffer = COMPRESS_JSON ? zlib.deflateSync(data) : data
+    const buffer = COMPRESS_JSON ? zlib.deflateSync(data as zlib.InputType) : data
     const ab = new TextDecoder()
-    return JSON.parse(ab.decode(buffer))
+    return JSON.parse(ab.decode(buffer as BufferSource))
   },
 }
 

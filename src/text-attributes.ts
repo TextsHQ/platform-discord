@@ -62,12 +62,12 @@ const findClosingIndex = (input: string[], curToken: string) => {
   return closingIndex
 }
 
-export function mapTextAttributes(src: string, getUserName: (id: string) => string) {
+export function mapTextAttributes(src: string, getUserName: (id: string) => string | undefined) {
   if (!src) return
 
   const entities: TextEntity[] = []
   let output = ''
-  let curToken: string = null
+  let curToken: string | null = null
   let input = Array.from(src)
 
   // Parse the input sequentially.
@@ -80,6 +80,7 @@ export function mapTextAttributes(src: string, getUserName: (id: string) => stri
         // See if we can find nested entities.
         let nestedAttributes = { text: '', textAttributes: undefined }
         if (!['<', '`', '```'].includes(curToken)) {
+          // @ts-expect-error
           nestedAttributes = mapTextAttributes(content, getUserName)
         }
         const from = Array.from(output).length
@@ -92,13 +93,8 @@ export function mapTextAttributes(src: string, getUserName: (id: string) => stri
           // Nested entities change the output, so update the range.
           entity.to = from + nestedAttributes.text.length
           // Offset the range of child entities.
-          const childEntities = nestedAttributes.textAttributes.entities.map(
-            en => ({
-              ...en,
-              from: en.from + from,
-              to: en.to + from,
-            }),
-          )
+          // @ts-expect-error
+          const childEntities = nestedAttributes.textAttributes.entities.map(en => ({ ...en, from: en.from + from, to: en.to + from }))
           entities.push(...childEntities)
           output += nestedAttributes.text
         } else if (curToken === '<') {
@@ -107,11 +103,13 @@ export function mapTextAttributes(src: string, getUserName: (id: string) => stri
           if (matches) {
             const id = matches[1]
             const username = getUserName(id)
-            output += `@${username}`
-            entity.to = from + [...username].length + 1
-            entity.mentionedUser = {
-              id,
-              username,
+            if (username) {
+              output += `@${username}`
+              entity.to = from + [...username].length + 1
+              entity.mentionedUser = {
+                id,
+                username,
+              }
             }
           // eslint-disable-next-line no-cond-assign
           } else if (matches = EMOTE_REGEX.exec(content)) {
@@ -181,9 +179,11 @@ export function mapTextAttributes(src: string, getUserName: (id: string) => stri
     if (TOKENS[3].includes(token)) {
       curToken = token
       input = input.slice(3)
+    // eslint-disable-next-line no-sequences
     } else if (token = input.slice(0, 2).join(''), TOKENS[2].includes(token)) {
       curToken = token
       input = input.slice(2)
+    // eslint-disable-next-line no-sequences
     } else if (token = input[0], TOKENS[1].includes(token)) {
       curToken = token
       input = input.slice(1)

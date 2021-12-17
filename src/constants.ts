@@ -48,7 +48,7 @@ export enum StickerFormat {
   LOTTIE = 3,
 }
 
-export const THREAD_TYPES: ThreadType[] = [
+export const THREAD_TYPES: (ThreadType | undefined)[] = [
   'channel', // GUILD_TEXT
   'single', // DM
   'channel', // GUILD_VOICE
