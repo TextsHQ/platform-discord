@@ -972,8 +972,8 @@ export default class DiscordNetworkAPI {
 
       case GatewayMessageType.MESSAGE_ACK: {
         if (!ENABLE_GUILDS && data.guild_id) return
-
         const threadID = data.channel_id
+        this.readStateMap.set(threadID, data.message_id)
         this.eventCallback([{
           type: ServerEventType.STATE_SYNC,
           mutationType: 'update',
@@ -981,7 +981,7 @@ export default class DiscordNetworkAPI {
           objectIDs: {
             threadID,
           },
-          entries: [{ id: threadID, isUnread: false }],
+          entries: [{ id: threadID, isUnread: data.ack_type === 0, lastReadMessageID: data.message_id }],
         }])
         break
       }
