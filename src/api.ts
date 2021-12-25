@@ -1,18 +1,20 @@
-import { PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Message, InboxName, MessageContent, PaginationArg, ActivityType, MessageSendOptions, texts, LoginCreds, Thread, AccountInfo, ServerEventType, Pref } from '@textshq/platform-sdk'
+import { PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Message, MessageContent, PaginationArg, ActivityType, MessageSendOptions, texts, LoginCreds, Thread, AccountInfo, ServerEventType } from '@textshq/platform-sdk'
 import DiscordNetworkAPI from './network-api'
 import { getDataURI } from './util'
 
 const POLLING_INTERVAL = 10_000
 
 export default class Discord implements PlatformAPI {
-  private accountID: string
+  private accountID?: string
 
   private api = new DiscordNetworkAPI()
 
   private pollingInterval?: NodeJS.Timeout
 
-  init = async (session: string, { accountID }: AccountInfo, prefs: Record<string, Pref>) => {
-    this.accountID = accountID
+  init = async (session?: string, accountInfo?: AccountInfo, prefs?: Record<string, any>) => {
+    this.accountID = accountInfo?.accountID
+    this.api.accountID = this.accountID
+
     if (!session) {
       texts.error('No session in init()!')
       return
@@ -25,15 +27,15 @@ export default class Discord implements PlatformAPI {
   }
 
   dispose = () => {
-    clearInterval(this.pollingInterval)
+    if (this.pollingInterval) clearInterval(this.pollingInterval)
     return this.api.dispose()
   }
 
   getCurrentUser = () => this.api.getCurrentUser()
 
-  login = async ({ jsCodeResult }: LoginCreds): Promise<LoginResult> => {
-    if (!jsCodeResult) return { type: 'error', errorMessage: 'Token was empty' }
-    await this.api.login(jsCodeResult)
+  login = async (creds?: LoginCreds): Promise<LoginResult> => {
+    if (!creds?.jsCodeResult) return { type: 'error', errorMessage: 'Token was empty' }
+    await this.api.login(creds.jsCodeResult)
     return { type: 'success' }
   }
 
@@ -47,7 +49,7 @@ export default class Discord implements PlatformAPI {
 
   searchUsers = (typed: string) => {
     const typedLower = typed.toLowerCase()
-    return typedLower ? this.api.userFriends.filter(u => u.username.toLowerCase().includes(typedLower)) : this.api.userFriends
+    return typedLower ? this.api.userFriends.filter(u => u.username?.toLowerCase().includes(typedLower)) : this.api.userFriends
   }
 
   /* searchMessages = (typed: string, pagination?: PaginationArg, threadID?: string) => {
@@ -58,7 +60,7 @@ export default class Discord implements PlatformAPI {
 
   getPresence = () => this.api.getUsersPresence()
 
-  getThreads = (inboxName: InboxName, pagination?: PaginationArg) => this.api.getThreads(inboxName, pagination)
+  getThreads = (folderName: string, pagination?: PaginationArg) => this.api.getThreads(folderName, pagination)
 
   getMessages = async (threadID: string, pagination?: PaginationArg): Promise<Paginated<Message>> => {
     const items = await this.api.getMessages(threadID, pagination)
@@ -77,7 +79,7 @@ export default class Discord implements PlatformAPI {
 
   deleteThread = (threadID: string) => this.api.closeThread(threadID)
 
-  reportThread = (type: 'spam', threadID: string, firstMessageID: string) => this.api.reportThread(threadID, firstMessageID)
+  reportThread = (type: 'spam', threadID: string, firstMessageID?: string) => this.api.reportThread(threadID, firstMessageID)
 
   sendMessage = (threadID: string, content: MessageContent, options?: MessageSendOptions) => this.api.sendMessage(threadID, content, options)
 
@@ -91,12 +93,16 @@ export default class Discord implements PlatformAPI {
 
   sendActivityIndicator = (type: ActivityType, threadID: string) => this.api.setTyping(type, threadID)
 
-  sendReadReceipt = (threadID: string, messageID: string) => {
+  sendReadReceipt = (threadID: string, messageID?: string) => {
     if (!messageID) {
-      const ogThreadJSON = texts.getOriginalObject('discord', this.accountID, ['thread', threadID])
+      const ogThreadJSON = texts.getOriginalObject?.('discord', this.accountID!, ['thread', threadID])
+      if (!ogThreadJSON) return
       const ogThread = JSON.parse(ogThreadJSON)
-      // eslint-disable-next-line no-param-reassign
       messageID = ogThread.last_message_id
+    }
+    if (!messageID) {
+      texts.log(`Unable to find last_message_id for threadID: ${threadID}`)
+      return
     }
     return this.api.sendReadReceipt(threadID, messageID)
   }
@@ -106,7 +112,7 @@ export default class Discord implements PlatformAPI {
   onResumeFromSleep = async () => {
     texts.log('[discord] Resumed from sleep')
     await this.api.connect(true, true)
-    if (this.api.lastFocusedThread) this.api.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: this.api.lastFocusedThread }])
+    if (this.api.lastFocusedThread) this.api.eventCallback?.([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: this.api.lastFocusedThread }])
   }
 
   startPolling = async () => {
@@ -132,10 +138,10 @@ export default class Discord implements PlatformAPI {
   stopPolling = async () => {
     texts.log('[discord] Stopping polling')
 
-    clearInterval(this.pollingInterval)
-    this.pollingInterval = null
+    if (this.pollingInterval) clearInterval(this.pollingInterval)
+    this.pollingInterval = undefined
 
     await this.api.connect(true, true)
-    if (this.api.lastFocusedThread) this.api.eventCallback([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: this.api.lastFocusedThread }])
+    if (this.api.lastFocusedThread) this.api.eventCallback?.([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: this.api.lastFocusedThread }])
   }
 }

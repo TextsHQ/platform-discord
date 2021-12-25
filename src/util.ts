@@ -24,6 +24,7 @@ export function generateSnowflake(timestamp = Date.now(), workerID = 1n, process
   return ((BigInt(timestamp) - DISCORD_EPOCH_BI) << 22n) | (workerID << 17n) | (processID << 12n) | snowflakeIncrement++
 }
 
+// TODO: Improve this
 const MIME_TYPES = {
   gif: 'image/gif',
   png: 'image/png',
@@ -31,19 +32,18 @@ const MIME_TYPES = {
   jpeg: 'image/jpeg',
   mp4: 'video/mp4',
 }
-
-export function mapMimeType(url: string) {
-  const elements = url.split('.')
-  if (!elements || elements.length === 0) return
-  const ext = elements[elements.length - 1]
-  return MIME_TYPES[ext.toLowerCase()]
+export function mapMimeType(url: string): string | undefined {
+  const ext = url.split('.').pop()?.toLowerCase()
+  if (!ext) return
+  // @ts-expect-error
+  return MIME_TYPES[ext]
 }
 
 // @ts-expect-error bigint notation
 let scienceIncrement = 0n
 
 // https://docs.google.com/document/d/1b5aDx7S1iLHoeb6B56izZakbXItA84gUjFzK-0OBwy0
-export function generateScienceClientUUID(userIDStr?: string): string {
+export function generateScienceClientUUID(userIDStr?: string): string | undefined {
   if (!userIDStr) return
 
   const randomPrefix = 0 | Math.floor(4294967296 * Math.random())

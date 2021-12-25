@@ -50,20 +50,22 @@ export default class WSClient {
 
   disconnect = (code: GatewayCloseCode = GatewayCloseCode.MANUAL_DISCONNECT, cleanup = true) => {
     texts.log('[discord ws] Disconnecting')
-    clearInterval(this.heartbeatTimer)
-    this.lastSequenceNumber = null
+    if (this.heartbeatTimer) clearInterval(this.heartbeatTimer)
+    this.lastSequenceNumber = undefined
     this.ws?.close(code)
-    if (cleanup) this.ws = null
+    if (cleanup) this.ws = undefined
     this.setReadyState(false)
   }
 
   private setupHandlers = () => {
-    this.ws.on('open', async () => {
+    if (!this.ws) texts.error('No WebSocket in setupHandlers()!')
+
+    this.ws!.on('open', async () => {
       texts.log('[discord ws] Connection open')
       if (!this.ready) await this.login()
     })
 
-    this.ws.on('close', async (code, reason) => {
+    this.ws!.on('close', async (code, reason) => {
       texts.log(`[discord ws] Connection closed. Code: ${code}, reason: ${reason}`)
       this.setReadyState(false)
 
@@ -88,19 +90,19 @@ export default class WSClient {
       this.onConnectionClosed?.(code, reason)
     })
 
-    this.ws.on('error', error => this.onError?.(error))
+    this.ws!.on('error', error => this.onError?.(error))
 
-    this.ws.on('unexpected-response', (request, response) => {
+    this.ws!.on('unexpected-response', (request, response) => {
       texts.log('[discord ws] Unexpected response: ' + request, response)
     })
 
-    this.ws.on('message', data => {
+    this.ws!.on('message', data => {
       try {
         const unpacked = this.packer.unpack(data)
         if (unpacked) this.processMessage(unpacked as GatewayMessage)
       } catch (e) {
         texts.error('[discord ws] Error unpacking:', e, data)
-        this.onError?.(e)
+        this.onError?.(e as Error)
       }
     })
   }
@@ -150,7 +152,7 @@ export default class WSClient {
   private sendHeartbeat = async () => {
     if (!this.ws || this.ws?.readyState === WebSocket.CONNECTING) return
 
-    if (this.lastHeartbeatAck + (this.heartbeatIntervalMs * 1.1) < Date.now()) {
+    if (this.lastHeartbeatAck && this.heartbeatIntervalMs && this.lastHeartbeatAck + (this.heartbeatIntervalMs * 1.1) < Date.now()) {
       // Connection zombified, terminate & resume
       this.disconnect(GatewayCloseCode.RECONNECT_REQUESTED)
       this.resumeOnConnect = true

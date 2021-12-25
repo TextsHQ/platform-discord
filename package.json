@@ -32,6 +32,7 @@
   "devDependencies": {
     "@textshq/eslint-config": "https://github.com/TextsHQ/eslint-config",
     "@types/jest": "^27.0.1",
+    "@types/lodash": "^4.14.177",
     "@types/node": "^16.7.10",
     "@types/ws": "^7.4.7",
     "jest": "^27.1.0",
