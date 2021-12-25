@@ -24,7 +24,10 @@ export default class Discord implements PlatformAPI {
     this.api.stopPolling = this.stopPolling
   }
 
-  dispose = () => this.api.dispose()
+  dispose = () => {
+    clearInterval(this.pollingInterval)
+    return this.api.dispose()
+  }
 
   getCurrentUser = () => this.api.getCurrentUser()
 

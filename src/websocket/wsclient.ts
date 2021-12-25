@@ -14,7 +14,7 @@ export default class WSClient {
 
   private lastSequenceNumber?: number | undefined
 
-  private heartbeatInterval?: number
+  private heartbeatIntervalMs?: number
 
   private heartbeatTimer?: NodeJS.Timer
 
@@ -50,7 +50,7 @@ export default class WSClient {
 
   disconnect = (code: GatewayCloseCode = GatewayCloseCode.MANUAL_DISCONNECT, cleanup = true) => {
     texts.log('[discord ws] Disconnecting')
-    clearInterval(this.heartbeatInterval)
+    clearInterval(this.heartbeatTimer)
     this.lastSequenceNumber = null
     this.ws?.close(code)
     if (cleanup) this.ws = null
@@ -132,9 +132,10 @@ export default class WSClient {
         this.disconnect()
         await this.connect()
         break
+      // @see https://discord.com/developers/docs/topics/gateway#hello
       case OPCode.HELLO:
         texts.log(`[discord ws] Heartbeat interval: ${message.d.heartbeat_interval}`)
-        this.heartbeatInterval = message.d.heartbeat_interval
+        this.heartbeatIntervalMs = message.d.heartbeat_interval
         this.heartbeatTimer = setInterval(this.sendHeartbeat, message.d.heartbeat_interval)
         this.setReadyState(true)
         break
@@ -149,7 +150,7 @@ export default class WSClient {
   private sendHeartbeat = async () => {
     if (!this.ws || this.ws?.readyState === WebSocket.CONNECTING) return
 
-    if (this.lastHeartbeatAck + (this.heartbeatInterval * 1.1) < Date.now()) {
+    if (this.lastHeartbeatAck + (this.heartbeatIntervalMs * 1.1) < Date.now()) {
       // Connection zombified, terminate & resume
       this.disconnect(GatewayCloseCode.RECONNECT_REQUESTED)
       this.resumeOnConnect = true
