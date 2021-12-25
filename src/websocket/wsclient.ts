@@ -1,10 +1,11 @@
-import WebSocket, { MessageEvent } from 'ws'
+import WebSocket from 'ws'
 import { texts } from '@textshq/platform-sdk'
+
 import { DiscordPresenceStatus, OPCode, GatewayMessageType, GatewayCloseCode } from './constants'
-import type { GatewayMessage } from './types'
-import type { Packer } from '../packers'
 import { sleep } from '../util'
 import { SUPER_PROPERTIES } from '../discord-constants'
+import type { GatewayMessage } from './types'
+import type { Packer } from '../packers'
 
 export default class WSClient {
   private ws?: WebSocket
@@ -145,10 +146,6 @@ export default class WSClient {
     }
   }
 
-  private wsOnMessage = (event: MessageEvent) => {
-
-  }
-
   private sendHeartbeat = async () => {
     if (!this.ws || this.ws?.readyState === WebSocket.CONNECTING) return
 
@@ -203,8 +200,7 @@ export default class WSClient {
   }
 
   private send = async (payload: GatewayMessage) => {
-    if (!this.ws) return
-    while (this.ws.readyState === WebSocket.CONNECTING) await sleep(25)
+    while (!this.ws || this.ws.readyState === WebSocket.CONNECTING) await sleep(25)
     const packed = this.packer.pack(payload)
     this.ws.send(packed)
   }
