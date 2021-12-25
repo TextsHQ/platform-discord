@@ -25,11 +25,6 @@ const getPNGStickerURL = (id: string) =>
 export const getEmojiURL = (emojiID: string, animated?: boolean) =>
   `https://cdn.discordapp.com/emojis/${emojiID}.${animated ? 'gif' : 'png'}`
 
-export const parseTweetURL = (url: string): { username: string, tweetID: string } | undefined => {
-  const [, username, tweetID] = /https?:\/\/twitter\.com\/(.+?)\/status\/(\d+)/.exec(url) || []
-  if (tweetID) return { username, tweetID }
-}
-
 export const mapReaction = (reaction: DiscordReactionDetails, participantID: string): MessageReaction => {
   // reaction.emoji = { id: '352592187265122304', name: 'pat' }
   // reaction.emoji = { id: null, name: '👍' }
@@ -181,13 +176,14 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
   }
 
   const handleGifvEmbed = (embed: APIEmbed) => {
+    const url = embed.video?.url ?? embed.url
     const attachment: MessageAttachment = {
-      id: embed.url,
+      id: url!,
       type: MessageAttachmentType.IMG,
-      mimeType: mapMimeType(embed.video.url),
+      mimeType: url ? mapMimeType(url) : undefined,
       isGif: true,
-      srcURL: embed.video.url,
-      size: { width: embed.video.width, height: embed.video.height },
+      srcURL: url,
+      size: embed.video?.width && embed.video.height ? { width: embed.video.width, height: embed.video.height } : undefined,
     }
     final.attachments!.push(attachment)
   }
@@ -195,12 +191,12 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
   const handleImageEmbed = (embed: APIEmbed) => {
     const image = embed.image ?? embed.thumbnail
     const attachment: MessageAttachment = {
-      id: embed.url,
+      id: (embed.url ?? image?.url)!,
       type: MessageAttachmentType.IMG,
-      mimeType: mapMimeType(image.url),
-      isGif: image.url.toLowerCase().endsWith('.gif'),
-      srcURL: image.proxy_url ?? image.url,
-      size: { width: image.width, height: image.height },
+      mimeType: image?.url ? mapMimeType(image.url) : undefined,
+      isGif: image?.url?.toLowerCase().endsWith('.gif'),
+      srcURL: image?.url,
+      size: image?.width && image.height ? { width: image.width, height: image.height } : undefined,
     }
     final.attachments!.push(attachment)
   }
@@ -208,9 +204,10 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
   const handleLinkEmbed = (embed: APIEmbed) => {
     const image = embed.image ?? embed.thumbnail
     const link: MessageLink = {
-      url: embed.url,
+      url: embed.url!,
       img: image?.url,
       imgSize: image?.width && image?.height ? { width: image.width, height: image.height } : undefined,
+      // @ts-expect-error
       title: embed.title || embed.author?.name,
       summary: embed.description || undefined,
     }
@@ -219,6 +216,7 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
 
   const urlRegex = /https?:\/\/(www\.)?([-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6})\b\/([-a-zA-Z0-9()!@:%_+.~#?&/=]*)/gi
   const handleRichEmbed = (embed: APIEmbed) => {
+    if (!embed.url) return
     const [,, domain, path] = urlRegex.exec(embed.url) ?? []
     switch (domain?.toLowerCase()) {
       case 'twitter.com': {
@@ -232,27 +230,31 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
           if ((embed.image || embed.video) && !(embed.title || embed.description || embed.footer || embed.color)) return
 
           const images = [embed.image, ...(message.embeds?.filter(e => e.url === embed.url && (e.image || e.video) && !e.timestamp).map(e => e.image))].filter(Boolean).map(image => ({
-            id: image.url,
-            srcURL: image.proxy_url ?? image.url,
+            id: image?.url!,
+            srcURL: image?.url,
             type: MessageAttachmentType.IMG,
             size: image?.width && image?.height ? { width: image.width, height: image.height } : undefined,
           }))
           const video = embed.video ? {
             id: embed.video.url,
-            srcURL: embed.thumbnail.url,
+            srcURL: embed.thumbnail?.url,
             type: MessageAttachmentType.IMG,
             size: embed.thumbnail?.width && embed.thumbnail?.height ? { width: embed.thumbnail.width, height: embed.thumbnail.height } : undefined,
           } : undefined
           const tweet: Tweet = {
             id: tweetID,
             user: {
+              // @ts-expect-error
               imgURL: embed.author?.icon_url,
               name: user,
+              // @ts-expect-error
               username: embed.author?.name,
             },
+            // @ts-expect-error
             text: embed.description,
             timestamp: embed.timestamp ? new Date(embed.timestamp) : undefined,
             url: embed.url,
+            // @ts-expect-error
             attachments: [...images, video].filter(Boolean),
           }
           final.tweets!.push(tweet)
@@ -263,6 +265,7 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
             url: embed.url,
             img: image?.proxy_url ?? image?.url,
             imgSize: image?.width && image?.height ? { width: image.width, height: image.height } : undefined,
+            // @ts-expect-error
             title: embed.title,
             summary: embed.description,
           }
@@ -283,6 +286,7 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
         if (embed.url) {
           const link: MessageLink = {
             url: embed.url,
+            // @ts-expect-error
             title: embed.title,
           }
           final.links!.push(link)
@@ -291,7 +295,7 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
         const image = embed.image ?? embed.thumbnail
         if (image) {
           const attachment: MessageAttachment = {
-            id: image.url,
+            id: image.url!,
             type: MessageAttachmentType.IMG,
             srcURL: image.url,
             size: image.width && image.height ? { width: image.width, height: image.height } : undefined,
@@ -306,20 +310,21 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
   const handleVideoEmbed = (embed: APIEmbed) => {
     if (embed.provider?.name?.toLowerCase() === 'youtube') {
       const link: MessageLink = {
-        url: embed.url,
+        url: embed.url!,
         img: embed.thumbnail?.url,
         imgSize: embed.thumbnail?.width && embed.thumbnail?.height ? { width: embed.thumbnail.width, height: embed.thumbnail.height } : undefined,
+        // @ts-expect-error
         title: embed.title,
         summary: embed.description,
       }
       final.links!.push(link)
     } else {
       const attachment: MessageAttachment = {
-        id: embed.url,
+        id: embed.url!,
         type: MessageAttachmentType.VIDEO,
-        mimeType: mapMimeType(embed.video.url),
-        srcURL: embed.video.url,
-        size: { width: embed.video.width, height: embed.video.height },
+        mimeType: embed.video?.url ? mapMimeType(embed.video.url) : undefined,
+        srcURL: embed.video?.url,
+        size: embed.video?.width && embed.video?.height ? { width: embed.video.width, height: embed.video.height } : undefined,
       }
       final.attachments!.push(attachment)
     }
@@ -365,7 +370,7 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
     }
     case MessageActivityType.Listen: {
       const link: MessageLink = {
-        url: message.activity.party_id,
+        url: message.activity.party_id!,
         title: `Listen together with ${message.author.username}`,
       }
       final.links!.push(link)

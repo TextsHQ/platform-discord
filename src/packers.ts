@@ -15,11 +15,11 @@ export type Packer = {
   unpack: (data: any) => any
 }
 
-const etfPacker: Packer = {
+const etfPacker: Packer | undefined = erlpack ? {
   encoding: 'etf',
-  pack: erlpack!.pack,
-  unpack: erlpack!.unpack,
-}
+  pack: erlpack.pack,
+  unpack: erlpack.unpack,
+} : undefined
 
 const COMPRESS_JSON = false
 const jsonPacker: Packer = {

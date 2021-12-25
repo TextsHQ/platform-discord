@@ -116,9 +116,9 @@ export default class DiscordNetworkAPI {
     if (!this.client) {
       const gatewayRes = await this.httpClient.requestAsString(`${API_ENDPOINT}/gateway`, { headers: { 'User-Agent': USER_AGENT } })
       const gatewayHost = JSON.parse(gatewayRes?.body)?.url as string ?? DEFAULT_GATEWAY
-      const gatewayURL = `${gatewayHost}/?v=${API_VERSION}&encoding=${defaultPacker.encoding}`
+      const gatewayURL = `${gatewayHost}/?v=${API_VERSION}&encoding=${defaultPacker!.encoding}`
       // texts.log(`[discord] URL: ${gatewayURL}`)
-      this.client = new WSClient(gatewayURL, this.token!, defaultPacker)
+      this.client = new WSClient(gatewayURL, this.token!, defaultPacker!)
     }
 
     this.client.resumeOnConnect = resume
