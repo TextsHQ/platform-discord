@@ -3,27 +3,8 @@ import { APIUser, APIChannel, APIEmbed, EmbedType, MessageActivityType, APIAttac
 import { uniqBy } from 'lodash'
 import type { DiscordMessage, DiscordReactionDetails } from './types'
 import { IGNORED_MESSAGE_TYPES, StickerFormat, THREAD_TYPES } from './constants'
+import { getEmojiURL, getLottieStickerURL, getPNGStickerURL, getThreadIcon, getTimestampFromSnowflake, getUserAvatar, mapMimeType } from './util'
 import { mapTextAttributes } from './text-attributes'
-import { getTimestampFromSnowflake, mapMimeType } from './util'
-
-const getUserAvatar = (userID: string, avatarID: string) =>
-  `https://cdn.discordapp.com/avatars/${userID}/${avatarID}.${avatarID.startsWith('a_') ? 'gif' : 'png'}?size=256`
-
-const getThreadIcon = (threadID: string, iconID: string) =>
-  `https://cdn.discordapp.com/channel-icons/${threadID}/${iconID}.png`
-
-/* const getGuildIcon = (guildID: string, iconID: string) =>
-  `https://cdn.discordapp.com/icons/${guildID}/${iconID}.png` */
-
-const getLottieStickerURL = (id: string) =>
-  `https://discord.com/stickers/${id}.json`
-
-// adding &passthrough=false makes it a regular png instead of apng
-const getPNGStickerURL = (id: string) =>
-  `https://media.discordapp.net/stickers/${id}.png?size=512`
-
-export const getEmojiURL = (emojiID: string, animated?: boolean) =>
-  `https://cdn.discordapp.com/emojis/${emojiID}.${animated ? 'gif' : 'png'}`
 
 export const mapReaction = (reaction: DiscordReactionDetails, participantID: string): MessageReaction => {
   // reaction.emoji = { id: '352592187265122304', name: 'pat' }
@@ -90,7 +71,7 @@ export function mapChannel(channel: APIChannel, isMuted: Boolean, guildName?: st
 }
 
 export function mapThread(thread: APIChannel, lastReadMessageID?: string, currentUser?: User): Thread {
-  const type: ThreadType | undefined = THREAD_TYPES[thread.type]
+  const type: ThreadType = THREAD_TYPES[thread.type]!
 
   const participants: User[] = thread.recipients?.map(mapUser) ?? []
   participants.sort((a, b) => ((a.username ?? '') < (b.username ?? '') ? 1 : -1))
@@ -106,7 +87,6 @@ export function mapThread(thread: APIChannel, lastReadMessageID?: string, curren
     isUnread: (timestamp ?? 0) > (lastMessageTimestamp ?? 0),
     lastReadMessageID,
     isReadOnly: thread.recipients?.[0]?.system ?? false,
-    // @ts-expect-error
     type,
     imgURL: thread.icon ? getThreadIcon(thread.id, thread.icon) : undefined,
     description: thread.topic ?? undefined,
@@ -153,11 +133,10 @@ export function mapMessage(message: DiscordMessage, currentUserID?: string, reac
 
   if (mapped.text && mapped.text.length > 0) {
     const getUserName = (id: string): string => message.mentions.find(m => m.id === id)?.username || id
-    // @ts-expect-error
-    const { text, textAttributes } = mapTextAttributes(mapped.text, getUserName)
-    if (text && textAttributes) {
-      mapped.text = text
-      mapped.textAttributes = textAttributes
+    const mappedTextAttributes = mapTextAttributes(mapped.text, getUserName)
+    if (mappedTextAttributes?.text && mappedTextAttributes?.textAttributes) {
+      mapped.text = mappedTextAttributes.text
+      mapped.textAttributes = mappedTextAttributes.textAttributes
     }
   }
 
@@ -208,8 +187,7 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
       url: embed.url!,
       img: image?.url,
       imgSize: image?.width && image?.height ? { width: image.width, height: image.height } : undefined,
-      // @ts-expect-error
-      title: embed.title || embed.author?.name,
+      title: embed.title ?? embed.author?.name ?? '',
       summary: embed.description || undefined,
     }
     final.links!.push(link)
@@ -245,18 +223,14 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
           const tweet: Tweet = {
             id: tweetID,
             user: {
-              // @ts-expect-error
-              imgURL: embed.author?.icon_url,
+              imgURL: embed.author?.icon_url ?? '',
               name: user,
-              // @ts-expect-error
-              username: embed.author?.name,
+              username: embed.author?.name ?? '',
             },
-            // @ts-expect-error
-            text: embed.description,
+            text: embed.description ?? '',
             timestamp: embed.timestamp ? new Date(embed.timestamp) : undefined,
             url: embed.url,
-            // @ts-expect-error
-            attachments: [...images, video].filter(Boolean),
+            attachments: [...images, video].filter(Boolean) as MessageAttachment[],
           }
           final.tweets!.push(tweet)
         } else {
@@ -266,8 +240,7 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
             url: embed.url,
             img: image?.proxy_url ?? image?.url,
             imgSize: image?.width && image?.height ? { width: image.width, height: image.height } : undefined,
-            // @ts-expect-error
-            title: embed.title,
+            title: embed.title ?? '',
             summary: embed.description,
           }
           final.links!.push(link)
@@ -275,20 +248,19 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
         break
       }
       default: {
-        let text = message.content
+        let text = message.content as string | undefined
         if (embed.title) text += `\n**${embed.title}**\n`
         if (embed.description) text += `\n${embed.description}`
         if (embed.fields && embed.fields.length > 0) {
           const fields = embed.fields.map(f => `**${f.name}**\n${f.value}`)
           text += '\n\n' + fields.join('\n\n')
         }
-        final.text = text.trim()
+        final.text = text?.trim()
 
         if (embed.url) {
           const link: MessageLink = {
             url: embed.url,
-            // @ts-expect-error
-            title: embed.title,
+            title: embed.title ?? '',
           }
           final.links!.push(link)
         }
@@ -314,8 +286,7 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
         url: embed.url!,
         img: embed.thumbnail?.url,
         imgSize: embed.thumbnail?.width && embed.thumbnail?.height ? { width: embed.thumbnail.width, height: embed.thumbnail.height } : undefined,
-        // @ts-expect-error
-        title: embed.title,
+        title: embed.title ?? '',
         summary: embed.description,
       }
       final.links!.push(link)

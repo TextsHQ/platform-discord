@@ -2,14 +2,14 @@ import path from 'path'
 import FormData from 'form-data'
 import { promises as fs } from 'fs'
 import { uniqBy } from 'lodash'
-import { texts, CurrentUser, MessageContent, PaginationArg, Thread, Message, ServerEventType, OnServerEventCallback, ActivityType, User, MessageSendOptions, ReAuthError, PresenceMap, Paginated, FetchOptions, ServerEvent, CustomEmojiMap, UserPresence, PartialWithID } from '@textshq/platform-sdk'
+import { texts, CurrentUser, MessageContent, PaginationArg, Thread, Message, ServerEventType, OnServerEventCallback, ActivityType, User, MessageSendOptions, ReAuthError, PresenceMap, Paginated, FetchOptions, ServerEvent, CustomEmojiMap, UserPresence, CustomEmoji } from '@textshq/platform-sdk'
 import type { APIChannel, APIEmoji, APIGuild, APIReaction, APIUser, GatewayPresenceUpdateData, Snowflake } from 'discord-api-types'
 
-import { getEmojiURL, mapChannel, mapCurrentUser, mapMessage, mapPresence, mapReaction, mapThread, mapUser } from './mappers'
+import { mapChannel, mapCurrentUser, mapMessage, mapPresence, mapReaction, mapThread, mapUser } from './mappers'
 import WSClient from './websocket/wsclient'
 import { GatewayCloseCode, GatewayMessageType, OPCode } from './websocket/constants'
 import { defaultPacker } from './packers'
-import { generateScienceClientUUID, generateSnowflake, sleep } from './util'
+import { generateScienceClientUUID, generateSnowflake, getEmojiURL, sleep } from './util'
 import { ENABLE_GUILDS, ENABLE_DM_GUILD_MEMBERS, ENABLE_DISCORD_ANALYTICS } from './preferences'
 import type { DiscordEmoji, DiscordMessage, DiscordReactionDetails, DiscordScienceEvent } from './types'
 import { IGNORED_CHANNEL_TYPES, ScienceEventType, USER_AGENT } from './constants'
@@ -252,9 +252,10 @@ export default class DiscordNetworkAPI {
 
   getMessageReactions = async (message: DiscordMessage, threadID: string) => {
     const getReactionDetails = async (r: APIReaction): Promise<DiscordReactionDetails | undefined> => {
-      // @ts-expect-error
-      const emojiQuery = encodeURIComponent(r.emoji.id ? `${r.emoji.name}:${r.emoji.id}` : r.emoji.name)
-      const reactedRes = await this.fetch({ method: 'GET', url: `channels/${threadID}/messages/${message.id}/reactions/${emojiQuery}` })
+      const emojiQuery = r.emoji.id ? `${r.emoji.name}:${r.emoji.id}` : r.emoji.name
+      if (!emojiQuery) return
+      const query = encodeURIComponent(emojiQuery)
+      const reactedRes = await this.fetch({ method: 'GET', url: `channels/${threadID}/messages/${message.id}/reactions/${query}` })
       const users: APIUser[] = reactedRes?.json
       return users ? { emoji: r.emoji, users } : undefined
     }
@@ -278,9 +279,7 @@ export default class DiscordNetworkAPI {
     if (!res || res.statusCode < 200 || res.statusCode > 204 || !res.json) throw new Error(getErrorMessage(res))
 
     const json: DiscordMessage[] = res.json
-
-    // @ts-expect-error
-    const messages: Message[] = (await Promise.all(json.map(m => this.getMessageReactions(m, threadID)))).filter(Boolean)
+    const messages = (await Promise.all(json.map(m => this.getMessageReactions(m, threadID)))).filter(Boolean) as Message[]
 
     if (ENABLE_GUILDS) {
       // Guilds don't return all users, so we need to keep it updated using message authors
@@ -309,14 +308,19 @@ export default class DiscordNetworkAPI {
 
     const text = content.text ? this.mapMentionsAndEmojis(content.text) : undefined
 
-    const requestContent = {
+    type RequestContent = {
+      headers: { [key: string]: string }
+      message_reference: { [key: string]: string | undefined } | undefined
+      json: any | undefined
+      body: any | undefined
+    }
+    const requestContent: RequestContent = {
       headers: {},
       message_reference: undefined,
       json: undefined,
       body: undefined,
     }
 
-    // @ts-expect-error
     if (options?.quotedMessageID) requestContent.message_reference = { message_id: options?.quotedMessageID }
 
     const nonce = generateSnowflake().toString()
@@ -343,11 +347,9 @@ export default class DiscordNetworkAPI {
       form.append('payload_json', JSON.stringify(payload_json))
 
       requestContent.headers = form.getHeaders()
-      // @ts-expect-error
       requestContent.body = form
     } else {
       requestContent.headers = { 'Content-Type': 'application/json' }
-      // @ts-expect-error
       requestContent.json = {
         content: text,
         nonce,
@@ -735,11 +737,9 @@ export default class DiscordNetworkAPI {
           const emojiEvent: ServerEvent = {
             type: ServerEventType.STATE_SYNC,
             objectIDs: {},
-            // @ts-expect-error
             mutationType: 'upsert',
             objectName: 'custom_emoji',
-            // @ts-expect-error
-            entries: emojis,
+            entries: emojis as any as CustomEmoji[],
           }
 
           this.eventCallback([emojiEvent])
@@ -1094,7 +1094,7 @@ export default class DiscordNetworkAPI {
   }
 
   private sendScienceRequest = async (type: ScienceEventType, properties?: any) => {
-    if (!ENABLE_DISCORD_ANALYTICS) return
+    if (!ENABLE_DISCORD_ANALYTICS || !this.deviceFingerprint) return
 
     const event: DiscordScienceEvent = {
       type,
@@ -1118,7 +1118,6 @@ export default class DiscordNetworkAPI {
     }
 
     texts.log(`[discord science] sending ${type}`)
-    // @ts-expect-error
     await this.fetch({ method: 'POST', url: 'science', json, headers })
   }
 }

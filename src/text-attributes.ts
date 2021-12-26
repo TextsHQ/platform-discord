@@ -3,7 +3,8 @@
  * https://support.discord.com/hc/en-us/articles/210298617-Markdown-Text-101-Chat-Formatting-Bold-Italic-Underline-
  */
 
-import type { TextEntity } from '@textshq/platform-sdk'
+import type { TextAttributes, TextEntity } from '@textshq/platform-sdk'
+import { getEmojiURL } from './util'
 
 const TOKENS = {
   1: ['*', '_', '`', '<'],
@@ -23,12 +24,7 @@ const getClosingToken = (token: string): string => (token === '<' ? '>' : token)
 const USER_REGEX = /^@!?(\d+)$/
 const EMOTE_REGEX = /^(a?):([A-Za-z0-9_]+):(\d+)$/
 
-const isDiscordEntity = (input: string): boolean => {
-  return USER_REGEX.test(input) || EMOTE_REGEX.test(input)
-}
-
-const getEmojiURL = (emojiID: string, animated: boolean) =>
-  `https://cdn.discordapp.com/emojis/${emojiID}.${animated ? 'gif' : 'png'}`
+const isDiscordEntity = (input: string): boolean => (USER_REGEX.test(input) || EMOTE_REGEX.test(input))
 
 /**
  * Try to find the closing index for curToken.
@@ -62,7 +58,9 @@ const findClosingIndex = (input: string[], curToken: string) => {
   return closingIndex
 }
 
-export function mapTextAttributes(src: string, getUserName: (id: string) => string | undefined) {
+type MappedTextAttributes = { text: string | undefined, textAttributes: TextAttributes | undefined }
+
+export function mapTextAttributes(src: string, getUserName: (id: string) => string | undefined): MappedTextAttributes | undefined {
   if (!src) return
 
   const entities: TextEntity[] = []
@@ -78,9 +76,8 @@ export function mapTextAttributes(src: string, getUserName: (id: string) => stri
         // A valid closingIndex is found, it's a valid token!
         const content = input.slice(0, closingIndex).join('') // .replace(/^\s+|\s+$/g, '')
         // See if we can find nested entities.
-        let nestedAttributes = { text: '', textAttributes: undefined }
+        let nestedAttributes: MappedTextAttributes | undefined = { text: undefined, textAttributes: undefined }
         if (!['<', '`', '```'].includes(curToken)) {
-          // @ts-expect-error
           nestedAttributes = mapTextAttributes(content, getUserName)
         }
         const from = Array.from(output).length
@@ -89,13 +86,12 @@ export function mapTextAttributes(src: string, getUserName: (id: string) => stri
           from,
           to: from + closingIndex,
         }
-        if (nestedAttributes.textAttributes) {
+        if (nestedAttributes?.textAttributes) {
           // Nested entities change the output, so update the range.
-          entity.to = from + nestedAttributes.text.length
+          entity.to = from + (nestedAttributes.text?.length ?? 0)
           // Offset the range of child entities.
-          // @ts-expect-error
-          const childEntities = nestedAttributes.textAttributes.entities.map(en => ({ ...en, from: en.from + from, to: en.to + from }))
-          entities.push(...childEntities)
+          const childEntities = nestedAttributes.textAttributes.entities?.map(en => ({ ...en, from: en.from + from, to: en.to + from }))
+          if (childEntities) entities.push(...childEntities)
           output += nestedAttributes.text
         } else if (curToken === '<') {
           // Handle discord entity: mention or emoji.

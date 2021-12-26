@@ -25,7 +25,7 @@ export function generateSnowflake(timestamp = Date.now(), workerID = 1n, process
 }
 
 // TODO: Improve this
-const MIME_TYPES = {
+const MIME_TYPES: { [key: string]: string } = {
   gif: 'image/gif',
   png: 'image/png',
   jpg: 'image/jpeg',
@@ -35,7 +35,6 @@ const MIME_TYPES = {
 export function mapMimeType(url: string): string | undefined {
   const ext = url.split('.').pop()?.toLowerCase()
   if (!ext) return
-  // @ts-expect-error
   return MIME_TYPES[ext]
 }
 
@@ -68,3 +67,16 @@ export function generateScienceClientUUID(userIDStr?: string): string | undefine
 
   return r.toString('base64')
 }
+
+export const getUserAvatar = (userID: string, avatarID: string) => `https://cdn.discordapp.com/avatars/${userID}/${avatarID}.${avatarID.startsWith('a_') ? 'gif' : 'png'}?size=256`
+
+export const getThreadIcon = (threadID: string, iconID: string) => `https://cdn.discordapp.com/channel-icons/${threadID}/${iconID}.png`
+
+/* export const getGuildIcon = (guildID: string, iconID: string) => `https://cdn.discordapp.com/icons/${guildID}/${iconID}.png` */
+
+export const getLottieStickerURL = (id: string) => `https://discord.com/stickers/${id}.json`
+
+// adding &passthrough=false makes it a regular png instead of apng
+export const getPNGStickerURL = (id: string) => `https://media.discordapp.net/stickers/${id}.png?size=512`
+
+export const getEmojiURL = (emojiID: string, animated?: boolean) => `https://cdn.discordapp.com/emojis/${emojiID}.${animated ? 'gif' : 'png'}`
