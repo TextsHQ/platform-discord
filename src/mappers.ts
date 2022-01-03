@@ -23,8 +23,7 @@ export const mapPresence = (userID: string, presence: GatewayPresenceUpdateData)
   const activity = presence.activities?.length > 0 ? presence.activities?.[0] as any : undefined
   return {
     userID,
-    isActive: presence.status !== PresenceUpdateStatus.Invisible && presence.status !== PresenceUpdateStatus.Offline,
-    status: activity ? 'custom' : (presence.status as UserPresence['status']),
+    status: presence.status as UserPresence['status'],
     customStatus: activity?.state ?? activity?.name,
   }
 }
