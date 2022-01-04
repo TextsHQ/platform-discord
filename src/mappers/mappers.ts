@@ -1,10 +1,11 @@
 import { CurrentUser, Message, MessageActionType, MessageAttachment, MessageAttachmentType, MessageLink, MessageReaction, Thread, ThreadType, User, PartialWithID, UserPresence, Tweet, texts } from '@textshq/platform-sdk'
 import { APIUser, APIChannel, APIEmbed, EmbedType, MessageActivityType, APIAttachment, MessageType, GatewayPresenceUpdateData, PresenceUpdateStatus } from 'discord-api-types/v9'
 import { uniqBy } from 'lodash'
-import type { DiscordMessage, DiscordReactionDetails } from './types'
-import { IGNORED_MESSAGE_TYPES, StickerFormat, THREAD_TYPES } from './constants'
-import { getEmojiURL, getLottieStickerURL, getPNGStickerURL, getThreadIcon, getTimestampFromSnowflake, getUserAvatar, mapMimeType } from './util'
-import { mapTextAttributes } from './text-attributes'
+import type { DiscordMessage, DiscordReactionDetails } from '../types'
+import { IGNORED_MESSAGE_TYPES, StickerFormat, THREAD_TYPES } from '../constants'
+import { getEmojiURL, getLottieStickerURL, getPNGStickerURL, getThreadIcon, getTimestampFromSnowflake, getUserAvatar, mapMimeType } from '../util'
+import { mapTextAttributes } from '../text-attributes'
+import { handleArticleEmbed, handleGifvEmbed, handleImageEmbed, handleLinkEmbed, handleRichEmbed, handleVideoEmbed } from './rich-embeds'
 
 export const mapReaction = (reaction: DiscordReactionDetails, participantID: string): MessageReaction => {
   // reaction.emoji = { id: '352592187265122304', name: 'pat' }
@@ -149,158 +150,6 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
     attachments: [],
   }
 
-  // TODO: Article embed (shows up as unknown)
-  const handleArticleEmbed = (embed: APIEmbed) => {
-    texts.log(embed)
-  }
-
-  const handleGifvEmbed = (embed: APIEmbed) => {
-    const url = embed.video?.url ?? embed.url
-    const attachment: MessageAttachment = {
-      id: url!,
-      type: MessageAttachmentType.IMG,
-      mimeType: url ? mapMimeType(url) : undefined,
-      isGif: true,
-      srcURL: url,
-      size: embed.video?.width && embed.video.height ? { width: embed.video.width, height: embed.video.height } : undefined,
-    }
-    final.attachments!.push(attachment)
-  }
-
-  const handleImageEmbed = (embed: APIEmbed) => {
-    const image = embed.image ?? embed.thumbnail
-    const attachment: MessageAttachment = {
-      id: (embed.url ?? image?.url)!,
-      type: MessageAttachmentType.IMG,
-      mimeType: image?.url ? mapMimeType(image.url) : undefined,
-      isGif: image?.url?.toLowerCase().endsWith('.gif'),
-      srcURL: image?.url,
-      size: image?.width && image.height ? { width: image.width, height: image.height } : undefined,
-    }
-    final.attachments!.push(attachment)
-  }
-
-  const handleLinkEmbed = (embed: APIEmbed) => {
-    const image = embed.image ?? embed.thumbnail
-    const link: MessageLink = {
-      url: embed.url!,
-      img: image?.url,
-      imgSize: image?.width && image?.height ? { width: image.width, height: image.height } : undefined,
-      title: embed.title ?? embed.author?.name ?? '',
-      summary: embed.description || undefined,
-    }
-    final.links!.push(link)
-  }
-
-  const urlRegex = /https?:\/\/(www\.)?([-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6})\b\/([-a-zA-Z0-9()!@:%_+.~#?&/=]*)/gi
-  const handleRichEmbed = (embed: APIEmbed) => {
-    if (!embed.url) return
-    const [,, domain, path] = urlRegex.exec(embed.url) ?? []
-    switch (domain?.toLowerCase()) {
-      case 'twitter.com': {
-        const [user,, tweetID] = path.split('/')
-        if (tweetID) {
-          // Tweet URL
-          /*
-              Discord treats every tweet image as standalone rich embed.
-              We're searching for all of them later, so discard every standalone rich embed with only image/video.
-          */
-          if ((embed.image || embed.video) && !(embed.title || embed.description || embed.footer || embed.color)) return
-
-          const images = [embed.image, ...(message.embeds?.filter(e => e.url === embed.url && (e.image || e.video) && !e.timestamp).map(e => e.image))].filter(Boolean).map(image => ({
-            id: image?.url!,
-            srcURL: image?.url,
-            type: MessageAttachmentType.IMG,
-            size: image?.width && image?.height ? { width: image.width, height: image.height } : undefined,
-          }))
-          const video = embed.video ? {
-            id: embed.video.url,
-            srcURL: embed.thumbnail?.url,
-            type: MessageAttachmentType.IMG,
-            size: embed.thumbnail?.width && embed.thumbnail?.height ? { width: embed.thumbnail.width, height: embed.thumbnail.height } : undefined,
-          } : undefined
-          const tweet: Tweet = {
-            id: tweetID,
-            user: {
-              imgURL: embed.author?.icon_url ?? '',
-              name: user,
-              username: embed.author?.name ?? '',
-            },
-            text: embed.description ?? '',
-            timestamp: embed.timestamp ? new Date(embed.timestamp) : undefined,
-            url: embed.url,
-            attachments: [...images, video].filter(Boolean) as MessageAttachment[],
-          }
-          final.tweets!.push(tweet)
-        } else {
-          // general Twitter URL
-          const image = embed.image ?? embed.thumbnail
-          const link: MessageLink = {
-            url: embed.url,
-            img: image?.proxy_url ?? image?.url,
-            imgSize: image?.width && image?.height ? { width: image.width, height: image.height } : undefined,
-            title: embed.title ?? '',
-            summary: embed.description,
-          }
-          final.links!.push(link)
-        }
-        break
-      }
-      default: {
-        let text = message.content as string | undefined
-        if (embed.title) text += `\n**${embed.title}**\n`
-        if (embed.description) text += `\n${embed.description}`
-        if (embed.fields && embed.fields.length > 0) {
-          const fields = embed.fields.map(f => `**${f.name}**\n${f.value}`)
-          text += '\n\n' + fields.join('\n\n')
-        }
-        final.text = text?.trim()
-
-        if (embed.url) {
-          const link: MessageLink = {
-            url: embed.url,
-            title: embed.title ?? '',
-          }
-          final.links!.push(link)
-        }
-
-        const image = embed.image ?? embed.thumbnail
-        if (image) {
-          const attachment: MessageAttachment = {
-            id: image.url!,
-            type: MessageAttachmentType.IMG,
-            srcURL: image.url,
-            size: image.width && image.height ? { width: image.width, height: image.height } : undefined,
-          }
-          final.attachments!.push(attachment)
-        }
-        break
-      }
-    }
-  }
-
-  const handleVideoEmbed = (embed: APIEmbed) => {
-    if (embed.provider?.name?.toLowerCase() === 'youtube') {
-      const link: MessageLink = {
-        url: embed.url!,
-        img: embed.thumbnail?.url,
-        imgSize: embed.thumbnail?.width && embed.thumbnail?.height ? { width: embed.thumbnail.width, height: embed.thumbnail.height } : undefined,
-        title: embed.title ?? '',
-        summary: embed.description,
-      }
-      final.links!.push(link)
-    } else {
-      const attachment: MessageAttachment = {
-        id: embed.url!,
-        type: MessageAttachmentType.VIDEO,
-        mimeType: embed.video?.url ? mapMimeType(embed.video.url) : undefined,
-        srcURL: embed.video?.url,
-        size: embed.video?.width && embed.video?.height ? { width: embed.video.width, height: embed.video.height } : undefined,
-      }
-      final.attachments!.push(attachment)
-    }
-  }
-
   message.embeds?.forEach(embed => {
     switch (embed.type) {
       case EmbedType.Article: {
@@ -308,23 +157,32 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
         break
       }
       case EmbedType.GIFV: {
-        handleGifvEmbed(embed)
+        const attachment = handleGifvEmbed(embed)
+        final.attachments!.push(attachment)
         break
       }
       case EmbedType.Image: {
-        handleImageEmbed(embed)
+        const attachment = handleImageEmbed(embed)
+        final.attachments!.push(attachment)
         break
       }
       case EmbedType.Link: {
-        handleLinkEmbed(embed)
+        const link = handleLinkEmbed(embed)
+        final.links!.push(link)
         break
       }
       case EmbedType.Rich: {
-        handleRichEmbed(embed)
+        const handled = handleRichEmbed(embed, message)
+        if (handled?.text) final.text = handled.text
+        if (handled?.tweet) final.tweets!.push(handled.tweet)
+        if (handled?.link) final.links!.push(handled.link)
+        if (handled?.attachment) final.attachments!.push(handled.attachment)
         break
       }
       case EmbedType.Video: {
-        handleVideoEmbed(embed)
+        const { link, attachment } = handleVideoEmbed(embed)
+        if (link) final.links!.push(link)
+        if (attachment) final.attachments!.push(attachment)
         break
       }
     }

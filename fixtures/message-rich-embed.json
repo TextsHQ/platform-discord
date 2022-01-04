@@ -1,12 +1,12 @@
 {
-  "id": "863775529790734357",
+  "id": "904436904487977110",
   "type": 0,
   "content": "",
   "channel_id": "809455844453646377",
   "author": {
     "id": "780098998044065822",
     "username": "Smort",
-    "avatar": "ac81be85707e9c67f54a4d88d59bc12e",
+    "avatar": "94ec692c8665a11bf5f8f201b4b4871e",
     "discriminator": "8727",
     "public_flags": 65536,
     "bot": true
@@ -15,9 +15,9 @@
   "embeds": [
     {
       "type": "rich",
-      "title": "SpaceShipTwo | VSS Unity 22",
-      "description": "Powered flight of VSS Unity on the first fully crewed flight. Including the founder Sir Richard Branson.",
-      "color": 1796690,
+      "title": "Falcon 9 Block 5 | SpX USCV-3 (NASA Crew Flight 3)",
+      "description": "Third crewed operational flight of a Crew Dragon spacecraft to the International Space Station as part of NASA's Commercial Crew Program.",
+      "color": 11411286,
       "fields": [
         {
           "name": "Status: Go",
@@ -26,13 +26,19 @@
         }
       ],
       "author": {
-        "name": "Estimated Time left: T-0 day/s 0 hour/s and 54 minute/s"
+        "name": "Estimated Time left: T-2 day/s 10 hour/s and 40 minute/s"
       },
       "image": {
-        "url": "https://spacelaunchnow-prod-east.nyc3.digitaloceanspaces.com/media/launcher_images/spaceshiptwo_image_20210522140909.jpeg",
-        "proxy_url": "https://images-ext-2.discordapp.net/external/1thkXToDuXHEGxm7-hLea49cHLoWTAe2ur4kZAzgxQ0/https/spacelaunchnow-prod-east.nyc3.digitaloceanspaces.com/media/launcher_images/spaceshiptwo_image_20210522140909.jpeg",
-        "width": 1920,
-        "height": 1280
+        "url": "https://spacelaunchnow-prod-east.nyc3.digitaloceanspaces.com/media/launch_images/falcon2520925_image_20211027204441.jpg",
+        "proxy_url": "https://images-ext-2.discordapp.net/external/pbNsWNAHidOkXoAWbdktaVQR9u1UXKQ-o7Rl4eEiqKs/https/spacelaunchnow-prod-east.nyc3.digitaloceanspaces.com/media/launch_images/falcon2520925_image_20211027204441.jpg",
+        "width": 1425,
+        "height": 1365
+      },
+      "thumbnail": {
+        "url": "https://spacelaunchnow-prod-east.nyc3.digitaloceanspaces.com/media/program_images/commercial2520_program_20200820201209.png",
+        "proxy_url": "https://images-ext-1.discordapp.net/external/ym_PUsedzn1I0EgIyKCE2VHQdHJ9HpfyV8rAB2kz6hs/https/spacelaunchnow-prod-east.nyc3.digitaloceanspaces.com/media/program_images/commercial2520_program_20200820201209.png",
+        "width": 994,
+        "height": 1024
       }
     }
   ],
@@ -41,7 +47,7 @@
   "pinned": false,
   "mention_everyone": false,
   "tts": false,
-  "timestamp": "2021-07-11T13:35:34.475000+00:00",
+  "timestamp": "2021-10-31T18:29:21.655000+00:00",
   "edited_timestamp": null,
   "flags": 0,
   "components": []

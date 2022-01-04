@@ -5,7 +5,7 @@ import { uniqBy } from 'lodash'
 import { texts, CurrentUser, MessageContent, PaginationArg, Thread, Message, ServerEventType, OnServerEventCallback, ActivityType, User, MessageSendOptions, ReAuthError, PresenceMap, Paginated, FetchOptions, ServerEvent, CustomEmojiMap, UserPresence, CustomEmoji } from '@textshq/platform-sdk'
 import type { APIChannel, APIEmoji, APIGuild, APIReaction, APIUser, GatewayPresenceUpdateData, Snowflake } from 'discord-api-types'
 
-import { mapChannel, mapCurrentUser, mapMessage, mapPresence, mapReaction, mapThread, mapUser } from './mappers'
+import { mapChannel, mapCurrentUser, mapMessage, mapPresence, mapReaction, mapThread, mapUser } from './mappers/mappers'
 import WSClient from './websocket/wsclient'
 import { GatewayCloseCode, GatewayMessageType, OPCode } from './websocket/constants'
 import { defaultPacker } from './packers'
