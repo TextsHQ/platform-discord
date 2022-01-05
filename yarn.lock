@@ -817,7 +817,7 @@ __metadata:
     "@types/node": ^16.7.10
     "@types/ws": ^7.4.7
     discord-api-types: ^0.22.0
-    erlpack: ^0.1.3
+    erlpack: ^0.1.4
     eslint: ^7.32.0
     form-data: ^4.0.0
     jest: ^27.1.0
@@ -2052,14 +2052,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"erlpack@npm:^0.1.3":
-  version: 0.1.3
-  resolution: "erlpack@npm:0.1.3"
+"erlpack@npm:^0.1.4":
+  version: 0.1.4
+  resolution: "erlpack@npm:0.1.4"
   dependencies:
     bindings: ^1.5.0
-    nan: ^2.14.0
+    nan: ^2.15.0
     node-gyp: latest
-  checksum: 7ef4effc58ec90f31bae6450f732abac7f7b52942a3838dc25aac2866a7ef3385ac38fa324669b4be913f6fbacd36a4e512fd083fdbd7592240789db689c95d6
+  checksum: d5bcc4a5eddec0b6040f9ef9dc028250c14343d275d6e091dc2db2bcaecc11b09cdf119720a333afba688cf35cd5a1da4ecdc79862c4d15f5426a90e756cfc50
   languageName: node
   linkType: hard
 
@@ -4262,7 +4262,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"nan@npm:^2.14.0":
+"nan@npm:^2.15.0":
   version: 2.15.0
   resolution: "nan@npm:2.15.0"
   dependencies:
