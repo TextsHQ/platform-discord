@@ -73,8 +73,6 @@ export default class DiscordNetworkAPI {
 
   startPolling?: () => void
 
-  stopPolling?: () => void
-
   ready = false
 
   currentUser?: CurrentUser
@@ -99,7 +97,7 @@ export default class DiscordNetworkAPI {
     // TODO: Check if disconnecting from WS is needed here
   }
 
-  dispose = () => {
+  disconnect = () => {
     this.ready = false
     this.client?.disconnect()
     this.client = undefined

@@ -22,13 +22,12 @@ export default class Discord implements PlatformAPI {
 
     await this.api.login(session)
 
-    this.api.startPolling = this.startPolling
-    this.api.stopPolling = this.stopPolling
+    // this.api.startPolling = this.startPolling
   }
 
   dispose = () => {
-    if (this.pollingInterval) clearInterval(this.pollingInterval)
-    return this.api.dispose()
+    this.api.disconnect()
+    this.stopPolling(false)
   }
 
   getCurrentUser = () => this.api.getCurrentUser()
@@ -123,7 +122,7 @@ export default class Discord implements PlatformAPI {
         const user = await this.api.getCurrentUser()
         if (user) {
           texts.log('[discord] Poll successful!')
-          await this.stopPolling()
+          await this.stopPolling(true)
           return true
         }
       } catch (error) {
@@ -135,13 +134,15 @@ export default class Discord implements PlatformAPI {
     if (!success) this.pollingInterval = setInterval(action, POLLING_INTERVAL)
   }
 
-  stopPolling = async () => {
+  stopPolling = async (success: boolean) => {
     texts.log('[discord] Stopping polling')
 
-    if (this.pollingInterval) clearInterval(this.pollingInterval)
+    if (this.pollingInterval != null) clearInterval(this.pollingInterval)
     this.pollingInterval = undefined
 
-    await this.api.connect(true, true)
-    if (this.api.lastFocusedThread) this.api.eventCallback?.([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: this.api.lastFocusedThread }])
+    if (success) {
+      await this.api.connect(true, true)
+      if (this.api.lastFocusedThread) this.api.eventCallback?.([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: this.api.lastFocusedThread }])
+    }
   }
 }
