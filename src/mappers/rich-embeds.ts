@@ -1,7 +1,7 @@
 import { MessageAttachmentType, texts } from '@textshq/platform-sdk'
 import type { MessageAttachment, MessageLink, Tweet } from '@textshq/platform-sdk'
 import type { APIEmbed } from 'discord-api-types'
-import { mapMimeType } from '../util'
+import { mapMimeType, parseMediaURL } from '../util'
 import type { DiscordMessage } from '../types'
 
 // TODO: Article embed (shows up as unknown)
@@ -10,12 +10,13 @@ export const handleArticleEmbed = (embed: APIEmbed) => {
 }
 
 export const handleGifvEmbed = (embed: APIEmbed): MessageAttachment => {
-  const url = embed.video?.url ?? embed.url
+  const url = (embed.video?.url ?? embed.url)!
+  const { type, isGif } = parseMediaURL(url)
   const attachment: MessageAttachment = {
     id: url!,
-    type: MessageAttachmentType.IMG,
-    mimeType: url ? mapMimeType(url) : undefined,
-    isGif: true,
+    type,
+    mimeType: mapMimeType(url),
+    isGif,
     srcURL: url,
     size: embed.video?.width && embed.video.height ? { width: embed.video.width, height: embed.video.height } : undefined,
   }
@@ -24,11 +25,12 @@ export const handleGifvEmbed = (embed: APIEmbed): MessageAttachment => {
 
 export const handleImageEmbed = (embed: APIEmbed): MessageAttachment => {
   const image = embed.image ?? embed.thumbnail
+  const { type, isGif } = parseMediaURL((image?.url ?? image?.proxy_url)!)
   const attachment: MessageAttachment = {
     id: (embed.url ?? image?.url)!,
-    type: MessageAttachmentType.IMG,
+    type,
     mimeType: image?.url ? mapMimeType(image.url) : undefined,
-    isGif: image?.url?.toLowerCase().endsWith('.gif'),
+    isGif,
     srcURL: image?.url,
     size: image?.width && image.height ? { width: image.width, height: image.height } : undefined,
   }
@@ -125,17 +127,20 @@ export const handleRichEmbed = (embed: APIEmbed, message: DiscordMessage): { tex
       }
 
       const image = embed.image ?? embed.thumbnail
-      if (image) {
+      const imageURL = image?.url ?? image?.proxy_url
+      if (image && imageURL) {
+        const { type, isGif } = parseMediaURL(imageURL)
         const attachment: MessageAttachment = {
-          id: image.url!,
-          type: MessageAttachmentType.IMG,
-          srcURL: image.url,
+          id: imageURL,
+          type,
+          srcURL: imageURL,
           size: image.width && image.height ? { width: image.width, height: image.height } : undefined,
+          isGif,
         }
         final.attachment = attachment
       }
 
-      break
+      return final
     }
   }
 }

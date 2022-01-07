@@ -1,3 +1,4 @@
+import { MessageAttachmentType } from '@textshq/platform-sdk'
 import { EPOCH as DISCORD_EPOCH, EPOCH_BI as DISCORD_EPOCH_BI } from './discord-constants'
 
 export const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
@@ -24,25 +25,11 @@ export function generateSnowflake(timestamp = Date.now(), workerID = 1n, process
   return ((BigInt(timestamp) - DISCORD_EPOCH_BI) << 22n) | (workerID << 17n) | (processID << 12n) | snowflakeIncrement++
 }
 
-// TODO: Improve this
-const MIME_TYPES: { [key: string]: string } = {
-  gif: 'image/gif',
-  png: 'image/png',
-  jpg: 'image/jpeg',
-  jpeg: 'image/jpeg',
-  mp4: 'video/mp4',
-}
-export function mapMimeType(url: string): string | undefined {
-  const ext = url.split('.').pop()?.toLowerCase()
-  if (!ext) return
-  return MIME_TYPES[ext]
-}
-
 // @ts-expect-error bigint notation
 let scienceIncrement = 0n
 
 // https://docs.google.com/document/d/1b5aDx7S1iLHoeb6B56izZakbXItA84gUjFzK-0OBwy0
-export function generateScienceClientUUID(userIDStr?: string): string | undefined {
+export const generateScienceClientUUID = (userIDStr?: string): string | undefined => {
   if (!userIDStr) return
 
   const randomPrefix = 0 | Math.floor(4294967296 * Math.random())
@@ -66,6 +53,46 @@ export function generateScienceClientUUID(userIDStr?: string): string | undefine
   r.writeInt32LE(Number(scienceIncrement++), 20)
 
   return r.toString('base64')
+}
+
+// TODO: Support more types / improve this
+const MIME_TYPES: { [key: string]: string } = {
+  gif: 'image/gif',
+  gifv: 'image/gif',
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  mp4: 'video/mp4',
+}
+export const mapMimeType = (url: string): string | undefined => {
+  const ext = url.split('.').pop()?.toLowerCase()
+  if (!ext) return
+  return MIME_TYPES[ext]
+}
+
+export const parseMediaURL = (url: string): { isGif?: boolean, type: MessageAttachmentType } => {
+  const extension = url.split('.').pop()?.toLowerCase()
+  switch (extension) {
+    case 'gif':
+    case 'gifv':
+      return { isGif: true, type: MessageAttachmentType.IMG }
+    case 'png':
+    case 'jpeg':
+    case 'jpg':
+    case 'webp':
+      return { isGif: false, type: MessageAttachmentType.IMG }
+    case 'avi':
+    case 'mp4':
+    case 'mov':
+      return { type: MessageAttachmentType.VIDEO }
+    case 'mp3':
+    case 'wav':
+    case 'm4a':
+    case 'ogg':
+      return { type: MessageAttachmentType.AUDIO }
+    default:
+      return { type: MessageAttachmentType.UNKNOWN }
+  }
 }
 
 export const getUserAvatar = (userID: string, avatarID: string) => `https://cdn.discordapp.com/avatars/${userID}/${avatarID}.${avatarID.startsWith('a_') ? 'gif' : 'png'}?size=256`
