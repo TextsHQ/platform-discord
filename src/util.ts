@@ -5,7 +5,7 @@ export const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, 
 
 export const getDataURI = (buffer: Buffer, mimeType = '') => `data:${mimeType};base64,${buffer.toString('base64')}`
 
-export function getTimestampFromSnowflake(snowflake?: string): Date | undefined {
+export function getTimestampFromSnowflake(snowflake?: string | null): Date | undefined {
   if (!snowflake) return
   const int = BigInt.asUintN(64, BigInt(snowflake))
   // @ts-expect-error bigint notation

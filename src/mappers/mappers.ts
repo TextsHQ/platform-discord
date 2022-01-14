@@ -46,31 +46,7 @@ export function mapCurrentUser(user: APIUser): CurrentUser {
   }
 }
 
-export function mapChannel(channel: APIChannel, isMuted: Boolean, guildName?: string): Thread {
-  return {
-    _original: JSON.stringify(channel),
-    folderName: guildName,
-    id: channel.id,
-    title: channel.name,
-    isUnread: false, // check it somehow
-    isReadOnly: false, // check permissions
-    mutedUntil: isMuted ? 'forever' : undefined,
-    type: 'channel', // 'channel' | 'broadcast'
-    // createdAt: guildJoinDate,
-    description: channel.topic ?? undefined,
-    timestamp: getTimestampFromSnowflake(channel.last_message_id ?? undefined),
-    messages: {
-      items: [],
-      hasMore: true,
-    },
-    participants: {
-      items: [],
-      hasMore: true,
-    },
-  }
-}
-
-export function mapThread(thread: APIChannel, lastReadMessageID?: string, currentUser?: User): Thread {
+export function mapThread(thread: APIChannel, lastReadMessageID?: string, isMuted?: boolean, currentUser?: User): Thread {
   const type: ThreadType = THREAD_TYPES[thread.type]!
 
   const participants: User[] = thread.recipients?.map(mapUser) ?? []
@@ -91,6 +67,7 @@ export function mapThread(thread: APIChannel, lastReadMessageID?: string, curren
     imgURL: thread.icon ? getThreadIcon(thread.id, thread.icon) : undefined,
     description: thread.topic ?? undefined,
     timestamp,
+    mutedUntil: isMuted ? 'forever' : undefined,
     messages: {
       hasMore: true,
       items: [],
@@ -98,9 +75,6 @@ export function mapThread(thread: APIChannel, lastReadMessageID?: string, curren
     participants: {
       hasMore: false,
       items: participants,
-    },
-    extra: {
-      lastMessageID: thread.last_message_id,
     },
   }
 }

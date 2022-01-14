@@ -3,9 +3,9 @@ import FormData from 'form-data'
 import { promises as fs } from 'fs'
 import { uniqBy } from 'lodash'
 import { texts, CurrentUser, MessageContent, PaginationArg, Thread, Message, ServerEventType, OnServerEventCallback, ActivityType, User, MessageSendOptions, ReAuthError, PresenceMap, Paginated, FetchOptions, ServerEvent, CustomEmojiMap, UserPresence, CustomEmoji } from '@textshq/platform-sdk'
-import type { APIChannel, APIEmoji, APIGuild, APIReaction, APIUser, GatewayPresenceUpdateData, Snowflake } from 'discord-api-types'
+import { APIChannel, APIEmoji, APIGuild, APIReaction, APIUser, ChannelType, GatewayPresenceUpdateData, Snowflake } from 'discord-api-types/v9'
 
-import { mapChannel, mapCurrentUser, mapMessage, mapPresence, mapReaction, mapThread, mapUser } from './mappers/mappers'
+import { mapCurrentUser, mapMessage, mapPresence, mapReaction, mapThread, mapUser } from './mappers/mappers'
 import WSClient from './websocket/wsclient'
 import { GatewayCloseCode, GatewayMessageType, OPCode } from './websocket/constants'
 import { defaultPacker } from './packers'
@@ -147,7 +147,7 @@ export default class DiscordNetworkAPI {
       // @ts-expect-error
       .sort((a, b) => a.last_message_id - b.last_message_id)
       .reverse()
-      .map(t => mapThread(t, this.readStateMap.get(t.id), this.currentUser))
+      .map(t => mapThread(t, this.readStateMap.get(t.id), this.mutedChannels.has(t.id), this.currentUser))
 
     threads.flatMap(t => t.participants.items).forEach(p => this.userMappings.set(p.username, p.id))
 
@@ -167,7 +167,7 @@ export default class DiscordNetworkAPI {
     })
 
     if (!res || res.statusCode < 200 || res.statusCode > 204 || !res.json) throw new Error(getErrorMessage(res))
-    return mapThread(res.json, undefined, this.currentUser)
+    return mapThread(res.json, undefined, this.mutedChannels.has(res.json.id), this.currentUser)
   }
 
   /** https://discord.com/developers/docs/resources/channel#deleteclose-channel */
@@ -582,7 +582,7 @@ export default class DiscordNetworkAPI {
           const allChannels = data.guilds.map((g: APIGuild) => {
             const channels = [...g.channels ?? [], ...g.threads ?? []]
               .filter(c => !IGNORED_CHANNEL_TYPES.has(c.type))
-              .map(c => mapChannel(c, this.mutedChannels.has(c.id), g.name))
+              .map(c => mapThread(c, this.readStateMap.get(c.id), this.mutedChannels.has(c.id), this.currentUser))
 
             return [g.id, channels]
           })
@@ -620,20 +620,32 @@ export default class DiscordNetworkAPI {
       case GatewayMessageType.CHANNEL_CREATE: {
         if (!ENABLE_GUILDS && data.guild_id) return
 
-        const channel = mapChannel(data, this.mutedChannels.has(data.id))
+        switch (data.type) {
+          case ChannelType.GuildText:
+          case ChannelType.GuildNews:
+          case ChannelType.GuildNewsThread:
+          case ChannelType.GuildPublicThread:
+          case ChannelType.GuildPrivateThread: {
+            // const channels = [...this.channelsMap?.get(data.guild_id) ?? [], channel]
+            // this.channelsMap?.set(data.guild_id, channels)
+            break
+          }
+          case ChannelType.DM:
+          case ChannelType.GroupDM: {
+            const channel = mapThread(data, this.readStateMap.get(data.id), this.mutedChannels.has(data.id), this.currentUser)
 
-        this.eventCallback([{
-          type: ServerEventType.STATE_SYNC,
-          mutationType: 'upsert',
-          objectName: 'thread',
-          objectIDs: {
-            threadID: data.id,
-          },
-          entries: [channel],
-        }])
-
-        const channels = [...this.channelsMap?.get(data.guild_id) ?? [], channel]
-        this.channelsMap?.set(data.guild_id, channels)
+            this.eventCallback([{
+              type: ServerEventType.STATE_SYNC,
+              mutationType: 'upsert',
+              objectName: 'thread',
+              objectIDs: {
+                threadID: data.id,
+              },
+              entries: [channel],
+            }])
+            break
+          }
+        }
 
         break
       }
@@ -648,7 +660,7 @@ export default class DiscordNetworkAPI {
         if (index < 0) return
 
         const channel = channels[index]
-        const newChannel = mapChannel(data, this.mutedChannels.has(data.id))
+        const newChannel = mapThread(data, this.readStateMap.get(data.id), this.mutedChannels.has(data.id), this.currentUser)
         Object.assign(channel, newChannel)
         channels[index] = channel
         this.channelsMap?.set(data.guild_id, channels)
@@ -747,7 +759,7 @@ export default class DiscordNetworkAPI {
 
         const channels = (data.channels as APIChannel[])
           .filter(c => !IGNORED_CHANNEL_TYPES.has(c.type))
-          .map(c => mapChannel(c, this.mutedChannels.has(c.id)), data.name)
+          .map(c => mapThread(c, this.readStateMap.get(c.id), this.mutedChannels.has(c.id), this.currentUser))
 
         this.channelsMap?.set(data.id, channels)
 
