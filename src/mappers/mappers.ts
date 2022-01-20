@@ -247,14 +247,14 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
 
   final.attachments = [...final.attachments!, ...attachments, ...stickers].filter(Boolean)
   final.tweets = uniqBy(final.tweets, 'id')
-  if (final.tweets?.length > 0) {
-    // TODO: Check if this works every time (can there be a tweet & attachment/link?)
-    final.attachments = undefined
-    final.links = undefined
-  }
+  // if (final.tweets?.length > 0) {
+  //   // TODO: Check if this works every time (can there be a tweet & attachment/link?)
+  //   final.attachments = undefined
+  //   final.links = undefined
+  // }
 
-  const attachmentURLs = final.attachments?.map(a => a.id)
-  if (attachmentURLs?.length === 1 && attachmentURLs[0] === message.content) final.text = ''
+  // const attachmentURLs = final.attachments?.map(a => a.id)
+  // if (attachmentURLs?.length === 1 && attachmentURLs[0] === message.content) final.text = ''
 
   return final
 }

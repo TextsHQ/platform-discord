@@ -17,6 +17,7 @@ import { SUPER_PROPERTIES } from './discord-constants'
 
 import _emojis from './resources/emojis.json'
 import _emojiShortcuts from './resources/shortcuts.json'
+import { PLATFORM_NAME } from './api'
 
 const API_VERSION = 9
 const API_ENDPOINT = `https://discord.com/api/v${API_VERSION}`
@@ -857,13 +858,23 @@ export default class DiscordNetworkAPI {
       case GatewayMessageType.MESSAGE_UPDATE: {
         if (!ENABLE_GUILDS && data.guild_id) return
 
-        const message = mapMessage(data, this.currentUser?.id)
+        let mapped = data
+
+        const og = texts.getOriginalObject?.(PLATFORM_NAME, this.accountID!, ['message', data.id])
+        if (og) {
+          const ogParsed = JSON.parse(og)
+          Object.assign(ogParsed, data)
+          mapped = ogParsed
+        }
+
+        const message = mapMessage(mapped, this.currentUser?.id)
         if (!message) return
+
         this.eventCallback([{
           type: ServerEventType.STATE_SYNC,
           mutationType: 'update',
           objectName: 'message',
-          objectIDs: { threadID: data.channel_id },
+          objectIDs: { threadID: mapped.channel_id },
           entries: [message],
         }])
         break
