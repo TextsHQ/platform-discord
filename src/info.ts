@@ -54,6 +54,14 @@ const info: PlatformInfo = {
     recordedAudioMimeType: 'audio/ogg',
     gifMimeType: 'image/gif',
     supportsCaption: true,
+    maxSize: {
+      // todo: conditionally change for nitro and non-nitro users with platform info override
+      // Discord Nitro: "Upload what you want with increased 100MB upload size."
+      image: 100 * 1024 * 1024,
+      video: 100 * 1024 * 1024,
+      audio: 100 * 1024 * 1024,
+      files: 100 * 1024 * 1024,
+    },
   },
   maxGroupTitleLength: 100,
   prefs: {
