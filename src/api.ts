@@ -92,7 +92,7 @@ export default class Discord implements PlatformAPI {
 
   removeReaction = (threadID: string, messageID: string, reactionKey: string) => this.api.removeReaction(threadID, messageID, reactionKey)
 
-  sendActivityIndicator = (type: ActivityType, threadID: string) => this.api.setTyping(type, threadID)
+  sendActivityIndicator = (type: ActivityType, threadID?: string) => this.api.setTyping(type, threadID)
 
   sendReadReceipt = (threadID: string, messageID?: string) => {
     if (!messageID) {

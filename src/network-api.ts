@@ -444,8 +444,8 @@ export default class DiscordNetworkAPI {
     if (!res || res.statusCode < 200 || res.statusCode > 204) throw new Error(getErrorMessage(res))
   }
 
-  setTyping = async (type: ActivityType, threadID: string): Promise<void> => {
-    if (type === ActivityType.TYPING && this.ready) await this.fetch({ method: 'POST', url: `channels/${threadID}/typing` })
+  setTyping = async (type: ActivityType, threadID?: string): Promise<void> => {
+    if (type === ActivityType.TYPING && this.ready && threadID) await this.fetch({ method: 'POST', url: `channels/${threadID}/typing` })
   }
 
   getUsersPresence = async () => {
