@@ -21,7 +21,7 @@
     "erlpack": "^0.1.4"
   },
   "dependencies": {
-    "@textshq/platform-sdk": "https://github.com/TextsHQ/platform-sdk#main",
+    "@textshq/platform-sdk": "https://github.com/TextsHQ/platform-sdk#1fecb954d2530c482aad8c40b4ef5d4be6b2ae23",
     "discord-api-types": "^0.22.0",
     "erlpack": "^0.1.4",
     "eslint": "^7.32.0",
