@@ -3,6 +3,7 @@ import DiscordNetworkAPI from './network-api'
 import { getDataURI } from './util'
 
 const POLLING_INTERVAL = 10_000
+const LOG_PREFIX = '[discord]'
 
 export const PLATFORM_NAME = 'discord'
 
@@ -111,24 +112,24 @@ export default class Discord implements PlatformAPI {
   onThreadSelected = (threadID?: string) => this.api.onThreadSelected(threadID)
 
   onResumeFromSleep = async () => {
-    texts.log('[discord] Resumed from sleep')
+    texts.log(`${LOG_PREFIX} Resumed from sleep`)
     await this.api.connect(true, true)
     if (this.api.lastFocusedThread) this.api.eventCallback?.([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: this.api.lastFocusedThread }])
   }
 
   startPolling = async () => {
-    texts.log(`[discord] Starting polling, interval: ${POLLING_INTERVAL}`)
+    texts.log(`${LOG_PREFIX} Starting polling, interval: ${POLLING_INTERVAL}`)
     const action = async (): Promise<boolean> => {
-      texts.log('[discord] Polling...')
+      texts.log(`${LOG_PREFIX} Polling...`)
       try {
         const user = await this.api.getCurrentUser()
         if (user) {
-          texts.log('[discord] Poll successful!')
+          texts.log(`${LOG_PREFIX} Poll successful!`)
           await this.stopPolling(true)
           return true
         }
       } catch (error) {
-        texts.log('[discord] Poll failed!', error)
+        texts.log(`${LOG_PREFIX} Poll failed!`, error)
       }
       return false
     }
@@ -137,7 +138,7 @@ export default class Discord implements PlatformAPI {
   }
 
   stopPolling = async (success: boolean) => {
-    texts.log('[discord] Stopping polling')
+    texts.log(`${LOG_PREFIX} Stopping polling`)
 
     if (this.pollingInterval != null) clearInterval(this.pollingInterval)
     this.pollingInterval = undefined
