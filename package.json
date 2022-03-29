@@ -21,7 +21,7 @@
     "erlpack": "^0.1.4"
   },
   "dependencies": {
-    "@textshq/platform-sdk": "https://github.com/TextsHQ/platform-sdk#1fecb954d2530c482aad8c40b4ef5d4be6b2ae23",
+    "@textshq/platform-sdk": "https://github.com/TextsHQ/platform-sdk#main",
     "discord-api-types": "^0.22.0",
     "erlpack": "^0.1.4",
     "eslint": "^7.32.0",
@@ -31,12 +31,12 @@
   },
   "devDependencies": {
     "@textshq/eslint-config": "https://github.com/TextsHQ/eslint-config",
-    "@types/jest": "^27.0.1",
-    "@types/lodash": "^4.14.177",
+    "@types/jest": "^27.4.1",
+    "@types/lodash": "^4.14.181",
     "@types/node": "^16.7.10",
     "@types/ws": "^7.4.7",
-    "jest": "^27.1.0",
-    "typescript": "^4.3.4"
+    "jest": "^27.5.1",
+    "typescript": "^4.6.3"
   },
   "packageManager": "yarn@3.1.0"
 }
