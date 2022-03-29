@@ -639,9 +639,7 @@ export default class DiscordNetworkAPI {
               type: ServerEventType.STATE_SYNC,
               mutationType: 'upsert',
               objectName: 'thread',
-              objectIDs: {
-                threadID: data.id,
-              },
+              objectIDs: {},
               entries: [channel],
             }])
             break
@@ -670,9 +668,7 @@ export default class DiscordNetworkAPI {
           type: ServerEventType.STATE_SYNC,
           mutationType: 'update',
           objectName: 'thread',
-          objectIDs: {
-            threadID: data.id,
-          },
+          objectIDs: {},
           entries: [channel],
         }])
         break
@@ -685,9 +681,7 @@ export default class DiscordNetworkAPI {
           type: ServerEventType.STATE_SYNC,
           mutationType: 'delete',
           objectName: 'thread',
-          objectIDs: {
-            threadID: data.id,
-          },
+          objectIDs: {},
           entries: [data.id],
         }])
         break
@@ -768,9 +762,7 @@ export default class DiscordNetworkAPI {
           type: ServerEventType.STATE_SYNC,
           mutationType: 'upsert',
           objectName: 'thread',
-          objectIDs: {
-            threadID: c.id,
-          },
+          objectIDs: {},
           entries: [c],
         }))
 
@@ -792,9 +784,7 @@ export default class DiscordNetworkAPI {
           type: ServerEventType.STATE_SYNC,
           mutationType: 'delete',
           objectName: 'thread',
-          objectIDs: {
-            threadID: id,
-          },
+          objectIDs: {},
           entries: [id],
         }))
         this.eventCallback(events)
@@ -1011,9 +1001,7 @@ export default class DiscordNetworkAPI {
           type: ServerEventType.STATE_SYNC,
           mutationType: 'update',
           objectName: 'thread',
-          objectIDs: {
-            threadID,
-          },
+          objectIDs: {},
           entries: [{ id: threadID, isUnread: data.ack_type === 0, lastReadMessageID: data.message_id }],
         }])
         break
