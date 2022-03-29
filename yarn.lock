@@ -2,7 +2,7 @@
 # Manual changes might be lost - proceed with caution!
 
 __metadata:
-  version: 6
+  version: 5
   cacheKey: 8
 
 "@ampproject/remapping@npm:^2.1.0":
@@ -573,7 +573,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@babel/plugin-proposal-private-property-in-object@npm:^7.16.0, @babel/plugin-proposal-private-property-in-object@npm:^7.16.7":
+"@babel/plugin-proposal-private-property-in-object@npm:^7.16.7":
   version: 7.16.7
   resolution: "@babel/plugin-proposal-private-property-in-object@npm:7.16.7"
   dependencies:
@@ -1866,17 +1866,17 @@ __metadata:
   dependencies:
     "@textshq/eslint-config": "https://github.com/TextsHQ/eslint-config"
     "@textshq/platform-sdk": "https://github.com/TextsHQ/platform-sdk"
-    "@types/jest": ^27.0.1
-    "@types/lodash": ^4.14.177
+    "@types/jest": ^27.4.1
+    "@types/lodash": ^4.14.181
     "@types/node": ^16.7.10
     "@types/ws": ^7.4.7
     discord-api-types: ^0.22.0
     erlpack: ^0.1.4
     eslint: ^7.32.0
     form-data: ^4.0.0
-    jest: ^27.1.0
+    jest: ^27.5.1
     lodash: ^4.17.21
-    typescript: ^4.3.4
+    typescript: ^4.6.3
     ws: ^8.2.1
   languageName: unknown
   linkType: soft
@@ -1979,7 +1979,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/jest@npm:^27.0.1":
+"@types/jest@npm:^27.4.1":
   version: 27.4.1
   resolution: "@types/jest@npm:27.4.1"
   dependencies:
@@ -2003,10 +2003,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/lodash@npm:^4.14.177":
-  version: 4.14.179
-  resolution: "@types/lodash@npm:4.14.179"
-  checksum: 71faa0c8071732c2b7f0bd092850d3cea96fc7912055d57d819cf2ab399a64150e4190d8a4ea35a0905662ddc118be9d2abd55891d8047c085acf98608156149
+"@types/lodash@npm:^4.14.181":
+  version: 4.14.181
+  resolution: "@types/lodash@npm:4.14.181"
+  checksum: 0d1863d8383fd2f8bb42e9e3fc1d6255bb88ff034d6df848941063698944313dae944fc1270315613e3d303fae7c7a9a86085ad3235ed6204c56c4b0b3699aa9
   languageName: node
   linkType: hard
 
@@ -5139,7 +5139,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"jest@npm:^27.1.0":
+"jest@npm:^27.5.1":
   version: 27.5.1
   resolution: "jest@npm:27.5.1"
   dependencies:
@@ -6888,23 +6888,23 @@ __metadata:
   languageName: node
   linkType: hard
 
-"typescript@npm:^4.3.4":
-  version: 4.6.2
-  resolution: "typescript@npm:4.6.2"
+"typescript@npm:^4.6.3":
+  version: 4.6.3
+  resolution: "typescript@npm:4.6.3"
   bin:
     tsc: bin/tsc
     tsserver: bin/tsserver
-  checksum: 8a44ed7e6f6c4cb1ebe8cf236ecda2fb119d84dcf0fbd77e707b2dfea1bbcfc4e366493a143513ce7f57203c75da9d4e20af6fe46de89749366351046be7577c
+  checksum: 255bb26c8cb846ca689dd1c3a56587af4f69055907aa2c154796ea28ee0dea871535b1c78f85a6212c77f2657843a269c3a742d09d81495b97b914bf7920415b
   languageName: node
   linkType: hard
 
-"typescript@patch:typescript@^4.3.4#~builtin<compat/typescript>":
-  version: 4.6.2
-  resolution: "typescript@patch:typescript@npm%3A4.6.2#~builtin<compat/typescript>::version=4.6.2&hash=bda367"
+"typescript@patch:typescript@^4.6.3#~builtin<compat/typescript>":
+  version: 4.6.3
+  resolution: "typescript@patch:typescript@npm%3A4.6.3#~builtin<compat/typescript>::version=4.6.3&hash=ddd1e8"
   bin:
     tsc: bin/tsc
     tsserver: bin/tsserver
-  checksum: 40b493a71747fb89fa70df104e2c4a5e284b43750af5bea024090a5261cefa387f7a9372411b13030f7bf5555cee4275443d08805642ae5c74ef76740854a4c7
+  checksum: fe6bdc1afb2f145ddb7b0a3a31f96352209f6a5704d97f038414ea22ff9d8dd42f32cfb6652e30458d7d958d2d4e85de2df11c574899c6f750a6b3c0e90a3a76
   languageName: node
   linkType: hard
 
