@@ -1,12 +1,14 @@
 import zlib from 'zlib'
+import { texts } from '@textshq/platform-sdk'
 import type { Data as WSData } from 'ws'
 import type Erlpack from 'erlpack'
 
 let erlpack: typeof Erlpack | undefined
 try {
   erlpack = require('erlpack')
-} catch {
-  // swallow
+  texts.log('[discord] erlpack loaded')
+} catch (error) {
+  texts.error(error)
 }
 
 export type Packer = {

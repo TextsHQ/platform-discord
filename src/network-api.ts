@@ -646,9 +646,7 @@ export default class DiscordNetworkAPI {
               type: ServerEventType.STATE_SYNC,
               mutationType: 'upsert',
               objectName: 'thread',
-              objectIDs: {
-                threadID: d.id,
-              },
+              objectIDs: {},
               entries: [channel],
             }])
             break
@@ -677,9 +675,7 @@ export default class DiscordNetworkAPI {
           type: ServerEventType.STATE_SYNC,
           mutationType: 'update',
           objectName: 'thread',
-          objectIDs: {
-            threadID: d.id,
-          },
+          objectIDs: {},
           entries: [channel],
         }])
         break
@@ -692,9 +688,7 @@ export default class DiscordNetworkAPI {
           type: ServerEventType.STATE_SYNC,
           mutationType: 'delete',
           objectName: 'thread',
-          objectIDs: {
-            threadID: d.id,
-          },
+          objectIDs: {},
           entries: [d.id],
         }])
         break
@@ -775,9 +769,7 @@ export default class DiscordNetworkAPI {
           type: ServerEventType.STATE_SYNC,
           mutationType: 'upsert',
           objectName: 'thread',
-          objectIDs: {
-            threadID: c.id,
-          },
+          objectIDs: {},
           entries: [c],
         }))
 
@@ -799,9 +791,7 @@ export default class DiscordNetworkAPI {
           type: ServerEventType.STATE_SYNC,
           mutationType: 'delete',
           objectName: 'thread',
-          objectIDs: {
-            threadID: id,
-          },
+          objectIDs: {},
           entries: [id],
         }))
         this.eventCallback(events)
@@ -1018,9 +1008,7 @@ export default class DiscordNetworkAPI {
           type: ServerEventType.STATE_SYNC,
           mutationType: 'update',
           objectName: 'thread',
-          objectIDs: {
-            threadID,
-          },
+          objectIDs: {},
           entries: [{ id: threadID, isUnread: d.ack_type === 0, lastReadMessageID: d.message_id }],
         }])
         break
