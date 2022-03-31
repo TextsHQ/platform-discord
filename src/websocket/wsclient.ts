@@ -83,23 +83,23 @@ class WSClient {
       throw WSError.wsNotReady
     }
 
-    this.ws.on('open', this.onWSOpen)
-    this.ws.on('close', this.onWSClose)
-    this.ws.on('message', this.onWSMessage)
-    this.ws.on('error', this.onWSError)
-    this.ws.on('unexpected-response', this.onWSUnexpectedResponse)
+    this.ws.on('open', this.wsOpen)
+    this.ws.on('close', this.wsClose)
+    this.ws.on('message', this.wsMessage)
+    this.ws.on('error', this.wsError)
+    this.ws.on('unexpected-response', this.wsUnexpectedResponse)
   }
 
-  private onWSOpen = () => {
+  private wsOpen = () => {
     texts.log(LOG_PREFIX, 'WebSocket open!')
 
   }
 
-  private onWSClose = (code: number, reason: string) => {
+  private wsClose = (code: number, reason: string) => {
     texts.log(LOG_PREFIX, `WebSocket closed! Code: ${code}, reason: '${reason}'`)
   }
 
-  private onWSMessage = (data: WebSocket.Data) => {
+  private wsMessage = (data: WebSocket.Data) => {
     try {
       const unpacked = this.packer.unpack(data) as GatewayMessage
       if (!unpacked) throw WSError.errorUnpacking
@@ -111,18 +111,18 @@ class WSClient {
     }
   }
 
-  private onWSError = (err: Error) => {
+  private wsError = (err: Error) => {
     texts.log(LOG_PREFIX, `WebSocket error: ${err}`)
   }
 
-  private onWSUnexpectedResponse = (request: ClientRequest, response: IncomingMessage) => {
+  private wsUnexpectedResponse = (request: ClientRequest, response: IncomingMessage) => {
     texts.log(LOG_PREFIX, 'WebSocket unexpected response!', request, response)
   }
 
-  private handleMessage = ({ op, d, s, t }: GatewayMessage) => {
-    if (s) this.lastSequenceNumber = s
+  private handleMessage = (message: GatewayMessage) => {
+    if (message.s) this.lastSequenceNumber = message.s
 
-    switch (op) {
+    switch (message.op) {
       case OPCode.DISPATCH: {
         break
       }
@@ -137,7 +137,7 @@ class WSClient {
         break
       }
       case OPCode.HELLO: {
-        this.setupHeartbeat(d.heartbeat_interval)
+        this.setupHeartbeat(message.d.heartbeat_interval)
         this.sendIdentify()
         break
       }
@@ -153,18 +153,20 @@ class WSClient {
       case OPCode.VOICE_STATE_UPDATE:
       case OPCode.RESUME:
       case OPCode.REQUEST_GUILD_MEMBERS: {
-        // Shouldn't ever happend
-        texts.log(LOG_PREFIX, `Received send-only OPCode (${op})!`, d, s, t)
+        // Shouldn't ever happen
+        texts.log(LOG_PREFIX, `Received send-only OPCode (${message.op})!`, message)
         break
       }
 
       // * Default
 
       default: {
-        texts.log(LOG_PREFIX, `Unhandled OPCode (${op})!`, d, s, t)
+        texts.log(LOG_PREFIX, `Unhandled OPCode (${message.op})!`, message)
         break
       }
     }
+
+    this.onMessage?.(message)
   }
 
   private setupHeartbeat = (interval: number) => {

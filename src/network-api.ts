@@ -545,7 +545,7 @@ export default class DiscordNetworkAPI {
   }
 
   private handleGatewayMessage = ({ op, d, t }: GatewayMessage) => {
-    // texts.log(`${LOG_PREFIX}`, op, d, t)
+    // texts.log(LOG_PREFIX, op, d, t)
 
     switch (t) {
       // * Documented
