@@ -9,7 +9,8 @@ import { mapCurrentUser, mapMessage, mapPresence, mapReaction, mapThread, mapUse
 import WSClient from './websocket/wsclient'
 import { GatewayCloseCode, GatewayMessageType, OPCode } from './websocket/constants'
 import { defaultPacker } from './packers'
-import { generateScienceClientUUID, generateSnowflake, getEmojiURL, sleep } from './util'
+import { generateScienceClientUUID, getEmojiURL, sleep } from './util'
+import { generateSnowflake } from './common-util'
 import { ENABLE_GUILDS, ENABLE_DM_GUILD_MEMBERS, ENABLE_DISCORD_ANALYTICS } from './preferences'
 import type { DiscordEmoji, DiscordMessage, DiscordReactionDetails, DiscordScienceEvent } from './types'
 import { IGNORED_CHANNEL_TYPES, ScienceEventType, USER_AGENT } from './constants'
@@ -322,8 +323,10 @@ export default class DiscordNetworkAPI {
 
     if (options?.quotedMessageID) requestContent.message_reference = { message_id: options?.quotedMessageID }
 
-    const nonce = generateSnowflake().toString()
-    this.sendMessageNonces.add(nonce)
+    const nonce = options?.pendingMessageID?.includes('-')
+      ? generateSnowflake().toString() // for ios
+      : options?.pendingMessageID
+    this.sendMessageNonces.add(nonce!)
 
     if (content.fileBuffer || content.filePath) {
       const form = new FormData()

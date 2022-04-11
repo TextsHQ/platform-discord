@@ -1,5 +1,5 @@
 import { MessageAttachmentType } from '@textshq/platform-sdk'
-import { EPOCH as DISCORD_EPOCH, EPOCH_BI as DISCORD_EPOCH_BI } from './discord-constants'
+import { EPOCH as DISCORD_EPOCH } from './discord-constants'
 
 export { setTimeout as sleep } from 'timers/promises'
 
@@ -11,18 +11,6 @@ export function getTimestampFromSnowflake(snowflake?: string | null): Date | und
   // @ts-expect-error bigint notation
   const dateBits = Number(int >> 22n)
   return new Date(dateBits + DISCORD_EPOCH)
-}
-
-// @ts-expect-error bigint notation
-let snowflakeIncrement = 0n
-
-// @ts-expect-error bigint notation
-export function generateSnowflake(timestamp = Date.now(), workerID = 1n, processID = 1n): bigint {
-  // @ts-expect-error bigint notation
-  if (snowflakeIncrement >= 4095n) snowflakeIncrement = 0n
-  // timestamp, workerID, processID, increment
-  // @ts-expect-error bigint notation
-  return ((BigInt(timestamp) - DISCORD_EPOCH_BI) << 22n) | (workerID << 17n) | (processID << 12n) | snowflakeIncrement++
 }
 
 // @ts-expect-error bigint notation
