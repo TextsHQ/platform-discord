@@ -111,8 +111,8 @@ export default class Discord implements PlatformAPI {
 
   onThreadSelected = (threadID?: string) => this.api.onThreadSelected(threadID)
 
-  onResumeFromSleep = async () => {
-    texts.log(`${LOG_PREFIX} Resumed from sleep`)
+  reconnectRealtime = async () => {
+    texts.log(`${LOG_PREFIX} reconnectRealtime`)
     await this.api.connect(true, true)
     if (this.api.lastFocusedThread) this.api.eventCallback?.([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: this.api.lastFocusedThread }])
   }

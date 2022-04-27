@@ -1,4 +1,5 @@
 import { PlatformInfo, MessageDeletionMode, Attribute } from '@textshq/platform-sdk'
+import { generateSnowflake } from './common-util'
 
 const info: PlatformInfo = {
   name: 'discord',
@@ -63,13 +64,14 @@ const info: PlatformInfo = {
     },
   },
   maxGroupTitleLength: 100,
-  prefs: {
-    // enable_guilds: {
-    //   label: 'Enable guilds',
-    //   type: 'checkbox',
-    //   default: false,
-    // },
-  },
+  generateUniqueMessageID: () => generateSnowflake().toString(),
+  // prefs: {
+  //   enable_guilds: {
+  //     label: 'Enable guilds',
+  //     type: 'checkbox',
+  //     default: false,
+  //   },
+  // },
 }
 
 export default info

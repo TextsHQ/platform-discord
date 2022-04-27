@@ -5,9 +5,6 @@ export const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Apple
 
 export const EPOCH = 1420070400000
 
-// @ts-expect-error bigint notation
-export const EPOCH_BI = 1420070400000n
-
 export const SUPER_PROPERTIES = {
   os: osPlatform() === 'darwin' ? 'Mac OS X' : 'Windows',
   browser: usesErlpack ? 'Discord Client' : 'Chrome',
