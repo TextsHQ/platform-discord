@@ -153,8 +153,7 @@ export default class DiscordNetworkAPI {
     if (!res || res.statusCode < 200 || res.statusCode > 204 || !res.json) throw new Error(getErrorMessage(res))
 
     const threads: Thread[] = (res.json as APIChannel[])
-      // @ts-expect-error
-      .sort((a, b) => a.last_message_id - b.last_message_id)
+      .sort((a, b) => +a.last_message_id! - +b.last_message_id!)
       .reverse()
       .map(t => mapThread(t, this.readStateMap.get(t.id), this.mutedChannels.has(t.id), this.currentUser))
 

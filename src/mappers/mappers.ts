@@ -1,11 +1,12 @@
 import { CurrentUser, Message, MessageActionType, MessageAttachment, MessageAttachmentType, MessageLink, MessageReaction, Thread, ThreadType, User, PartialWithID, UserPresence, texts } from '@textshq/platform-sdk'
 import { APIUser, APIChannel, EmbedType, MessageActivityType, APIAttachment, MessageType, GatewayPresenceUpdateData } from 'discord-api-types/v9'
 import { uniqBy } from 'lodash'
-import type { DiscordMessage, DiscordReactionDetails } from '../types'
+
 import { IGNORED_MESSAGE_TYPES, StickerFormat, THREAD_TYPES } from '../constants'
 import { getEmojiURL, getLottieStickerURL, getPNGStickerURL, getThreadIcon, getTimestampFromSnowflake, getUserAvatar } from '../util'
 import { mapTextAttributes } from '../text-attributes'
 import { handleArticleEmbed, handleGifvEmbed, handleImageEmbed, handleLinkEmbed, handleRichEmbed, handleVideoEmbed } from './rich-embeds'
+import type { DiscordMessage, DiscordReactionDetails } from '../types'
 
 export const mapReaction = (reaction: DiscordReactionDetails, participantID: string): MessageReaction => {
   // reaction.emoji = { id: '352592187265122304', name: 'pat' }

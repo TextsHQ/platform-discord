@@ -1,0 +1,25 @@
+{
+  "id": "975338750257274880",
+  "type": 0,
+  "content": "testing some more\n😄 \n\n```ts\nimport { useEffect, useRef } from 'react'\n\nconst Code: React.FC<{ lang: string }> = props => {\n  const { lang, children } = props\n  const ref = useRef<HTMLElement>()\n  return <code ref={ref} {...props}>{children}</code>\n}\n\nexport default Code\n```\n\n😃\n\n```ts\n  useEffect(() => {\n    if (!ref.current) return\n    (async () => {\n      const { default: hljs } = await import('highlight.js')\n      hljs.highlightBlock(ref.current)\n    })()\n  }, [ref, lang])\n```\n\nmeow",
+  "channel_id": "790193575429799966",
+  "author": {
+    "id": "550905327705391144",
+    "username": "Kishan Bagaria",
+    "avatar": "2adf1dd3cee508a5962c3025a01e51b0",
+    "avatar_decoration": null,
+    "discriminator": "6239",
+    "public_flags": 0
+  },
+  "attachments": [],
+  "embeds": [],
+  "mentions": [],
+  "mention_roles": [],
+  "pinned": false,
+  "mention_everyone": false,
+  "tts": false,
+  "timestamp": "2022-05-15T10:07:58.979000+00:00",
+  "edited_timestamp": null,
+  "flags": 0,
+  "components": []
+}
