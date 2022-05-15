@@ -31,6 +31,7 @@
   },
   "devDependencies": {
     "@textshq/eslint-config": "https://github.com/TextsHQ/eslint-config",
+    "@textshq/platform-test-lib": "https://github.com/TextsHQ/platform-test-lib",
     "@types/jest": "^27.4.1",
     "@types/lodash": "^4.14.181",
     "@types/node": "^16.7.10",

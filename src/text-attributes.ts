@@ -126,7 +126,7 @@ export function mapTextAttributes(src: string, getUserName: (id: string) => stri
         }
         switch (curToken) {
           case '```':
-            // TODO: Check snippet language
+            entity.codeLanguage = input.slice(0, input.indexOf('\n')).join('')
             entity.code = true
             entity.pre = true
             break

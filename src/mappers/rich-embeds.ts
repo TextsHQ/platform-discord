@@ -1,6 +1,7 @@
 import { MessageAttachmentType, texts } from '@textshq/platform-sdk'
 import type { MessageAttachment, MessageLink, Tweet } from '@textshq/platform-sdk'
 import type { APIEmbed } from 'discord-api-types/v9'
+
 import { mapMimeType, parseMediaURL } from '../util'
 import type { DiscordMessage } from '../types'
 

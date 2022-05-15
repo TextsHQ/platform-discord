@@ -67,5 +67,5 @@
     "skipLibCheck": true,
     "importsNotUsedAsValues": "error"
   },
-  "exclude": ["dist", "node_modules"]
+  "exclude": ["dist", "node_modules", "fixtures"]
 }
