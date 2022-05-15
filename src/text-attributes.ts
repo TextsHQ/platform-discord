@@ -6,10 +6,12 @@
 import type { TextAttributes, TextEntity } from '@textshq/platform-sdk'
 import { getEmojiURL } from './util'
 
+const CODE_BACKTICKS = '```'
+
 const TOKENS = {
   1: ['*', '_', '`', '<'],
   2: ['**', '__', '~~', '||'],
-  3: ['***', '```'],
+  3: ['***', CODE_BACKTICKS],
 }
 
 const getClosingToken = (token: string): string => (token === '<' ? '>' : token)
@@ -77,7 +79,7 @@ export function mapTextAttributes(src: string, getUserName: (id: string) => stri
         const content = input.slice(0, closingIndex).join('') // .replace(/^\s+|\s+$/g, '')
         // See if we can find nested entities.
         let nestedAttributes: MappedTextAttributes | undefined = { text: undefined, textAttributes: undefined }
-        if (!['<', '`', '```'].includes(curToken)) {
+        if (!['<', '`', CODE_BACKTICKS].includes(curToken)) {
           nestedAttributes = mapTextAttributes(content, getUserName)
         }
         const from = Array.from(output).length
@@ -125,7 +127,7 @@ export function mapTextAttributes(src: string, getUserName: (id: string) => stri
           output += content
         }
         switch (curToken) {
-          case '```':
+          case CODE_BACKTICKS:
             entity.codeLanguage = input.slice(0, input.indexOf('\n')).join('')
             entity.code = true
             entity.pre = true
@@ -158,6 +160,13 @@ export function mapTextAttributes(src: string, getUserName: (id: string) => stri
             break
         }
         entities.push(entity)
+        if (entity.codeLanguage != null) {
+          entities.push({
+            from,
+            to: from + entity.codeLanguage.length + 1,
+            replaceWith: '',
+          })
+        }
         input = input.slice(closingIndex + curToken.length)
         curToken = null
         continue
