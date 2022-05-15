@@ -7,7 +7,7 @@ import { APIChannel, APIEmoji, APIGuild, APIReaction, APIUser, ChannelType, Gate
 
 import { mapCurrentUser, mapMessage, mapPresence, mapReaction, mapThread, mapUser } from './mappers/mappers'
 import WSClient from './websocket/wsclient'
-import { GatewayCloseCode, GatewayMessageType, OPCode } from './websocket/constants'
+import { GatewayCloseCode, GatewayMessageType } from './websocket/constants'
 import { defaultPacker } from './packers'
 import { generateScienceClientUUID, getEmojiURL, sleep } from './util'
 import { generateSnowflake } from './common-util'
@@ -476,6 +476,10 @@ export default class DiscordNetworkAPI {
     await this.sendScienceRequest(ScienceEventType.channel_opened, { channel_id: threadID })
   }
 
+  setGatewayShouldResume = (shouldResume: boolean) => {
+    if (this.client) this.client.shouldResume = shouldResume
+  }
+
   private onGuildCustomEmojiMapUpdate = () => {
     if (this.guildCustomEmojiMap) this.allCustomEmojis = Array.from(this.guildCustomEmojiMap.values()).flat()
     // TODO: State sync
@@ -523,14 +527,17 @@ export default class DiscordNetworkAPI {
     this.client.onConnectionClosed = (code, reason) => {
       this.ready = false
 
+      // TODO: Show toast
+
       switch (code) {
         case GatewayCloseCode.ADDRESS_NOT_FOUND:
+          texts.log(LOG_PREFIX, 'Gateway connection closed due to network connection loss.')
           this.startPolling?.()
           break
         case GatewayCloseCode.AUTHENTICATION_FAILED:
+          texts.log(LOG_PREFIX, 'Gateway connection closed due to authentication failure.')
           this.client?.disconnect()
           this.client = undefined
-          // eslint-disable-next-line @typescript-eslint/no-throw-literal
           throw new ReAuthError('Access token invalid')
         case GatewayCloseCode.SESSION_TIMED_OUT:
           texts.log(`${LOG_PREFIX} Gateway session timed out`)

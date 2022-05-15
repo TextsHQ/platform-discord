@@ -4,11 +4,21 @@ import WebSocket from 'ws'
 import { SUPER_PROPERTIES } from '../discord-constants'
 import type { Packer } from '../packers'
 import { DEBUG } from '../preferences'
-import { DiscordPresenceStatus, GatewayMessageType, OPCode } from './constants'
+import { DiscordPresenceStatus, GatewayCloseCode, GatewayMessageType, OPCode } from './constants'
 import { WSError } from './errors'
 import type { GatewayConnectionOptions, GatewayMessage } from './types'
 
 const LOG_PREFIX = '[discord ws]'
+
+/*
+    * Reconnecting with IDENTIFY
+    + Works
+    - We don't know about skipped events
+
+    * Reconnecting with RESUME
+    ? how
+    ? response: { d: false }
+*/
 
 class WSClient {
   private readonly gateway: string
@@ -21,19 +31,22 @@ class WSClient {
 
   private ws?: WebSocket
 
-  private sessionID?: number
+  private sessionID?: string
 
   private lastSequenceNumber?: number
 
   private heartbeatTimer?: NodeJS.Timer
 
-  private receivedHeartbeatAck: boolean = false
+  private receivedHeartbeatAck?: boolean
 
   private _ready: boolean = false
 
   public get ready(): boolean {
     return this._ready
   }
+
+  /// Should connection be resumed after connecting?
+  shouldResume = false
 
   public onMessage?: (message: GatewayMessage) => void
 
@@ -50,27 +63,35 @@ class WSClient {
     this.options = options
   }
 
-  public connect = async () => {
+  public connect = () => {
     if (this.ready || (this.ws?.readyState == WebSocket.CONNECTING) || this.ws?.readyState == WebSocket.OPEN) {
       texts.log(LOG_PREFIX, `Attempted to connect, but is already ready/connecting, ready: ${this.ready}, state: ${this.ws?.readyState}`)
       return
     }
 
-    const gatewayURL = `${this.gateway}?v=${encodeURIComponent(this.options.version)}&encoding=${encodeURIComponent(this.options.encoding)}&compress=${encodeURIComponent(this.options.compress ?? '')}`
-    console.log(gatewayURL)
+    const urlParts = {
+      v: this.options.version.toString(),
+      encoding: this.options.encoding.toString(),
+      // compress: this.options.compress?.toString() ?? ''
+    }
+    const urlParams = new URLSearchParams(urlParts)
+    const gatewayURL = `${this.gateway}?${urlParams.toString()}`
+    texts.log(LOG_PREFIX, 'Gateway URL:', gatewayURL)
     this.ws = new WebSocket(gatewayURL)
     this.setupHandlers()
   }
 
-  public disconnect = () => {
-    // TODO: disconnect
+  public disconnect = (code: number = GatewayCloseCode.MANUAL_DISCONNECT) => {
+    texts.log(LOG_PREFIX, `Disconnecting, code: ${code}`)
+    this.ws?.close(code)
+    if (this.heartbeatTimer) clearInterval(this.heartbeatTimer)
   }
 
   public send = async (message: GatewayMessage) => {
-    if (DEBUG) texts.log('>', message)
+    if (DEBUG) texts.log('<', message)
 
-    if (!this.ws) {
-      texts.error(LOG_PREFIX, 'Attempted to send, but there\'s no ws!')
+    if (this.ws?.readyState != WebSocket.OPEN) {
+      texts.error(LOG_PREFIX, `Attempted to send, but ws isn\'t ready: readyState: ${this.ws?.readyState}.`)
       throw WSError.wsNotReady
     }
     const packed = this.packer.pack(message)
@@ -92,21 +113,28 @@ class WSClient {
 
   private wsOpen = () => {
     texts.log(LOG_PREFIX, 'WebSocket open!')
-
   }
 
   private wsClose = (code: number, reason: string) => {
     texts.log(LOG_PREFIX, `WebSocket closed! Code: ${code}, reason: '${reason}'`)
+    if (code == GatewayCloseCode.RECONNECT_REQUESTED) {
+      this.shouldResume = true
+      this.disconnect(GatewayCloseCode.RECONNECT_REQUESTED)
+      this.connect()
+    }
+
+    if (this.heartbeatTimer) clearInterval(this.heartbeatTimer)
+    this.onConnectionClosed?.(code, reason)
   }
 
   private wsMessage = (data: WebSocket.Data) => {
     try {
       const unpacked = this.packer.unpack(data) as GatewayMessage
       if (!unpacked) throw WSError.errorUnpacking
-      if (DEBUG) texts.log('<', unpacked)
+      if (DEBUG) texts.log('>', unpacked)
       this.handleMessage(unpacked)
     } catch (e) {
-      texts.error('[discord ws] Error unpacking', e, data)
+      texts.error(LOG_PREFIX, 'Error unpacking', e, data)
       this.onError?.(e as Error)
     }
   }
@@ -124,6 +152,7 @@ class WSClient {
 
     switch (message.op) {
       case OPCode.DISPATCH: {
+        this.handleDispatch(message)
         break
       }
       case OPCode.HEARTBEAT: {
@@ -138,8 +167,8 @@ class WSClient {
       }
       case OPCode.HELLO: {
         this.setupHeartbeat(message.d.heartbeat_interval)
-        this.sendIdentify()
-        break
+        this.sendIdentifyOrResume()
+        this.shouldResume = false
       }
       case OPCode.HEARTBEAT_ACK: {
         this.receivedHeartbeatAck = true
@@ -170,7 +199,7 @@ class WSClient {
   }
 
   private setupHeartbeat = (interval: number) => {
-    texts.log(LOG_PREFIX, `Setting interval to ${interval}`)
+    texts.log(LOG_PREFIX, `Setting heartbeat interval to ${interval}`)
 
     const jitter = Math.random()
     setTimeout(() => {
@@ -179,43 +208,97 @@ class WSClient {
     }, interval + jitter)
   }
 
-  private sendIdentify = () => {
-    const payload: GatewayMessage = {
-      op: OPCode.IDENTIFY,
-      d: {
-        token: this.token,
-        properties: SUPER_PROPERTIES,
-        presence: {
-          status: DiscordPresenceStatus.ONLINE,
-          since: 0,
-          activities: [],
-          afk: false,
+  private sendIdentifyOrResume = () => {
+    // TODO: Resuming returns `d: false`
+    this.shouldResume = false
+
+    texts.log(LOG_PREFIX, this.shouldResume ? 'Resuming' : 'Sending identify')
+
+    let payload: GatewayMessage
+    if (this.shouldResume) {
+      payload = {
+        op: OPCode.RESUME,
+        d: {
+          token: this.token,
+          'session_id': this.sessionID,
+          seq: this.lastSequenceNumber
+        }
+      }
+    } else {
+      payload = {
+        op: OPCode.IDENTIFY,
+        d: {
+          token: this.token,
+          properties: SUPER_PROPERTIES,
+          presence: {
+            status: DiscordPresenceStatus.ONLINE,
+            since: null,
+            activities: [],
+            afk: false,
+          },
+          compress: !!this.options.compress && this.packer.compress,
+          capabilities: 125, // sniffed
+          client_state: {
+            guild_hashes: {},
+            highest_last_message_id: '0',
+            read_state_version: 0,
+            user_guild_settings_version: -1,
+          },
         },
-        compress: !!this.options.compress && this.packer.compress,
-        capabilities: 125, // sniffed
-        client_state: {
-          guild_hashes: {},
-          highest_last_message_id: '0',
-          read_state_version: 0,
-          user_guild_settings_version: -1,
-        },
-      },
+      }
     }
+
     this.send(payload)
   }
 
   private sendHeartbeat = () => {
-    if (!this.receivedHeartbeatAck) {
-      // TODO: connection zombified, https://discord.com/developers/docs/topics/gateway#heartbeating
+    if (this.receivedHeartbeatAck == false) {
+      // TODO: Check this - connection zombified, https://discord.com/developers/docs/topics/gateway#heartbeating
+      texts.log(LOG_PREFIX, 'Connection zombified')
+      this.shouldResume = true
+      this.disconnect(GatewayCloseCode.RECONNECT_REQUESTED)
+      this.connect()
+      return
     }
-
-    this.receivedHeartbeatAck = false
 
     const payload: GatewayMessage = {
       op: OPCode.HEARTBEAT,
       d: this.lastSequenceNumber
     }
     this.send(payload)
+    this.receivedHeartbeatAck = false
+  }
+
+  private handleDispatch = (message: GatewayMessage) => {
+    switch (message.t) {
+      case GatewayMessageType.READY: {
+        this.sessionID = message.d?.session_id
+        break
+      }
+      case GatewayMessageType.SESSIONS_REPLACE: {
+        const session = message.d?.at(0)
+        if (session.session_id) this.sessionID = session.session_id
+        break
+      }
+
+      case GatewayMessageType.RESUMED: {
+        const presencePayload = {
+          op: OPCode.PRESENCE_UPDATE,
+          d: {
+            status: DiscordPresenceStatus.ONLINE,
+            since: null,
+            activities: [],
+            afk: false,
+          }
+        }
+        this.send(presencePayload)
+        break
+      }
+
+      default:
+        break
+
+    }
   }
 }
 

@@ -25,7 +25,7 @@ export default class Discord implements PlatformAPI {
 
     await this.api.login(session)
 
-    // this.api.startPolling = this.startPolling
+    this.api.startPolling = this.startPolling
   }
 
   dispose = () => {
@@ -119,6 +119,8 @@ export default class Discord implements PlatformAPI {
 
   startPolling = async () => {
     texts.log(`${LOG_PREFIX} Starting polling, interval: ${POLLING_INTERVAL}`)
+    this.api.setGatewayShouldResume(true)
+
     const action = async (): Promise<boolean> => {
       texts.log(`${LOG_PREFIX} Polling...`)
       try {
