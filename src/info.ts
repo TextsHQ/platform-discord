@@ -49,6 +49,7 @@ const info: PlatformInfo = {
     Attribute.SUPPORTS_STOP_TYPING_INDICATOR,
     // Attribute.SUPPORTS_SEARCH,
     Attribute.SUBSCRIBE_TO_THREAD_SELECTION,
+    Attribute.SUPPORTS_PUSH_NOTIFICATIONS,
   ]),
   attachments: {
     recordedAudioMimeType: 'audio/ogg',
