@@ -40,7 +40,8 @@ export default class Discord implements PlatformAPI {
     return { type: 'success' }
   }
 
-  logout = () => this.api.logout()
+  logout = () =>
+    (this.pushToken ? this.api.logout('gcm', this.pushToken) : this.api.logout())
 
   serializeSession = () => this.api.token
 
@@ -148,12 +149,15 @@ export default class Discord implements PlatformAPI {
     }
   }
 
+  private pushToken: string
+
   registerForPushNotifications = async (type: keyof NotificationsInfo, token: string) => {
     if (type !== 'android') throw Error('invalid type')
     await this.api.createDevice(token)
   }
 
   unregisterForPushNotifications = async (type: keyof NotificationsInfo, token: string) => {
-
+    // TODO: persist to session
+    this.pushToken = token
   }
 }

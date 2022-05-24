@@ -94,8 +94,8 @@ export default class DiscordNetworkAPI {
     }
   }
 
-  logout = async () => {
-    this.fetch({ method: 'POST', url: 'auth/logout', json: { provider: null, voip_provider: null } })
+  logout = async (provider?: 'gcm', pushToken?: string) => {
+    this.fetch({ method: 'POST', url: 'auth/logout', json: provider ? { provider, token: pushToken } : { provider: null, voip_provider: null } })
     // TODO: Check if disconnecting from WS is needed here
   }
 
