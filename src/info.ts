@@ -63,6 +63,11 @@ const info: PlatformInfo = {
       files: 100 * 1024 * 1024,
     },
   },
+  notifications: {
+    android: {
+      senderID: '162066849712',
+    },
+  },
   maxGroupTitleLength: 100,
   generateUniqueMessageID: () => generateSnowflake().toString(),
   // prefs: {

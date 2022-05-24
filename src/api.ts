@@ -1,4 +1,4 @@
-import { PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Message, MessageContent, PaginationArg, ActivityType, MessageSendOptions, texts, LoginCreds, Thread, AccountInfo, ServerEventType } from '@textshq/platform-sdk'
+import { PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Message, MessageContent, PaginationArg, ActivityType, MessageSendOptions, texts, LoginCreds, Thread, AccountInfo, ServerEventType, NotificationsInfo } from '@textshq/platform-sdk'
 import DiscordNetworkAPI from './network-api'
 import { getDataURI } from './util'
 
@@ -146,5 +146,13 @@ export default class Discord implements PlatformAPI {
       await this.api.connect(true, true)
       if (this.api.lastFocusedThread) this.api.eventCallback?.([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: this.api.lastFocusedThread }])
     }
+  }
+
+  registerForPushNotifications = async (type: keyof NotificationsInfo, token: string) => {
+
+  }
+
+  unregisterForPushNotifications = async (type: keyof NotificationsInfo, token: string) => {
+
   }
 }
