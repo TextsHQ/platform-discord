@@ -149,10 +149,12 @@ export default class Discord implements PlatformAPI {
     }
   }
 
-  private pushToken: string
+  private pushToken: string | undefined
 
   registerForPushNotifications = async (type: keyof NotificationsInfo, token: string) => {
     if (type !== 'android') throw Error('invalid type')
+    // TODO: persist to session
+    this.pushToken = token
     await this.api.createDevice(token)
   }
 
