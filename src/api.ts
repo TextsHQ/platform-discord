@@ -149,7 +149,8 @@ export default class Discord implements PlatformAPI {
   }
 
   registerForPushNotifications = async (type: keyof NotificationsInfo, token: string) => {
-
+    if (type !== 'android') throw Error('invalid type')
+    await this.api.createDevice(token)
   }
 
   unregisterForPushNotifications = async (type: keyof NotificationsInfo, token: string) => {

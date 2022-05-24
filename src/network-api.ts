@@ -249,6 +249,21 @@ export default class DiscordNetworkAPI {
     return success
   }
 
+  createDevice = async (token: string) => {
+    await this.waitUntilReady()
+
+    const res = await this.fetch({
+      method: 'POST',
+      url: 'users/@me/devices',
+      json: {
+        provider: 'gcm',
+        token,
+      },
+    })
+
+    if (res?.statusCode !== 204) throw new Error(getErrorMessage(res))
+  }
+
   getMessageReactions = async (message: DiscordMessage, threadID: string) => {
     const getReactionDetails = async (r: APIReaction): Promise<DiscordReactionDetails | undefined> => {
       const emojiQuery = r.emoji.id ? `${r.emoji.name}:${r.emoji.id}` : r.emoji.name
