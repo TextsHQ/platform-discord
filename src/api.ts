@@ -1,4 +1,4 @@
-import { PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Message, MessageContent, PaginationArg, ActivityType, MessageSendOptions, texts, LoginCreds, Thread, AccountInfo, ServerEventType } from '@textshq/platform-sdk'
+import { PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Message, MessageContent, PaginationArg, ActivityType, MessageSendOptions, texts, LoginCreds, Thread, AccountInfo, ServerEventType, NotificationsInfo } from '@textshq/platform-sdk'
 import DiscordNetworkAPI from './network-api'
 import { getDataURI } from './util'
 
@@ -41,7 +41,8 @@ export default class Discord implements PlatformAPI {
     return { type: 'success' }
   }
 
-  logout = () => this.api.logout()
+  logout = () =>
+    (this.pushToken ? this.api.logout('gcm', this.pushToken) : this.api.logout())
 
   serializeSession = () => this.api.token
 
@@ -149,5 +150,19 @@ export default class Discord implements PlatformAPI {
       await this.api.connect(true, true)
       if (this.api.lastFocusedThread) this.api.eventCallback?.([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: this.api.lastFocusedThread }])
     }
+  }
+
+  private pushToken: string | undefined
+
+  registerForPushNotifications = async (type: keyof NotificationsInfo, token: string) => {
+    if (type !== 'android') throw Error('invalid type')
+    // TODO: persist to session
+    this.pushToken = token
+    await this.api.createDevice(token)
+  }
+
+  unregisterForPushNotifications = async (type: keyof NotificationsInfo, token: string) => {
+    // TODO: persist to session
+    this.pushToken = token
   }
 }

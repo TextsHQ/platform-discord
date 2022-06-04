@@ -102,8 +102,8 @@ export default class DiscordNetworkAPI {
     }
   }
 
-  logout = async () => {
-    this.fetch({ method: 'POST', url: 'auth/logout', json: { provider: null, voip_provider: null } })
+  logout = async (provider?: 'gcm', pushToken?: string) => {
+    this.fetch({ method: 'POST', url: 'auth/logout', json: provider ? { provider, token: pushToken } : { provider: null, voip_provider: null } })
     // TODO: Check if disconnecting from WS is needed here
   }
 
@@ -254,6 +254,21 @@ export default class DiscordNetworkAPI {
       }])
     }
     return success
+  }
+
+  createDevice = async (token: string) => {
+    await this.waitUntilReady()
+
+    const res = await this.fetch({
+      method: 'POST',
+      url: 'users/@me/devices',
+      json: {
+        provider: 'gcm',
+        token,
+      },
+    })
+
+    if (res?.statusCode !== 204) throw new Error(getErrorMessage(res))
   }
 
   getMessageReactions = async (message: DiscordMessage, threadID: string) => {

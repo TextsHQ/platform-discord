@@ -49,6 +49,7 @@ const info: PlatformInfo = {
     Attribute.SUPPORTS_STOP_TYPING_INDICATOR,
     // Attribute.SUPPORTS_SEARCH,
     Attribute.SUBSCRIBE_TO_THREAD_SELECTION,
+    Attribute.SUPPORTS_PUSH_NOTIFICATIONS,
   ]),
   attachments: {
     recordedAudioMimeType: 'audio/ogg',
@@ -61,6 +62,11 @@ const info: PlatformInfo = {
       video: 100 * 1024 * 1024,
       audio: 100 * 1024 * 1024,
       files: 100 * 1024 * 1024,
+    },
+  },
+  notifications: {
+    android: {
+      senderID: '162066849712',
     },
   },
   maxGroupTitleLength: 100,
