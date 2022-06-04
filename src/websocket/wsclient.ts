@@ -116,11 +116,12 @@ class WSClient {
   }
 
   private wsClose = (code: number, reason: string) => {
-    texts.log(LOG_PREFIX, `WebSocket closed! Code: ${code}, reason: '${reason}'`)
+    texts.log(LOG_PREFIX, `WebSocket closed! Code: ${code}, reason: '${reason || '<none>'}'`)
     if (code == GatewayCloseCode.RECONNECT_REQUESTED) {
       this.shouldResume = true
       this.disconnect(GatewayCloseCode.RECONNECT_REQUESTED)
       this.connect()
+      return
     }
 
     if (this.heartbeatTimer) clearInterval(this.heartbeatTimer)
@@ -229,23 +230,25 @@ class WSClient {
         op: OPCode.IDENTIFY,
         d: {
           token: this.token,
+          capabilities: 509, // sniffed
           properties: SUPER_PROPERTIES,
           presence: {
             status: DiscordPresenceStatus.ONLINE,
-            since: null,
+            since: 0,
             activities: [],
-            afk: false,
+            afk: false
           },
-          compress: !!this.options.compress && this.packer.compress,
-          capabilities: 125, // sniffed
+          compress: false,
           client_state: {
             guild_hashes: {},
             highest_last_message_id: '0',
             read_state_version: 0,
             user_guild_settings_version: -1,
-          },
-        },
+            user_settings_version: -1
+          }
+        }
       }
+
     }
 
     this.send(payload)

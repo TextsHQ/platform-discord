@@ -48,8 +48,10 @@ const info: PlatformInfo = {
     Attribute.SUPPORTS_DELETE_THREAD,
     Attribute.SUPPORTS_STOP_TYPING_INDICATOR,
     // Attribute.SUPPORTS_SEARCH,
-    Attribute.SUBSCRIBE_TO_THREAD_SELECTION,
     Attribute.SUPPORTS_PUSH_NOTIFICATIONS,
+    Attribute.SUBSCRIBE_TO_THREAD_SELECTION,
+    Attribute.SUBSCRIBE_TO_CONN_STATE_CHANGE,
+    Attribute.SUBSCRIBE_TO_ONLINE_OFFLINE_ACTIVITY,
   ]),
   attachments: {
     recordedAudioMimeType: 'audio/ogg',

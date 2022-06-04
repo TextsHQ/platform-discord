@@ -1,4 +1,4 @@
-import { PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Message, MessageContent, PaginationArg, ActivityType, MessageSendOptions, texts, LoginCreds, Thread, AccountInfo, ServerEventType, NotificationsInfo } from '@textshq/platform-sdk'
+import { PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Message, MessageContent, PaginationArg, ActivityType, MessageSendOptions, texts, LoginCreds, Thread, AccountInfo, ServerEventType, OnConnStateChangeCallback, ConnectionState, ConnectionStatus, NotificationsInfo } from '@textshq/platform-sdk'
 import DiscordNetworkAPI from './network-api'
 import { getDataURI } from './util'
 
@@ -13,6 +13,10 @@ export default class Discord implements PlatformAPI {
   private api = new DiscordNetworkAPI()
 
   private pollingInterval?: NodeJS.Timeout
+
+  private connCallback: OnConnStateChangeCallback = () => {}
+
+  private connState: ConnectionState = { status: ConnectionStatus.UNKNOWN }
 
   init = async (session?: string, accountInfo?: AccountInfo, prefs?: Record<string, any>) => {
     this.accountID = accountInfo?.accountID
@@ -111,6 +115,10 @@ export default class Discord implements PlatformAPI {
   }
 
   onThreadSelected = (threadID?: string) => this.api.onThreadSelected(threadID)
+
+  onConnectionStateChange = (onEvent: OnConnStateChangeCallback) => {
+    this.connCallback = onEvent
+  }
 
   reconnectRealtime = async () => {
     texts.log(`${LOG_PREFIX} reconnectRealtime`)

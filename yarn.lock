@@ -1093,7 +1093,7 @@ __metadata:
   peerDependencies:
     eslint: ">=7"
     typescript: ">=4"
-  checksum: 61508a7905945bc62c20308c9c9f884b0e80307f2e6dca2809533d85da048e7f05bdb19defe991e007f14213ce7a85c225ad206bbfa792e17fe938fb73ff45b2
+  checksum: 6e9645e303f9dedf26f5b470427668a2e2645efebdeef90fa1e9e0e2d5c56498737078452f67f5f7a1bd2af1875cd8a3fed71d7247fd5693b7fe89292c9a1fb3
   languageName: node
   linkType: hard
 
@@ -1102,7 +1102,7 @@ __metadata:
   resolution: "@textshq/platform-discord@workspace:."
   dependencies:
     "@textshq/eslint-config": "https://github.com/TextsHQ/eslint-config"
-    "@textshq/platform-sdk": "https://github.com/TextsHQ/platform-sdk#main"
+    "@textshq/platform-sdk": "https://github.com/TextsHQ/platform-sdk"
     "@textshq/platform-test-lib": "https://github.com/TextsHQ/platform-test-lib"
     "@types/jest": ^27.4.1
     "@types/lodash": ^4.14.181
@@ -1119,7 +1119,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@textshq/platform-sdk@https://github.com/TextsHQ/platform-sdk#main":
+"@textshq/platform-sdk@https://github.com/TextsHQ/platform-sdk":
   version: 0.4.4
   resolution: "@textshq/platform-sdk@https://github.com/TextsHQ/platform-sdk.git#commit=872b1e896be308bb0120924dabdefa9fd451a861"
   dependencies:
