@@ -83,8 +83,8 @@ class WSClient {
 
   public disconnect = (code: number = GatewayCloseCode.MANUAL_DISCONNECT) => {
     texts.log(LOG_PREFIX, `Disconnecting, code: ${code}`)
-    this.ws?.close(code)
     if (this.heartbeatTimer) clearInterval(this.heartbeatTimer)
+    this.ws?.close(code)
   }
 
   public send = async (message: GatewayMessage) => {

@@ -8,4 +8,4 @@ export const ENABLE_DM_GUILD_MEMBERS = false
 export const ENABLE_DISCORD_ANALYTICS = false
 
 // Extra debug logging
-export const DEBUG = true
+export const DEBUG = false
