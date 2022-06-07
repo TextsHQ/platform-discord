@@ -6,3 +6,6 @@ export const ENABLE_DM_GUILD_MEMBERS = false
 
 // Send /science requests?
 export const ENABLE_DISCORD_ANALYTICS = false
+
+// Extra debug logging
+export const DEBUG = false

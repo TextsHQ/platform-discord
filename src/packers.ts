@@ -13,19 +13,23 @@ try {
 
 export type Packer = {
   encoding: string
+  compress: boolean
   pack: (data: any) => any
   unpack: (data: any) => any
 }
 
+// TODO: Support compression
 const etfPacker: Packer | undefined = erlpack ? {
   encoding: 'etf',
+  compress: false,
   pack: erlpack.pack,
-  unpack: erlpack.unpack,
+  unpack: erlpack.unpack
 } : undefined
 
 const COMPRESS_JSON = false
 const jsonPacker: Packer = {
   encoding: 'json',
+  compress: COMPRESS_JSON,
   pack: JSON.stringify,
   unpack: (data: WSData) => {
     // const str = decodeData(data)

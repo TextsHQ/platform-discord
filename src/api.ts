@@ -1,8 +1,9 @@
-import { PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Message, MessageContent, PaginationArg, ActivityType, MessageSendOptions, texts, LoginCreds, Thread, AccountInfo, ServerEventType, NotificationsInfo } from '@textshq/platform-sdk'
+import { PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Message, MessageContent, PaginationArg, ActivityType, MessageSendOptions, texts, LoginCreds, Thread, AccountInfo, ServerEventType, OnConnStateChangeCallback, ConnectionState, ConnectionStatus, NotificationsInfo } from '@textshq/platform-sdk'
 import DiscordNetworkAPI from './network-api'
 import { getDataURI } from './util'
 
 const POLLING_INTERVAL = 10_000
+const LOG_PREFIX = '[discord]'
 
 export const PLATFORM_NAME = 'discord'
 
@@ -12,6 +13,10 @@ export default class Discord implements PlatformAPI {
   private api = new DiscordNetworkAPI()
 
   private pollingInterval?: NodeJS.Timeout
+
+  private connCallback: OnConnStateChangeCallback = () => {}
+
+  private connState: ConnectionState = { status: ConnectionStatus.UNKNOWN }
 
   init = async (session?: string, accountInfo?: AccountInfo, prefs?: Record<string, any>) => {
     this.accountID = accountInfo?.accountID
@@ -24,7 +29,7 @@ export default class Discord implements PlatformAPI {
 
     await this.api.login(session)
 
-    // this.api.startPolling = this.startPolling
+    this.api.startPolling = this.startPolling
   }
 
   dispose = () => {
@@ -111,25 +116,31 @@ export default class Discord implements PlatformAPI {
 
   onThreadSelected = (threadID?: string) => this.api.onThreadSelected(threadID)
 
+  onConnectionStateChange = (onEvent: OnConnStateChangeCallback) => {
+    this.connCallback = onEvent
+  }
+
   reconnectRealtime = async () => {
-    texts.log('[discord] reconnectRealtime')
+    texts.log(`${LOG_PREFIX} reconnectRealtime`)
     await this.api.connect(true, true)
     if (this.api.lastFocusedThread) this.api.eventCallback?.([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: this.api.lastFocusedThread }])
   }
 
   startPolling = async () => {
-    texts.log(`[discord] Starting polling, interval: ${POLLING_INTERVAL}`)
+    texts.log(`${LOG_PREFIX} Starting polling, interval: ${POLLING_INTERVAL}`)
+    this.api.setGatewayShouldResume(true)
+
     const action = async (): Promise<boolean> => {
-      texts.log('[discord] Polling...')
+      texts.log(`${LOG_PREFIX} Polling...`)
       try {
         const user = await this.api.getCurrentUser()
         if (user) {
-          texts.log('[discord] Poll successful!')
+          texts.log(`${LOG_PREFIX} Poll successful!`)
           await this.stopPolling(true)
           return true
         }
       } catch (error) {
-        texts.log('[discord] Poll failed!', error)
+        texts.log(`${LOG_PREFIX} Poll failed!`, error)
       }
       return false
     }
@@ -138,7 +149,7 @@ export default class Discord implements PlatformAPI {
   }
 
   stopPolling = async (success: boolean) => {
-    texts.log('[discord] Stopping polling')
+    texts.log(`${LOG_PREFIX} Stopping polling`)
 
     if (this.pollingInterval != null) clearInterval(this.pollingInterval)
     this.pollingInterval = undefined

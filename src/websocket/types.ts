@@ -32,3 +32,9 @@ export interface GatewayMessage {
     */
   t?: GatewayMessageType
 }
+
+export interface GatewayConnectionOptions {
+  version: number
+  encoding: string
+  compress?: string
+}

@@ -81,7 +81,7 @@ export enum GatewayMessageType {
   CHANNEL_UNREAD_UPDATE = 'CHANNEL_UNREAD_UPDATE', // ???
   GUILD_APPLICATION_COMMAND_COUNTS_UPDATE = 'GUILD_APPLICATION_COMMAND_COUNTS_UPDATE', // ???
   MESSAGE_ACK = 'MESSAGE_ACK', // message has been read
-  READY_SUPPLEMENTAL = 'READY_SUPPLEMENTAL', // ???
+  READY_SUPPLEMENTAL = 'READY_SUPPLEMENTAL', // additional initial data, sent after 'READY'
   RELATIONSHIP_ADD = 'RELATIONSHIP_ADD', // friend invite was sent/accepted
   RELATIONSHIP_REMOVE = 'RELATIONSHIP_REMOVE', // friend was removed
   SESSIONS_REPLACE = 'SESSIONS_REPLACE', // dispatched when connected to gateway on top of another session (i.e. in Discord app)
