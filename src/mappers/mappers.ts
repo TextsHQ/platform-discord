@@ -1,10 +1,10 @@
-import { CurrentUser, Message, MessageActionType, Attachment, AttachmentType, MessageLink, MessageReaction, Thread, ThreadType, User, PartialWithID, UserPresence, texts } from '@textshq/platform-sdk'
+import { CurrentUser, Message, MessageActionType, Attachment, AttachmentType, MessageLink, MessageReaction, Thread, ThreadType, User, PartialWithID, UserPresence, texts, TextEntity } from '@textshq/platform-sdk'
 import { APIUser, APIChannel, EmbedType, MessageActivityType, APIAttachment, MessageType, GatewayPresenceUpdateData } from 'discord-api-types/v9'
 import { uniqBy } from 'lodash'
 
 import { IGNORED_MESSAGE_TYPES, StickerFormat, THREAD_TYPES } from '../constants'
 import { getEmojiURL, getLottieStickerURL, getPNGStickerURL, getThreadIcon, getTimestampFromSnowflake, getUserAvatar } from '../util'
-import { mapTextAttributes } from '../text-attributes'
+import { parse } from '../text-attributes/text-attributes'
 import { handleArticleEmbed, handleGifvEmbed, handleImageEmbed, handleLinkEmbed, handleRichEmbed, handleVideoEmbed } from './rich-embeds'
 import type { DiscordMessage, DiscordReactionDetails } from '../types'
 
@@ -109,11 +109,11 @@ export function mapMessage(message: DiscordMessage, currentUserID?: string, reac
 
   if (mapped.text && mapped.text.length > 0) {
     const getUserName = (id: string): string => message.mentions.find(m => m.id === id)?.username || id
-    const mappedTextAttributes = mapTextAttributes(mapped.text, getUserName)
-    if (mappedTextAttributes?.text && mappedTextAttributes?.textAttributes) {
-      mapped.text = mappedTextAttributes.text
-      mapped.textAttributes = mappedTextAttributes.textAttributes
-    }
+    const mappedTextAttributes = parse(mapped.text, { getUserName })
+    // if (mappedTextAttributes?.text && mappedTextAttributes?.textAttributes) {
+    //   mapped.text = mappedTextAttributes.text
+    //   mapped.textAttributes = mappedTextAttributes.textAttributes
+    // }
   }
 
   return mapped

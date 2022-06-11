@@ -1,4 +1,4 @@
-import { mapTextAttributes } from '../text-attributes'
+import { parse } from '../text-attributes/text-attributes'
 
 const flatCases = [
   {
@@ -254,6 +254,6 @@ const getUserName = (id: string): string | undefined => {
 
 test('text attributes', () => {
   for (const c of cases) {
-    expect(mapTextAttributes(c.text, getUserName)).toEqual(c.result)
+    expect(parse(c.text, { getUserName })).toEqual(c.result)
   }
 })
