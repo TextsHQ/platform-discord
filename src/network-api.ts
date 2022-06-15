@@ -79,7 +79,11 @@ export default class DiscordNetworkAPI {
 
   accountID?: string
 
-  eventCallback!: OnServerEventCallback
+  pendingEventsQueue: ServerEvent[] = []
+
+  eventCallback: OnServerEventCallback = (events: ServerEvent[]) => {
+    this.pendingEventsQueue.push(...events)
+  }
 
   startPolling?: () => void
 

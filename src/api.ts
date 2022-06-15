@@ -14,9 +14,9 @@ export default class Discord implements PlatformAPI {
 
   private pollingInterval?: NodeJS.Timeout
 
-  private connCallback: OnConnStateChangeCallback = () => {}
+  // private connCallback: OnConnStateChangeCallback = () => {}
 
-  private connState: ConnectionState = { status: ConnectionStatus.UNKNOWN }
+  // private connState: ConnectionState = { status: ConnectionStatus.UNKNOWN }
 
   init = async (session?: string, accountInfo?: AccountInfo, prefs?: Record<string, any>) => {
     this.accountID = accountInfo?.accountID
@@ -52,6 +52,8 @@ export default class Discord implements PlatformAPI {
 
   subscribeToEvents = (onEvent: OnServerEventCallback) => {
     this.api.eventCallback = onEvent
+    onEvent(this.api.pendingEventsQueue)
+    this.api.pendingEventsQueue.length = 0
   }
 
   searchUsers = (typed: string) => {
@@ -86,19 +88,26 @@ export default class Discord implements PlatformAPI {
 
   deleteThread = (threadID: string) => this.api.closeThread(threadID)
 
-  reportThread = (type: 'spam', threadID: string, firstMessageID?: string) => this.api.reportThread(threadID, firstMessageID)
+  reportThread = (type: 'spam', threadID: string, firstMessageID?: string) =>
+    this.api.reportThread(threadID, firstMessageID)
 
-  sendMessage = (threadID: string, content: MessageContent, options?: MessageSendOptions) => this.api.sendMessage(threadID, content, options)
+  sendMessage = (threadID: string, content: MessageContent, options?: MessageSendOptions) =>
+    this.api.sendMessage(threadID, content, options)
 
-  editMessage = (threadID: string, messageID: string, content: MessageContent, options?: MessageSendOptions) => this.api.editMessage(threadID, messageID, content, options)
+  editMessage = (threadID: string, messageID: string, content: MessageContent, options?: MessageSendOptions) =>
+    this.api.editMessage(threadID, messageID, content, options)
 
-  deleteMessage = (threadID: string, messageID: string, forEveryone?: boolean) => this.api.deleteMessage(threadID, messageID, forEveryone)
+  deleteMessage = (threadID: string, messageID: string, forEveryone?: boolean) =>
+    this.api.deleteMessage(threadID, messageID, forEveryone)
 
-  addReaction = (threadID: string, messageID: string, reactionKey: string) => this.api.addReaction(threadID, messageID, reactionKey)
+  addReaction = (threadID: string, messageID: string, reactionKey: string) =>
+    this.api.addReaction(threadID, messageID, reactionKey)
 
-  removeReaction = (threadID: string, messageID: string, reactionKey: string) => this.api.removeReaction(threadID, messageID, reactionKey)
+  removeReaction = (threadID: string, messageID: string, reactionKey: string) =>
+    this.api.removeReaction(threadID, messageID, reactionKey)
 
-  sendActivityIndicator = (type: ActivityType, threadID?: string) => this.api.setTyping(type, threadID)
+  sendActivityIndicator = (type: ActivityType, threadID?: string) =>
+    this.api.setTyping(type, threadID)
 
   sendReadReceipt = (threadID: string, messageID?: string) => {
     if (!messageID) {
@@ -116,9 +125,9 @@ export default class Discord implements PlatformAPI {
 
   onThreadSelected = (threadID?: string) => this.api.onThreadSelected(threadID)
 
-  onConnectionStateChange = (onEvent: OnConnStateChangeCallback) => {
-    this.connCallback = onEvent
-  }
+  // onConnectionStateChange = (onEvent: OnConnStateChangeCallback) => {
+  //   this.connCallback = onEvent
+  // }
 
   reconnectRealtime = async () => {
     texts.log(`${LOG_PREFIX} reconnectRealtime`)
