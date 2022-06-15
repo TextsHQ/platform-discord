@@ -23,7 +23,7 @@ const etfPacker: Packer | undefined = erlpack ? {
   encoding: 'etf',
   compress: false,
   pack: erlpack.pack,
-  unpack: erlpack.unpack
+  unpack: erlpack.unpack,
 } : undefined
 
 const COMPRESS_JSON = false

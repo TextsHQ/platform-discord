@@ -39,7 +39,7 @@ class WSClient {
 
   private receivedHeartbeatAck?: boolean
 
-  private _ready: boolean = false
+  private _ready = false
 
   public get ready(): boolean {
     return this._ready
@@ -64,7 +64,7 @@ class WSClient {
   }
 
   public connect = () => {
-    if (this.ready || (this.ws?.readyState == WebSocket.CONNECTING) || this.ws?.readyState == WebSocket.OPEN) {
+    if (this.ready || (this.ws?.readyState === WebSocket.CONNECTING) || this.ws?.readyState === WebSocket.OPEN) {
       texts.log(LOG_PREFIX, `Attempted to connect, but is already ready/connecting, ready: ${this.ready}, state: ${this.ws?.readyState}`)
       return
     }
@@ -90,8 +90,8 @@ class WSClient {
   public send = async (message: GatewayMessage) => {
     if (DEBUG) texts.log('<', message)
 
-    if (this.ws?.readyState != WebSocket.OPEN) {
-      texts.error(LOG_PREFIX, `Attempted to send, but ws isn\'t ready: readyState: ${this.ws?.readyState}.`)
+    if (this.ws?.readyState !== WebSocket.OPEN) {
+      texts.error(LOG_PREFIX, `Attempted to send, but ws isn't ready: readyState: ${this.ws?.readyState}.`)
       throw WSError.wsNotReady
     }
     const packed = this.packer.pack(message)
@@ -117,7 +117,7 @@ class WSClient {
 
   private wsClose = (code: number, reason: string) => {
     texts.log(LOG_PREFIX, `WebSocket closed! Code: ${code}, reason: '${reason || '<none>'}'`)
-    if (code == GatewayCloseCode.RECONNECT_REQUESTED) {
+    if (code === GatewayCloseCode.RECONNECT_REQUESTED) {
       this.shouldResume = true
       this.disconnect(GatewayCloseCode.RECONNECT_REQUESTED)
       this.connect()
@@ -152,32 +152,27 @@ class WSClient {
     if (message.s) this.lastSequenceNumber = message.s
 
     switch (message.op) {
-      case OPCode.DISPATCH: {
+      case OPCode.DISPATCH:
         this.handleDispatch(message)
         break
-      }
-      case OPCode.HEARTBEAT: {
+      case OPCode.HEARTBEAT:
         this.sendHeartbeat()
         break
-      }
-      case OPCode.RECONNECT: {
+      case OPCode.RECONNECT:
         break
-      }
-      case OPCode.INVALID_SESSION: {
+      case OPCode.INVALID_SESSION:
         break
-      }
-      case OPCode.HELLO: {
+      case OPCode.HELLO:
         this.setupHeartbeat(message.d.heartbeat_interval)
         this.sendIdentifyOrResume()
         this.shouldResume = false
-      }
+        break
       case OPCode.HEARTBEAT_ACK: {
         this.receivedHeartbeatAck = true
         break
       }
 
       // * Send-only
-
       case OPCode.IDENTIFY:
       case OPCode.PRESENCE_UPDATE:
       case OPCode.VOICE_STATE_UPDATE:
@@ -221,9 +216,9 @@ class WSClient {
         op: OPCode.RESUME,
         d: {
           token: this.token,
-          'session_id': this.sessionID,
-          seq: this.lastSequenceNumber
-        }
+          session_id: this.sessionID,
+          seq: this.lastSequenceNumber,
+        },
       }
     } else {
       payload = {
@@ -236,7 +231,7 @@ class WSClient {
             status: DiscordPresenceStatus.ONLINE,
             since: 0,
             activities: [],
-            afk: false
+            afk: false,
           },
           compress: false,
           client_state: {
@@ -244,18 +239,17 @@ class WSClient {
             highest_last_message_id: '0',
             read_state_version: 0,
             user_guild_settings_version: -1,
-            user_settings_version: -1
-          }
-        }
+            user_settings_version: -1,
+          },
+        },
       }
-
     }
 
     this.send(payload)
   }
 
   private sendHeartbeat = () => {
-    if (this.receivedHeartbeatAck == false) {
+    if (!this.receivedHeartbeatAck) {
       // TODO: Check this - connection zombified, https://discord.com/developers/docs/topics/gateway#heartbeating
       texts.log(LOG_PREFIX, 'Connection zombified')
       this.shouldResume = true
@@ -266,7 +260,7 @@ class WSClient {
 
     const payload: GatewayMessage = {
       op: OPCode.HEARTBEAT,
-      d: this.lastSequenceNumber
+      d: this.lastSequenceNumber,
     }
     this.send(payload)
     this.receivedHeartbeatAck = false
@@ -292,7 +286,7 @@ class WSClient {
             since: null,
             activities: [],
             afk: false,
-          }
+          },
         }
         this.send(presencePayload)
         break
@@ -300,7 +294,6 @@ class WSClient {
 
       default:
         break
-
     }
   }
 }
