@@ -33,8 +33,8 @@ export default class Discord implements PlatformAPI {
   }
 
   dispose = () => {
-    this.api.disconnect()
     this.stopPolling(false)
+    this.api.disconnect()
   }
 
   getCurrentUser = () => this.api.getCurrentUser()

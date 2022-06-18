@@ -35,7 +35,7 @@ class WSClient {
 
   private lastSequenceNumber?: number
 
-  private heartbeatTimer?: NodeJS.Timer
+  private heartbeatTimer?: NodeJS.Timer | NodeJS.Timeout
 
   private receivedHeartbeatAck?: boolean
 
@@ -117,6 +117,8 @@ class WSClient {
 
   private wsClose = (code: number, reason: string) => {
     texts.log(LOG_PREFIX, `WebSocket closed! Code: ${code}, reason: '${reason || '<none>'}'`)
+    if (this.heartbeatTimer) clearInterval(this.heartbeatTimer)
+
     if (code === GatewayCloseCode.RECONNECT_REQUESTED) {
       this.shouldResume = true
       this.disconnect(GatewayCloseCode.RECONNECT_REQUESTED)
@@ -124,7 +126,6 @@ class WSClient {
       return
     }
 
-    if (this.heartbeatTimer) clearInterval(this.heartbeatTimer)
     this.onConnectionClosed?.(code, reason)
   }
 
@@ -168,6 +169,7 @@ class WSClient {
         this.shouldResume = false
         break
       case OPCode.HEARTBEAT_ACK: {
+        if (DEBUG) texts.log(LOG_PREFIX, 'Got HEARTBEAT_ACK!')
         this.receivedHeartbeatAck = true
         break
       }
@@ -195,10 +197,11 @@ class WSClient {
   }
 
   private setupHeartbeat = (interval: number) => {
-    texts.log(LOG_PREFIX, `Setting heartbeat interval to ${interval}`)
+    if (DEBUG) texts.log(LOG_PREFIX, `Setting heartbeat interval to ${interval}`)
 
     const jitter = Math.random()
-    setTimeout(() => {
+    this.heartbeatTimer = setTimeout(() => {
+      this.receivedHeartbeatAck = true
       this.sendHeartbeat()
       this.heartbeatTimer = setInterval(this.sendHeartbeat, interval)
     }, interval + jitter)
@@ -208,7 +211,7 @@ class WSClient {
     // TODO: Resuming returns `d: false`
     this.shouldResume = false
 
-    texts.log(LOG_PREFIX, this.shouldResume ? 'Resuming' : 'Sending identify')
+    if (DEBUG) texts.log(LOG_PREFIX, this.shouldResume ? 'Resuming...' : 'Sending identify...')
 
     let payload: GatewayMessage
     if (this.shouldResume) {
@@ -249,6 +252,8 @@ class WSClient {
   }
 
   private sendHeartbeat = () => {
+    if (DEBUG) texts.log(LOG_PREFIX, 'Sending heartbeat...')
+
     if (!this.receivedHeartbeatAck) {
       // TODO: Check this - connection zombified, https://discord.com/developers/docs/topics/gateway#heartbeating
       texts.log(LOG_PREFIX, 'Connection zombified')
@@ -269,6 +274,7 @@ class WSClient {
   private handleDispatch = (message: GatewayMessage) => {
     switch (message.t) {
       case GatewayMessageType.READY: {
+        if (DEBUG) texts.log(LOG_PREFIX, 'Got dispatch <READY>!')
         this.sessionID = message.d?.session_id
         break
       }
