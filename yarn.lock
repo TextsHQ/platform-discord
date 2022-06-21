@@ -1124,7 +1124,7 @@ __metadata:
   resolution: "@textshq/platform-sdk@https://github.com/TextsHQ/platform-sdk.git#commit=872b1e896be308bb0120924dabdefa9fd451a861"
   dependencies:
     form-data: ^4.0.0
-  checksum: 8fac33a19bd63bec00c1c999f2a343ebcc410629e8f82c4548d820aa2bba6c03081d5285c2f5420c6cadd36958b5dc6103ced7891cb34a5e4fa4914f768e8c12
+  checksum: cd258ddeedcb498bbde5fcd600d6607df8842200688f20f638af86a58ffdaaa99ca6b68d8eb6d6d5a9fb7b30a1d1f38dafd3103f8221692fcb2ea6d399af8d30
   languageName: node
   linkType: hard
 
@@ -1135,7 +1135,7 @@ __metadata:
     got: ^11.8.2
   peerDependencies:
     "@textshq/platform-sdk": "*"
-  checksum: faa0b20e2d8b03365a5c497d2f7df33ba0f4f3ee2e193d942aac2001c8e3f5ed08e1e682cbc19815bd7310822a94dc18d98fbafef9040d794b7d6593f6c4d6a8
+  checksum: c852782011198620113903d30be6badd9b7c5c24529c226de3815cfddbd12c99c8fe4af98f587a279d75842db26809a043fad849eabe8a5caec462a7a94b60ba
   languageName: node
   linkType: hard
 
