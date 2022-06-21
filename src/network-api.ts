@@ -476,6 +476,15 @@ export default class DiscordNetworkAPI {
     if (type === ActivityType.TYPING && this.ready && threadID) await this.fetch({ method: 'POST', url: `channels/${threadID}/typing` })
   }
 
+  modifyParticipant = async (threadID: string, participantID: string, remove = false) => {
+    await this.waitUntilReady()
+
+    const method = remove ? 'DELETE' : 'PUT'
+    const res = await this.fetch({ method, url: `channels/${threadID}/recipients/${participantID}` })
+
+    if (!res || res.statusCode < 200 || res.statusCode > 204) throw new Error(getErrorMessage(res))
+  }
+
   getUsersPresence = async () => {
     await this.waitForInitialData()
     return this.usersPresence
@@ -1053,6 +1062,28 @@ export default class DiscordNetworkAPI {
       case GatewayMessageType.RELATIONSHIP_REMOVE: {
         const index = this.userFriends.findIndex(f => f.id === d.id)
         if (index >= 0) this.userFriends.splice(index, 1)
+        break
+      }
+
+      case GatewayMessageType.CHANNEL_RECIPIENT_ADD: {
+        this.eventCallback([{
+          type: ServerEventType.STATE_SYNC,
+          mutationType: 'upsert',
+          objectName: 'participant',
+          objectIDs: {
+            threadID: d.channel_id,
+          },
+          entries: [mapUser(d.user)],
+        }])
+        break
+      }
+
+      case GatewayMessageType.CHANNEL_RECIPIENT_REMOVE:
+      {
+        this.eventCallback([{
+          type: ServerEventType.THREAD_MESSAGES_REFRESH,
+          threadID: d.channel_id,
+        }])
         break
       }
 

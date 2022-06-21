@@ -75,7 +75,8 @@ export enum GatewayMessageType {
   VOICE_STATE_UPDATE = 'VOICE_STATE_UPDATE', // someone joined, left, or moved a voice channel
   VOICE_SERVER_UPDATE = 'VOICE_SERVER_UPDATE', // guild's voice server was updated
   WEBHOOKS_UPDATE = 'WEBHOOKS_UPDATE', // guild channel webhook was created, update, or deleted
-
+  CHANNEL_RECIPIENT_ADD = 'CHANNEL_RECIPIENT_ADD', // user added to a group DM
+  CHANNEL_RECIPIENT_REMOVE = 'CHANNEL_RECIPIENT_REMOVE', // user removed fro ma group DM
   // Undocumented
   CHANNEL_PINS_ACK = 'CHANNEL_PINS_ACK', // channel pins update has been read
   CHANNEL_UNREAD_UPDATE = 'CHANNEL_UNREAD_UPDATE', // ???

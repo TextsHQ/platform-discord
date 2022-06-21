@@ -1,4 +1,4 @@
-import { PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Message, MessageContent, PaginationArg, ActivityType, MessageSendOptions, texts, LoginCreds, Thread, AccountInfo, ServerEventType, OnConnStateChangeCallback, ConnectionState, ConnectionStatus, NotificationsInfo } from '@textshq/platform-sdk'
+import { PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Message, MessageContent, PaginationArg, ActivityType, MessageSendOptions, texts, LoginCreds, Thread, AccountInfo, ServerEventType, NotificationsInfo } from '@textshq/platform-sdk'
 import DiscordNetworkAPI from './network-api'
 import { getDataURI } from './util'
 
@@ -182,4 +182,8 @@ export default class Discord implements PlatformAPI {
     // TODO: persist to session
     this.pushToken = token
   }
+
+  addParticipant = (threadID: string, participantID: string) => this.api.modifyParticipant(threadID, participantID)
+
+  removeParticipant = (threadID: string, participantID: string) => this.api.modifyParticipant(threadID, participantID, true)
 }
