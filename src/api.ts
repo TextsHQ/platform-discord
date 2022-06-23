@@ -80,6 +80,7 @@ export default class Discord implements PlatformAPI {
 
   updateThread = (threadID: string, updates: Partial<Thread>) => {
     if ('title' in updates) return this.api.patchChannel(threadID, { name: updates.title })
+    if ('mutedUntil' in updates) return this.api.muteThread(threadID, updates.mutedUntil)
   }
 
   changeThreadImage = async (threadID: string, imageBuffer: Buffer, mimeType: string) => {

@@ -421,6 +421,24 @@ export default class DiscordNetworkAPI {
     return true
   }
 
+  patchSettings = async (threadID: string, overrides: any) => {
+    const channelOverrides : any = { channel_overrides: {} }
+    channelOverrides.channel_overrides[threadID] = overrides
+    const res = await this.fetch({ url: 'users/@me/guilds/@me/settings', method: 'PATCH', json: channelOverrides })
+    if (!res || res.statusCode < 200 || res.statusCode > 204) throw new Error(getErrorMessage(res))
+    return true
+  }
+
+  muteThread = async (threadID: string, mutedUntil: Date | 'forever' | undefined) => {
+    const settings = mutedUntil === 'forever' ? {
+      muted: true,
+      mute_config: {
+        selected_time_window: -1,
+        end_time: null },
+    } : { muted: false }
+    return this.patchSettings(threadID, settings)
+  }
+
   deleteMessage = async (threadID: string, messageID: string, forEveryone?: boolean): Promise<boolean> => {
     if (!forEveryone) return false
     await this.waitUntilReady()
