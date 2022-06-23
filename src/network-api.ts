@@ -418,15 +418,12 @@ export default class DiscordNetworkAPI {
   patchChannel = async (channelID: string, patches: { name?: string, icon?: string }) => {
     const res = await this.fetch({ url: `channels/${channelID}`, method: 'PATCH', json: patches })
     if (!res || res.statusCode < 200 || res.statusCode > 204) throw new Error(getErrorMessage(res))
-    return true
   }
 
   patchSettings = async (threadID: string, overrides: any) => {
-    const channelOverrides : any = { channel_overrides: {} }
-    channelOverrides.channel_overrides[threadID] = overrides
-    const res = await this.fetch({ url: 'users/@me/guilds/@me/settings', method: 'PATCH', json: channelOverrides })
+    const json = { channel_overrides: { [threadID]: overrides } }
+    const res = await this.fetch({ url: 'users/@me/guilds/@me/settings', method: 'PATCH', json })
     if (!res || res.statusCode < 200 || res.statusCode > 204) throw new Error(getErrorMessage(res))
-    return true
   }
 
   muteThread = async (threadID: string, mutedUntil: Date | 'forever' | undefined) => {
@@ -439,13 +436,12 @@ export default class DiscordNetworkAPI {
     return this.patchSettings(threadID, settings)
   }
 
-  deleteMessage = async (threadID: string, messageID: string, forEveryone?: boolean): Promise<boolean> => {
-    if (!forEveryone) return false
+  deleteMessage = async (threadID: string, messageID: string, forEveryone?: boolean) => {
+    if (!forEveryone) return
     await this.waitUntilReady()
 
     const res = await this.fetch({ method: 'DELETE', url: `channels/${threadID}/messages/${messageID}` })
     if (!res || res.statusCode < 200 || res.statusCode > 204) throw new Error(getErrorMessage(res))
-    return true
   }
 
   sendReadReceipt = async (threadID: string, messageID: string) => {
