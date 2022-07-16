@@ -160,13 +160,13 @@ export function mapTextAttributes(src: string, getUserName: (id: string) => stri
             break
         }
         entities.push(entity)
-        if (entity.codeLanguage != null) {
-          entities.push({
-            from,
-            to: from + entity.codeLanguage.length + 1,
-            replaceWith: '',
-          })
-        }
+        // if (entity.codeLanguage != null) {
+        //   entities.push({
+        //     from,
+        //     to: from + entity.codeLanguage.length + 1,
+        //     replaceWith: '',
+        //   })
+        // }
         input = input.slice(closingIndex + curToken.length)
         curToken = null
         continue
