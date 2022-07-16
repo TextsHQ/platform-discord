@@ -88,8 +88,6 @@ export default class DiscordNetworkAPI {
 
   ready = false
 
-  gotFirstGuild = false
-
   currentUser?: CurrentUser
 
   userFriends: User[] = []
@@ -152,7 +150,7 @@ export default class DiscordNetworkAPI {
   }
 
   getThreads = async (folderName: string, pagination?: PaginationArg): Promise<Paginated<Thread>> => {
-    await this.waitForGuild()
+    await this.waitForInitialData()
 
     const res = await this.fetch({ method: 'GET', url: 'users/@me/channels' })
     if (!res || res.statusCode < 200 || res.statusCode > 204 || !res.json) throw new Error(getErrorMessage(res))
@@ -809,7 +807,7 @@ export default class DiscordNetworkAPI {
               url: getEmojiURL(e.id!, e.animated),
             })),
           }
-          this.gotFirstGuild = true
+
           this.eventCallback([emojiEvent])
         }
 
@@ -1143,10 +1141,6 @@ export default class DiscordNetworkAPI {
         break
       }
     }
-  }
-
-  private waitForGuild = async () => {
-    while (!this.waitForGuild) await sleep(SLEEP_TIME)
   }
 
   private waitForInitialData = async () => {
