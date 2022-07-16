@@ -5,8 +5,6 @@ import { getDataURI } from './util'
 const POLLING_INTERVAL = 10_000
 const LOG_PREFIX = '[discord]'
 
-export const PLATFORM_NAME = 'discord'
-
 export default class Discord implements PlatformAPI {
   private accountID?: string
 
@@ -112,7 +110,7 @@ export default class Discord implements PlatformAPI {
 
   sendReadReceipt = (threadID: string, messageID?: string) => {
     if (!messageID) {
-      const ogThreadJSON = texts.getOriginalObject?.(PLATFORM_NAME, this.accountID!, ['thread', threadID])
+      const ogThreadJSON = texts.getOriginalObject?.('discord', this.accountID!, ['thread', threadID])
       if (!ogThreadJSON) return
       const ogThread = JSON.parse(ogThreadJSON)
       messageID = ogThread.last_message_id

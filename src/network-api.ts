@@ -18,7 +18,6 @@ import { SUPER_PROPERTIES } from './discord-constants'
 
 import _emojis from './resources/emojis.json'
 import _emojiShortcuts from './resources/shortcuts.json'
-import { PLATFORM_NAME } from './api'
 import type { GatewayConnectionOptions, GatewayMessage } from './websocket/types'
 
 const API_VERSION = 9
@@ -791,12 +790,13 @@ export default class DiscordNetworkAPI {
 
       case GatewayMessageType.GUILD_CREATE: {
         if (this.guildCustomEmojiMap) {
-          const emojis: DiscordEmoji[] = (d as APIGuild).emojis.map(e => ({
+          const guild = d as APIGuild
+          const emojis: DiscordEmoji[] = guild.emojis.map(e => ({
             displayName: e.name ?? e.id!,
             reactionKey: `<:${e.name}:${e.id}>`,
             url: getEmojiURL(e.id!, e.animated),
           }))
-          this.guildCustomEmojiMap.set(d.id, emojis)
+          this.guildCustomEmojiMap.set(guild.id, emojis)
           this.onGuildCustomEmojiMapUpdate()
 
           const emojiEvent: ServerEvent = {
@@ -804,7 +804,10 @@ export default class DiscordNetworkAPI {
             objectIDs: {},
             mutationType: 'upsert',
             objectName: 'custom_emoji',
-            entries: emojis as any as CustomEmoji[],
+            entries: guild.emojis.map(e => ({
+              id: e.id!,
+              url: getEmojiURL(e.id!, e.animated),
+            })),
           }
           this.gotFirstGuild = true
           this.eventCallback([emojiEvent])
@@ -910,7 +913,7 @@ export default class DiscordNetworkAPI {
 
         let mapped = d
 
-        const og = texts.getOriginalObject?.(PLATFORM_NAME, this.accountID!, ['message', d.id])
+        const og = texts.getOriginalObject?.('discord', this.accountID!, ['message', d.id])
         if (og) {
           const ogParsed = JSON.parse(og)
           Object.assign(ogParsed, d)
