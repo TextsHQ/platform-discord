@@ -72,8 +72,6 @@ export default class DiscordNetworkAPI {
 
   private deviceFingerprint?: string = undefined
 
-  private gotInitialUserData = false
-
   token?: string
 
   accountID?: string
@@ -150,7 +148,7 @@ export default class DiscordNetworkAPI {
   }
 
   getThreads = async (folderName: string, pagination?: PaginationArg): Promise<Paginated<Thread>> => {
-    await this.waitForInitialData()
+    await this.waitUntilReady()
 
     const res = await this.fetch({ method: 'GET', url: 'users/@me/channels' })
     if (!res || res.statusCode < 200 || res.statusCode > 204 || !res.json) throw new Error(getErrorMessage(res))
@@ -499,12 +497,12 @@ export default class DiscordNetworkAPI {
   }
 
   getUsersPresence = async () => {
-    await this.waitForInitialData()
+    await this.waitUntilReady()
     return this.usersPresence
   }
 
   getCustomEmojis = async (): Promise<CustomEmojiMap> => {
-    await this.waitForInitialData()
+    await this.waitUntilReady()
     if (!this.allCustomEmojis) return {}
 
     const emojis = this.allCustomEmojis.map(e => [e.displayName, e.url])
@@ -647,7 +645,6 @@ export default class DiscordNetworkAPI {
           this.channelsMap = new Map(allChannels)
         }
 
-        this.gotInitialUserData = true
         this.ready = true
         break
       }
@@ -1141,10 +1138,6 @@ export default class DiscordNetworkAPI {
         break
       }
     }
-  }
-
-  private waitForInitialData = async () => {
-    while (!this.gotInitialUserData) await sleep(SLEEP_TIME)
   }
 
   private waitUntilReady = async () => {
