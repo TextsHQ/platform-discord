@@ -1,6 +1,6 @@
 import { PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Message, MessageContent, PaginationArg, ActivityType, MessageSendOptions, texts, LoginCreds, Thread, AccountInfo, ServerEventType, NotificationsInfo } from '@textshq/platform-sdk'
 import DiscordNetworkAPI from './network-api'
-import { getDataURI, sleep } from './util'
+import { getDataURI } from './util'
 
 const POLLING_INTERVAL = 10_000
 const LOG_PREFIX = '[discord]'
@@ -17,10 +17,6 @@ export default class Discord implements PlatformAPI {
   // private connState: ConnectionState = { status: ConnectionStatus.UNKNOWN }
 
   init = async (session?: string, accountInfo?: AccountInfo, prefs?: Record<string, any>) => {
-    texts.log(LOG_PREFIX, 'Hello, world!')
-    await sleep(3000)
-    texts.log(LOG_PREFIX, 'awaken')
-
     this.accountID = accountInfo?.accountID
     this.api.accountID = this.accountID
 

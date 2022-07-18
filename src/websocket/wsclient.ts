@@ -163,6 +163,8 @@ class WSClient {
         break
       case OPCode.RECONNECT:
       case OPCode.INVALID_SESSION:
+        texts.log(LOG_PREFIX, 'op:', message.op, 'reconnecting')
+        this._ready = false
         this.shouldResume = false
         this.disconnect(GatewayCloseCode.MANUAL_DISCONNECT)
         this.connect()
