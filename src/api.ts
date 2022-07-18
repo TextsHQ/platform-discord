@@ -19,12 +19,7 @@ export default class Discord implements PlatformAPI {
   init = async (session?: string, accountInfo?: AccountInfo, prefs?: Record<string, any>) => {
     this.accountID = accountInfo?.accountID
     this.api.accountID = this.accountID
-
-    if (!session) {
-      texts.error(LOG_PREFIX, 'No session in init()!')
-      this.api.disconnect()
-      return
-    }
+    if (!session) return
 
     await this.api.login(session)
     this.api.startPolling = this.startPolling
