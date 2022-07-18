@@ -113,10 +113,12 @@ class WSClient {
 
   private wsOpen = () => {
     texts.log(LOG_PREFIX, 'WebSocket open!')
+    this._ready = true
   }
 
   private wsClose = (code: number, reason: string) => {
     texts.log(LOG_PREFIX, `WebSocket closed! Code: ${code}, reason: '${reason || '<none>'}'`)
+    this._ready = false
     if (this.heartbeatTimer) clearInterval(this.heartbeatTimer)
 
     if (code === GatewayCloseCode.RECONNECT_REQUESTED) {
@@ -160,8 +162,12 @@ class WSClient {
         this.sendHeartbeat()
         break
       case OPCode.RECONNECT:
-        break
       case OPCode.INVALID_SESSION:
+        texts.log(LOG_PREFIX, 'op:', message.op, 'reconnecting')
+        this._ready = false
+        this.shouldResume = false
+        this.disconnect(GatewayCloseCode.MANUAL_DISCONNECT)
+        this.connect()
         break
       case OPCode.HELLO:
         this.setupHeartbeat(message.d.heartbeat_interval)

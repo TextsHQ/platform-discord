@@ -21,16 +21,17 @@ export default class Discord implements PlatformAPI {
     this.api.accountID = this.accountID
 
     if (!session) {
-      texts.error('No session in init()!')
+      texts.error(LOG_PREFIX, 'No session in init()!')
+      this.api.disconnect()
       return
     }
 
     await this.api.login(session)
-
     this.api.startPolling = this.startPolling
   }
 
   dispose = () => {
+    texts.log(LOG_PREFIX, 'Disposing')
     this.stopPolling(false)
     this.api.disconnect()
   }
@@ -50,7 +51,7 @@ export default class Discord implements PlatformAPI {
 
   subscribeToEvents = (onEvent: OnServerEventCallback) => {
     this.api.eventCallback = onEvent
-    onEvent(this.api.pendingEventsQueue)
+    if (this.api.pendingEventsQueue.length > 0) onEvent(this.api.pendingEventsQueue)
     this.api.pendingEventsQueue.length = 0
   }
 
