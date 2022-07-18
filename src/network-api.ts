@@ -93,6 +93,8 @@ export default class DiscordNetworkAPI {
   lastFocusedThread?: string
 
   login = async (token: string) => {
+    texts.log(LOG_PREFIX, 'Logging in with token...')
+
     if (!token) throw new Error('No token found.')
     this.token = token
     this.connect()
@@ -110,7 +112,7 @@ export default class DiscordNetworkAPI {
 
   disconnect = () => {
     this.ready = false
-    this.client?.disconnect()
+    if (this.client?.ready) this.client?.disconnect()
     this.client = undefined
   }
 
@@ -576,6 +578,7 @@ export default class DiscordNetworkAPI {
           texts.log(LOG_PREFIX, 'Gateway connection closed due to authentication failure.')
           this.client?.disconnect()
           this.client = undefined
+          // eslint-disable-next-line @typescript-eslint/no-throw-literal
           throw new ReAuthError('Access token invalid')
         case GatewayCloseCode.SESSION_TIMED_OUT:
           texts.log(`${LOG_PREFIX} Gateway session timed out`)

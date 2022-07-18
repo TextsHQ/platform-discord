@@ -1,6 +1,6 @@
 import { PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Message, MessageContent, PaginationArg, ActivityType, MessageSendOptions, texts, LoginCreds, Thread, AccountInfo, ServerEventType, NotificationsInfo } from '@textshq/platform-sdk'
 import DiscordNetworkAPI from './network-api'
-import { getDataURI } from './util'
+import { getDataURI, sleep } from './util'
 
 const POLLING_INTERVAL = 10_000
 const LOG_PREFIX = '[discord]'
@@ -17,20 +17,25 @@ export default class Discord implements PlatformAPI {
   // private connState: ConnectionState = { status: ConnectionStatus.UNKNOWN }
 
   init = async (session?: string, accountInfo?: AccountInfo, prefs?: Record<string, any>) => {
+    texts.log(LOG_PREFIX, 'Hello, world!')
+    await sleep(3000)
+    texts.log(LOG_PREFIX, 'awaken')
+
     this.accountID = accountInfo?.accountID
     this.api.accountID = this.accountID
 
     if (!session) {
-      texts.error('No session in init()!')
+      texts.error(LOG_PREFIX, 'No session in init()!')
+      this.api.disconnect()
       return
     }
 
     await this.api.login(session)
-
     this.api.startPolling = this.startPolling
   }
 
   dispose = () => {
+    texts.log(LOG_PREFIX, 'Disposing')
     this.stopPolling(false)
     this.api.disconnect()
   }
@@ -50,7 +55,7 @@ export default class Discord implements PlatformAPI {
 
   subscribeToEvents = (onEvent: OnServerEventCallback) => {
     this.api.eventCallback = onEvent
-    onEvent(this.api.pendingEventsQueue)
+    if (this.api.pendingEventsQueue.length > 0) onEvent(this.api.pendingEventsQueue)
     this.api.pendingEventsQueue.length = 0
   }
 
