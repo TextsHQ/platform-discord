@@ -2,11 +2,12 @@ import zlib from 'zlib'
 import { texts } from '@textshq/platform-sdk'
 import type { Data as WSData } from 'ws'
 import type Erlpack from 'erlpack'
+import { DEBUG } from './preferences'
 
 let erlpack: typeof Erlpack | undefined
 try {
   erlpack = require('erlpack')
-  texts.log('[discord] erlpack loaded')
+  if (DEBUG) texts.log('[discord] erlpack loaded')
 } catch (error) {
   texts.error(error)
 }

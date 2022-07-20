@@ -19,6 +19,8 @@ export default class Discord implements PlatformAPI {
   init = async (session?: string, accountInfo?: AccountInfo, prefs?: Record<string, any>) => {
     this.accountID = accountInfo?.accountID
     this.api.accountID = this.accountID
+
+    texts.log(LOG_PREFIX, 'Hello, world!')
     if (!session) return
 
     await this.api.login(session)
@@ -27,7 +29,7 @@ export default class Discord implements PlatformAPI {
 
   dispose = () => {
     texts.log(LOG_PREFIX, 'Disposing')
-    this.stopPolling(false)
+    if (this.pollingInterval) this.stopPolling(false)
     this.api.disconnect()
   }
 

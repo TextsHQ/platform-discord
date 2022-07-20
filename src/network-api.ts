@@ -2,7 +2,7 @@ import path from 'path'
 import FormData from 'form-data'
 import { promises as fs } from 'fs'
 import { uniqBy } from 'lodash'
-import { texts, CurrentUser, MessageContent, PaginationArg, Thread, Message, ServerEventType, OnServerEventCallback, ActivityType, User, MessageSendOptions, ReAuthError, PresenceMap, Paginated, FetchOptions, ServerEvent, CustomEmojiMap, UserPresence, CustomEmoji } from '@textshq/platform-sdk'
+import { texts, CurrentUser, MessageContent, PaginationArg, Thread, Message, ServerEventType, OnServerEventCallback, ActivityType, User, MessageSendOptions, ReAuthError, PresenceMap, Paginated, FetchOptions, ServerEvent, CustomEmojiMap, UserPresence } from '@textshq/platform-sdk'
 import { APIChannel, APIEmoji, APIGuild, APIReaction, APIUser, ChannelType, GatewayPresenceUpdateData, Snowflake } from 'discord-api-types/v9'
 
 import { mapCurrentUser, mapMessage, mapPresence, mapReaction, mapThread, mapUser } from './mappers/mappers'
@@ -111,6 +111,7 @@ export default class DiscordNetworkAPI {
   }
 
   disconnect = () => {
+    texts.log(LOG_PREFIX, 'Disconnecting')
     this.ready = false
     if (this.client?.ready) this.client?.disconnect()
     this.client = undefined
@@ -118,16 +119,20 @@ export default class DiscordNetworkAPI {
 
   connect = async (force = false, resume = false) => {
     if (this.client && this.client.ready) {
-      if (force) this.client.disconnect()
-      else return
+      if (force) {
+        texts.log(LOG_PREFIX, 'Force connect!')
+        this.client.disconnect()
+      } else {
+        texts.log(LOG_PREFIX, 'connect() called, but already has client.')
+        return
+      }
     }
 
-    texts.log(`${LOG_PREFIX} Setting up ws...`)
+    texts.log(LOG_PREFIX, 'Connecting...')
 
     if (!this.client) {
       const gatewayRes = await this.httpClient.requestAsString(`${API_ENDPOINT}/gateway`, { headers: { 'User-Agent': USER_AGENT } })
       const gatewayHost = JSON.parse(gatewayRes?.body)?.url as string ?? DEFAULT_GATEWAY
-      // texts.log(`${LOG_PREFIX} URL: ${gatewayURL}`)
       this.client = new WSClient(gatewayHost, this.token!, defaultPacker!, WS_OPTIONS)
     }
 

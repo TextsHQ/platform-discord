@@ -42,7 +42,7 @@ class WSClient {
   private _ready = false
 
   public get ready(): boolean {
-    return this._ready
+    return this._ready && this.ws?.readyState === WebSocket.OPEN
   }
 
   /// Should connection be resumed after connecting?
@@ -54,7 +54,7 @@ class WSClient {
 
   public onError?: (error: Error) => void
 
-  public onConnectionClosed?: (code: number, reason: string) => void
+  public onConnectionClosed?: (code: number, reason?: string) => void
 
   constructor(gateway: string, token: string, packer: Packer, options: GatewayConnectionOptions) {
     this.gateway = gateway
@@ -76,13 +76,13 @@ class WSClient {
     }
     const urlParams = new URLSearchParams(urlParts)
     const gatewayURL = `${this.gateway}?${urlParams.toString()}`
-    texts.log(LOG_PREFIX, 'Gateway URL:', gatewayURL)
+    texts.log(LOG_PREFIX, 'Opening WebSocket, URL:', gatewayURL)
     this.ws = new WebSocket(gatewayURL)
     this.setupHandlers()
   }
 
   public disconnect = (code: number = GatewayCloseCode.MANUAL_DISCONNECT) => {
-    texts.log(LOG_PREFIX, `Disconnecting, code: ${code}`)
+    texts.log(LOG_PREFIX, `Disconnect called with code ${code}`)
     if (this.heartbeatTimer) clearInterval(this.heartbeatTimer)
     this.ws?.close(code)
   }
@@ -117,7 +117,7 @@ class WSClient {
   }
 
   private wsClose = (code: number, reason: string) => {
-    texts.log(LOG_PREFIX, `WebSocket closed! Code: ${code}, reason: '${reason || '<none>'}'`)
+    texts.log(LOG_PREFIX, 'WebSocket closed, code:', code)
     this._ready = false
     if (this.heartbeatTimer) clearInterval(this.heartbeatTimer)
 
@@ -135,7 +135,6 @@ class WSClient {
     try {
       const unpacked = this.packer.unpack(data) as GatewayMessage
       if (!unpacked) throw WSError.errorUnpacking
-      if (DEBUG) texts.log('>', unpacked)
       this.handleMessage(unpacked)
     } catch (e) {
       texts.error(LOG_PREFIX, 'Error unpacking', e, data)
@@ -152,7 +151,14 @@ class WSClient {
   }
 
   private handleMessage = (message: GatewayMessage) => {
-    if (message.s) this.lastSequenceNumber = message.s
+    if (DEBUG) texts.log('>', message)
+
+    if (message.s) {
+      const expectedSequenceNumber = (this.lastSequenceNumber ?? 0) + 1
+      if (message.s !== expectedSequenceNumber) texts.error(LOG_PREFIX, `Sequence # mismatch! Expected: ${expectedSequenceNumber}, got: ${message.s}.`)
+
+      this.lastSequenceNumber = message.s
+    }
 
     switch (message.op) {
       case OPCode.DISPATCH:
@@ -163,7 +169,7 @@ class WSClient {
         break
       case OPCode.RECONNECT:
       case OPCode.INVALID_SESSION:
-        texts.log(LOG_PREFIX, 'op:', message.op, 'reconnecting')
+        texts.log(LOG_PREFIX, `OP: ${message.op}, reconnecting...`)
         this._ready = false
         this.shouldResume = false
         this.disconnect(GatewayCloseCode.MANUAL_DISCONNECT)
