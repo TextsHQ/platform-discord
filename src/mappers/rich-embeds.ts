@@ -24,8 +24,9 @@ export const handleGifvEmbed = (embed: APIEmbed): MessageAttachment => {
   return attachment
 }
 
-export const handleImageEmbed = (embed: APIEmbed): MessageAttachment => {
+export const handleImageEmbed = (embed: APIEmbed): MessageAttachment | undefined => {
   const image = embed.image ?? embed.thumbnail
+  if (!image) return
   const { type, isGif } = parseMediaURL((image?.url ?? image?.proxy_url)!)
   const attachment: MessageAttachment = {
     id: (embed.url ?? image?.url)!,

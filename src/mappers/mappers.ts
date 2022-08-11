@@ -138,7 +138,7 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
       }
       case EmbedType.Image: {
         const attachment = handleImageEmbed(embed)
-        final.attachments!.push(attachment)
+        if (attachment) final.attachments!.push(attachment)
         break
       }
       case EmbedType.Link: {
