@@ -1169,7 +1169,13 @@ export default class DiscordNetworkAPI {
       const res = await this.httpClient.requestAsString(`${API_ENDPOINT}/${url}`, opts)
       // eslint-disable-next-line @typescript-eslint/no-throw-literal
       if (res.statusCode === 401) throw new ReAuthError('Unauthorized')
-      const responseJSON = res.body?.length ? JSON.parse(res.body) : undefined
+      const hasBody = res.body?.length
+      if (hasBody && res.body[0] === '<') {
+        texts.log(res.statusCode, url, res.body)
+        const [, title] = /<title[^>]*>(.*?)<\/title>/.exec(res.body) || []
+        throw Error(`expected json, got html, status code=${res.statusCode}, title=${title}`)
+      }
+      const responseJSON = hasBody ? JSON.parse(res.body) : undefined
       return {
         statusCode: res.statusCode,
         json: responseJSON,
