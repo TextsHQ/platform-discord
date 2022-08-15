@@ -2,54 +2,28 @@
 // Based on https://github.com/brussell98/discord-markdown
 //
 
-/*  htmlTag -> TextAttributes
- */
+import type { TextAttributes } from '@textshq/platform-sdk'
+import { parserFor, outputFor } from 'simple-markdown'
+import { rules } from './rules'
 
-import { parserFor, outputFor } from 'simple-markdown';
-import makeEntities from './entities';
-import { rules } from './rules';
-
-const discordCallbackDefaults = {
-  // @ts-ignore
-  user: (node) => '@' + markdown.sanitizeText(node.id),
-  // @ts-ignore
-  channel: (node) => '#' + markdown.sanitizeText(node.id),
-  // @ts-ignore
-  role: (node) => '&' + markdown.sanitizeText(node.id),
-  everyone: () => '@everyone',
-  here: () => '@here',
-};
-
-// @ts-ignore
 export function parse(
-  source: any,
+  source: string,
   callbacks: {
-    getUserName: (id: string) => string | undefined;
-  }
-) {
-  const options = {
-    embed: true,
-    escapeHTML: true,
-    discordCallback: {},
-  };
-
-  const parser = parserFor(rules);
-  // @ts-ignore
-  const output = outputFor(rules, 'entities');
+    getUserName: (id: string) => string | undefined
+  },
+): TextAttributes {
+  const parser = parserFor(rules)
+  // @ts-expect-error
+  const output = outputFor(rules, 'textEntities')
 
   const state = {
     inline: true,
     inQuote: false,
     inEmphasis: false,
-    escapeHTML: options.escapeHTML,
-    cssModuleNames: null,
-    discordCallback: {
-      ...discordCallbackDefaults,
-      ...options.discordCallback,
-    },
-  };
+    offset: 0,
+    nested: false,
+    discordCallbacks: callbacks,
+  }
 
-  // const nodes = parser(source, state)
-  // return makeEntities(nodes)
-  return output(parser(source, state), state);
+  return output(parser(source, state), state)
 }
