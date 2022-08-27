@@ -1102,7 +1102,7 @@ __metadata:
   resolution: "@textshq/platform-discord@workspace:."
   dependencies:
     "@textshq/eslint-config": "https://github.com/TextsHQ/eslint-config"
-    "@textshq/platform-sdk": "https://github.com/TextsHQ/platform-sdk"
+    "@textshq/platform-sdk": "https://github.com/TextsHQ/platform-sdk#main"
     "@textshq/platform-test-lib": "https://github.com/TextsHQ/platform-test-lib"
     "@types/jest": ^27.4.1
     "@types/lodash": ^4.14.181
@@ -1119,12 +1119,12 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@textshq/platform-sdk@https://github.com/TextsHQ/platform-sdk":
+"@textshq/platform-sdk@https://github.com/TextsHQ/platform-sdk#main":
   version: 0.4.4
-  resolution: "@textshq/platform-sdk@https://github.com/TextsHQ/platform-sdk.git#commit=c01e6c8e033788a2123fbd03d84163dd1e43681e"
+  resolution: "@textshq/platform-sdk@https://github.com/TextsHQ/platform-sdk.git#commit=dd38a9b5d82044da0b44f5cc1c87a0316adddb62"
   dependencies:
-    form-data: ^4.0.0
-  checksum: 7787d45f1e39ca81dbf5533a68af658e50b213e2f62d7b862506e95593691d8a63eab571edfe40cc7b6b1ea75c9b4f279bb891d67f1ae124b75198622ed636b4
+    qrcode.react: ^3.1.0
+  checksum: c55980e9e2842855ead0ec4894da10cd0c24dbf84f3e50b33ef8e5f34c5784ccc5fe4380bd6e3ab3694edf13d310fc9fd5c9bebe37d7fdd7c59be95e1ff342d6
   languageName: node
   linkType: hard
 
@@ -5359,6 +5359,15 @@ __metadata:
   version: 2.1.1
   resolution: "punycode@npm:2.1.1"
   checksum: 823bf443c6dd14f669984dea25757b37993f67e8d94698996064035edd43bed8a5a17a9f12e439c2b35df1078c6bec05a6c86e336209eb1061e8025c481168e8
+  languageName: node
+  linkType: hard
+
+"qrcode.react@npm:^3.1.0":
+  version: 3.1.0
+  resolution: "qrcode.react@npm:3.1.0"
+  peerDependencies:
+    react: ^16.8.0 || ^17.0.0 || ^18.0.0
+  checksum: 94a2942ecf83f461d869adb20305ae663c6d1abe93ef2c72442b07d756ce70cf6deb6fd588dc5b382b48c6991cfde1dfd5ac9b814c1461e71d5edb2d945e67fc
   languageName: node
   linkType: hard
 

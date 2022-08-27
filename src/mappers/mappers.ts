@@ -77,6 +77,7 @@ export function mapThread(thread: APIChannel, lastReadMessageID?: string, isMute
       hasMore: false,
       items: participants,
     },
+    partialLastMessage: thread.last_message_id ? { id: thread.last_message_id } : undefined,
   }
 }
 
