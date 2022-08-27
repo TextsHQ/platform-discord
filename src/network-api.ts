@@ -901,10 +901,7 @@ export default class DiscordNetworkAPI {
             type: ServerEventType.STATE_SYNC,
             mutationType: 'upsert',
             objectName: 'message',
-            objectIDs: {
-              threadID: d.channel_id,
-              messageID: d.id,
-            },
+            objectIDs: { threadID: d.channel_id },
             entries: [mapMessage(d, this.currentUser?.id) as Message],
           }])
         }
@@ -943,10 +940,7 @@ export default class DiscordNetworkAPI {
           type: ServerEventType.STATE_SYNC,
           mutationType: 'delete',
           objectName: 'message',
-          objectIDs: {
-            threadID: d.channel_id,
-            messageID: d.id,
-          },
+          objectIDs: { threadID: d.channel_id },
           entries: [d.id],
         }])
         break
@@ -959,9 +953,7 @@ export default class DiscordNetworkAPI {
           type: ServerEventType.STATE_SYNC,
           mutationType: 'delete',
           objectName: 'message',
-          objectIDs: {
-            threadID: d.channel_id,
-          },
+          objectIDs: { threadID: d.channel_id },
           entries: d.ids,
         }])
         break
@@ -1007,9 +999,7 @@ export default class DiscordNetworkAPI {
           type: ServerEventType.STATE_SYNC,
           mutationType: 'update',
           objectName: 'message',
-          objectIDs: {
-            threadID: d.channel_id,
-          },
+          objectIDs: { threadID: d.channel_id },
           entries: [{
             id: d.message_id,
             reactions: [],
