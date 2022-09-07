@@ -151,7 +151,10 @@ export default class Discord implements PlatformAPI {
       return false
     }
     const success = await action()
-    if (!success) this.pollingInterval = setInterval(action, POLLING_INTERVAL)
+    if (!success) {
+      clearInterval(this.pollingInterval!)
+      this.pollingInterval = setInterval(action, POLLING_INTERVAL)
+    }
   }
 
   stopPolling = async (success: boolean) => {

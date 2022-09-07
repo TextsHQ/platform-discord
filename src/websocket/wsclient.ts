@@ -35,7 +35,9 @@ class WSClient {
 
   private lastSequenceNumber?: number
 
-  private heartbeatTimer?: NodeJS.Timer | NodeJS.Timeout
+  private heartbeatTimer?: NodeJS.Timer
+
+  private heartbeatTimeout?: NodeJS.Timeout
 
   private receivedHeartbeatAck?: boolean
 
@@ -83,7 +85,8 @@ class WSClient {
 
   public disconnect = (code: number = GatewayCloseCode.MANUAL_DISCONNECT) => {
     texts.log(LOG_PREFIX, `Disconnect called with code ${code}`)
-    if (this.heartbeatTimer) clearInterval(this.heartbeatTimer)
+    clearInterval(this.heartbeatTimer!)
+    clearTimeout(this.heartbeatTimeout!)
     this.ws?.close(code)
   }
 
@@ -119,7 +122,7 @@ class WSClient {
   private wsClose = (code: number, reason: string) => {
     texts.log(LOG_PREFIX, 'WebSocket closed, code:', code)
     this._ready = false
-    if (this.heartbeatTimer) clearInterval(this.heartbeatTimer)
+    clearInterval(this.heartbeatTimer!)
 
     if (code === GatewayCloseCode.RECONNECT_REQUESTED) {
       this.shouldResume = true
@@ -212,9 +215,11 @@ class WSClient {
     if (DEBUG) texts.log(LOG_PREFIX, `Setting heartbeat interval to ${interval}`)
 
     const jitter = Math.random()
-    this.heartbeatTimer = setTimeout(() => {
+    clearTimeout(this.heartbeatTimeout!)
+    this.heartbeatTimeout = setTimeout(() => {
       this.receivedHeartbeatAck = true
       this.sendHeartbeat()
+      clearInterval(this.heartbeatTimer!)
       this.heartbeatTimer = setInterval(this.sendHeartbeat, interval)
     }, interval + jitter)
   }
