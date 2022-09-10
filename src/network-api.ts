@@ -1051,6 +1051,7 @@ export default class DiscordNetworkAPI {
 
       case GatewayMessageType.MESSAGE_ACK: {
         if (!ENABLE_GUILDS && d.guild_id) return
+        if (!d.message_id) return
         const threadID = d.channel_id
         this.readStateMap.set(threadID, d.message_id)
         this.eventCallback([{

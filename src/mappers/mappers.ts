@@ -62,7 +62,7 @@ export function mapThread(thread: APIChannel, lastReadMessageID?: string, isMute
     id: thread.id,
     title: thread.name,
     isUnread: (timestamp ?? 0) > (lastMessageTimestamp ?? 0),
-    lastReadMessageID: lastReadMessageID ? String(lastReadMessageID) : undefined,
+    lastReadMessageID,
     isReadOnly: thread.recipients?.[0]?.system ?? false,
     type,
     imgURL: thread.icon ? getThreadIcon(thread.id, thread.icon) : undefined,
