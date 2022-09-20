@@ -1093,7 +1093,7 @@ __metadata:
   peerDependencies:
     eslint: ">=7"
     typescript: ">=4"
-  checksum: 61508a7905945bc62c20308c9c9f884b0e80307f2e6dca2809533d85da048e7f05bdb19defe991e007f14213ce7a85c225ad206bbfa792e17fe938fb73ff45b2
+  checksum: d21566145f4e49f1f82d1f7f058f7354af305bd684dddabacd03d217da58d232974e5fe31637621c920bfc9a6b31ad8af8505f6b671e2dd5dc4ad6ccca56fe61
   languageName: node
   linkType: hard
 

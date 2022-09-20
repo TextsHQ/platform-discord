@@ -922,6 +922,7 @@ export default class DiscordNetworkAPI {
 
         const message = mapMessage(mapped, this.currentUser?.id)
         if (!message) return
+        delete message._original
 
         this.eventCallback([{
           type: ServerEventType.STATE_SYNC,
