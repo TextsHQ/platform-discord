@@ -39,6 +39,8 @@ const info: PlatformInfo = {
     allowsMultipleReactionsToSingleMessage: true,
   },
   attributes: new Set([
+    Attribute.CAN_MESSAGE_USERNAME,
+    Attribute.CANNOT_MESSAGE_SELF,
     Attribute.SUPPORTS_PRESENCE,
     Attribute.SUPPORTS_QUOTED_MESSAGES,
     Attribute.SUPPORTS_GROUP_IMAGE_CHANGE,
