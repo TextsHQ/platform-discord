@@ -42,7 +42,9 @@ export default class Discord implements PlatformAPI {
   }
 
   logout = () =>
-    (this.pushToken ? this.api.logout('gcm', this.pushToken) : this.api.logout())
+    (this.pushToken
+      ? this.api.logout('gcm', this.pushToken)
+      : this.api.logout())
 
   serializeSession = () => this.api.token
 
@@ -54,7 +56,9 @@ export default class Discord implements PlatformAPI {
 
   searchUsers = (typed: string) => {
     const typedLower = typed.toLowerCase()
-    return typedLower ? this.api.userFriends.filter(u => u.username?.toLowerCase().includes(typedLower)) : this.api.userFriends
+    return typedLower
+      ? this.api.userFriends.filter(u => u.fullName?.toLowerCase().includes(typedLower) || u.username?.toLowerCase().includes(typedLower))
+      : this.api.userFriends
   }
 
   /* searchMessages = (typed: string, pagination?: PaginationArg, threadID?: string) => {
