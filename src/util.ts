@@ -1,4 +1,4 @@
-import { MessageAttachmentType } from '@textshq/platform-sdk'
+import { AttachmentType } from '@textshq/platform-sdk'
 import { EPOCH as DISCORD_EPOCH } from './discord-constants'
 
 export { setTimeout as sleep } from 'timers/promises'
@@ -52,28 +52,28 @@ export const mapMimeType = (url: string): string | undefined => {
   return MIME_TYPES[ext]
 }
 
-export const parseMediaURL = (url: string): { isGif?: boolean, type: MessageAttachmentType } => {
+export const parseMediaURL = (url: string): { isGif?: boolean, type: AttachmentType } => {
   const extension = url.split('.').pop()?.toLowerCase()
   switch (extension) {
     case 'gif':
     case 'gifv':
-      return { isGif: true, type: MessageAttachmentType.IMG }
+      return { isGif: true, type: AttachmentType.IMG }
     case 'png':
     case 'jpeg':
     case 'jpg':
     case 'webp':
-      return { isGif: false, type: MessageAttachmentType.IMG }
+      return { isGif: false, type: AttachmentType.IMG }
     case 'avi':
     case 'mp4':
     case 'mov':
-      return { type: MessageAttachmentType.VIDEO }
+      return { type: AttachmentType.VIDEO }
     case 'mp3':
     case 'wav':
     case 'm4a':
     case 'ogg':
-      return { type: MessageAttachmentType.AUDIO }
+      return { type: AttachmentType.AUDIO }
     default:
-      return { type: MessageAttachmentType.UNKNOWN }
+      return { type: AttachmentType.UNKNOWN }
   }
 }
 

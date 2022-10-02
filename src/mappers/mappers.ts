@@ -1,4 +1,4 @@
-import { CurrentUser, Message, MessageActionType, MessageAttachment, MessageAttachmentType, MessageLink, MessageReaction, Thread, ThreadType, User, PartialWithID, UserPresence, texts } from '@textshq/platform-sdk'
+import { CurrentUser, Message, MessageActionType, Attachment, MessageAttachmentType, MessageLink, MessageReaction, Thread, ThreadType, User, PartialWithID, UserPresence, texts } from '@textshq/platform-sdk'
 import { APIUser, APIChannel, EmbedType, MessageActivityType, APIAttachment, MessageType, GatewayPresenceUpdateData } from 'discord-api-types/v9'
 import { uniqBy } from 'lodash'
 
@@ -187,7 +187,7 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
     }
   }
 
-  const stickers: MessageAttachment[] = [...(message.stickers || []), ...(message.sticker_items || [])]?.map(sticker => {
+  const stickers: Attachment[] = [...(message.stickers || []), ...(message.sticker_items || [])]?.map(sticker => {
     const ext = {
       [StickerFormat.PNG]: 'png',
       [StickerFormat.APNG]: 'png',
@@ -204,7 +204,7 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
     }
   })
   const attachments = (message.attachments as APIAttachment[] ?? []).map(a => {
-    const attachment: MessageAttachment = {
+    const attachment: Attachment = {
       id: a.id,
       type: MessageAttachmentType.UNKNOWN,
       isGif: false,

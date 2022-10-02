@@ -1,5 +1,5 @@
-import { MessageAttachmentType, texts } from '@textshq/platform-sdk'
-import type { MessageAttachment, MessageLink, Tweet } from '@textshq/platform-sdk'
+import { AttachmentType, texts } from '@textshq/platform-sdk'
+import type { Attachment, MessageLink, Tweet } from '@textshq/platform-sdk'
 import type { APIEmbed } from 'discord-api-types/v9'
 
 import { mapMimeType, parseMediaURL } from '../util'
@@ -10,10 +10,10 @@ export const handleArticleEmbed = (embed: APIEmbed) => {
   texts.log(embed)
 }
 
-export const handleGifvEmbed = (embed: APIEmbed): MessageAttachment => {
+export const handleGifvEmbed = (embed: APIEmbed): Attachment => {
   const url = (embed.video?.url ?? embed.url)!
   const { type, isGif } = parseMediaURL(url)
-  const attachment: MessageAttachment = {
+  const attachment: Attachment = {
     id: url!,
     type,
     mimeType: mapMimeType(url),
@@ -24,17 +24,17 @@ export const handleGifvEmbed = (embed: APIEmbed): MessageAttachment => {
   return attachment
 }
 
-export const handleImageEmbed = (embed: APIEmbed): MessageAttachment | undefined => {
+export const handleImageEmbed = (embed: APIEmbed): Attachment | undefined => {
   const image = embed.image ?? embed.thumbnail
   if (!image) return
-  const { type, isGif } = parseMediaURL((image?.url ?? image?.proxy_url)!)
-  const attachment: MessageAttachment = {
-    id: (embed.url ?? image?.url)!,
+  const { type, isGif } = parseMediaURL((image.url ?? image.proxy_url)!)
+  const attachment: Attachment = {
+    id: (embed.url ?? image.url)!,
     type,
-    mimeType: image?.url ? mapMimeType(image.url) : undefined,
+    mimeType: image.url ? mapMimeType(image.url) : undefined,
     isGif,
-    srcURL: image?.url,
-    size: image?.width && image.height ? { width: image.width, height: image.height } : undefined,
+    srcURL: image.url!,
+    size: image.width && image.height ? { width: image.width, height: image.height } : undefined,
   }
   return attachment
 }
@@ -67,13 +67,13 @@ const handleTweetEmbed = (embed: APIEmbed, message: DiscordMessage, path: string
     const images = [embed.image, ...(message.embeds?.filter(e => e.url === embed.url && (e.image || e.video) && !e.timestamp).map(e => e.image))].filter(Boolean).map(image => ({
       id: image?.url!,
       srcURL: image?.url,
-      type: MessageAttachmentType.IMG,
+      type: AttachmentType.IMG,
       size: image?.width && image?.height ? { width: image.width, height: image.height } : undefined,
     }))
     const video = embed.video ? {
       id: embed.video.url,
       srcURL: embed.thumbnail?.url,
-      type: MessageAttachmentType.IMG,
+      type: AttachmentType.IMG,
       size: embed.thumbnail?.width && embed.thumbnail?.height ? { width: embed.thumbnail.width, height: embed.thumbnail.height } : undefined,
     } : undefined
     const tweet: Tweet = {
@@ -86,7 +86,7 @@ const handleTweetEmbed = (embed: APIEmbed, message: DiscordMessage, path: string
       text: embed.description ?? '',
       timestamp: embed.timestamp ? new Date(embed.timestamp) : undefined,
       url: embed.url,
-      attachments: [...images, video].filter(Boolean) as MessageAttachment[],
+      attachments: [...images, video].filter(Boolean) as Attachment[],
     }
     return { tweet }
   } else {
@@ -103,13 +103,13 @@ const handleTweetEmbed = (embed: APIEmbed, message: DiscordMessage, path: string
   }
 }
 
-export const handleRichEmbed = (embed: APIEmbed, message: DiscordMessage): { text?: string, tweet?: Tweet, link?: MessageLink, attachment?: MessageAttachment } | undefined => {
+export const handleRichEmbed = (embed: APIEmbed, message: DiscordMessage): { text?: string, tweet?: Tweet, link?: MessageLink, attachment?: Attachment } | undefined => {
   const [,, domain, path] = embed.url ? (urlRegex.exec(embed.url) ?? []) : []
   switch (domain?.toLowerCase()) {
     case 'twitter.com':
       return handleTweetEmbed(embed, message, path)
     default: {
-      const final: { text?: string, link?: MessageLink, attachment?: MessageAttachment } = {}
+      const final: { text?: string, link?: MessageLink, attachment?: Attachment } = {}
 
       let text = message.content
       if (embed.title) text += `\n**${embed.title}**\n`
@@ -132,7 +132,7 @@ export const handleRichEmbed = (embed: APIEmbed, message: DiscordMessage): { tex
       const imageURL = image?.url ?? image?.proxy_url
       if (image && imageURL) {
         const { type, isGif } = parseMediaURL(imageURL)
-        const attachment: MessageAttachment = {
+        const attachment: Attachment = {
           id: imageURL,
           type,
           srcURL: imageURL,
@@ -147,7 +147,7 @@ export const handleRichEmbed = (embed: APIEmbed, message: DiscordMessage): { tex
   }
 }
 
-export const handleVideoEmbed = (embed: APIEmbed): { link?: MessageLink, attachment?: MessageAttachment } => {
+export const handleVideoEmbed = (embed: APIEmbed): { link?: MessageLink, attachment?: Attachment } => {
   if (embed.provider?.name?.toLowerCase() === 'youtube') {
     const link: MessageLink = {
       url: embed.url!,
@@ -157,14 +157,13 @@ export const handleVideoEmbed = (embed: APIEmbed): { link?: MessageLink, attachm
       summary: embed.description,
     }
     return { link }
-  } else {
-    const attachment: MessageAttachment = {
-      id: embed.url!,
-      type: MessageAttachmentType.VIDEO,
-      mimeType: embed.video?.url ? mapMimeType(embed.video.url) : undefined,
-      srcURL: embed.video?.url,
-      size: embed.video?.width && embed.video?.height ? { width: embed.video.width, height: embed.video.height } : undefined,
-    }
-    return { attachment }
   }
+  const attachment: Attachment = {
+    id: embed.url!,
+    type: AttachmentType.VIDEO,
+    mimeType: embed.video?.url ? mapMimeType(embed.video.url) : undefined,
+    srcURL: embed.video?.url!,
+    size: embed.video?.width && embed.video?.height ? { width: embed.video.width, height: embed.video.height } : undefined,
+  }
+  return { attachment }
 }
