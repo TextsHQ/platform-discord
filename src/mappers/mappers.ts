@@ -1,4 +1,4 @@
-import { CurrentUser, Message, MessageActionType, Attachment, MessageAttachmentType, MessageLink, MessageReaction, Thread, ThreadType, User, PartialWithID, UserPresence, texts } from '@textshq/platform-sdk'
+import { CurrentUser, Message, MessageActionType, Attachment, AttachmentType, MessageLink, MessageReaction, Thread, ThreadType, User, PartialWithID, UserPresence, texts } from '@textshq/platform-sdk'
 import { APIUser, APIChannel, EmbedType, MessageActivityType, APIAttachment, MessageType, GatewayPresenceUpdateData } from 'discord-api-types/v9'
 import { uniqBy } from 'lodash'
 
@@ -195,7 +195,7 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
     }[sticker.format_type]
     return {
       id: sticker.id,
-      type: MessageAttachmentType.IMG,
+      type: AttachmentType.IMG,
       mimeType: ext === 'json' ? 'image/lottie' : `image/${ext}`,
       isSticker: true,
       srcURL: ext === 'json' ? getLottieStickerURL(sticker.id) : getPNGStickerURL(sticker.id),
@@ -206,7 +206,7 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
   const attachments = (message.attachments as APIAttachment[] ?? []).map(a => {
     const attachment: Attachment = {
       id: a.id,
-      type: MessageAttachmentType.UNKNOWN,
+      type: AttachmentType.UNKNOWN,
       isGif: false,
       isVoiceNote: false,
       size: a.width && a.height ? { width: a.width, height: a.height } : undefined,
@@ -223,23 +223,23 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
       case 'jpg':
       case 'jpeg':
       case 'webp':
-        attachment.type = MessageAttachmentType.IMG
+        attachment.type = AttachmentType.IMG
         break
       case 'gif':
       case 'gifv':
-        attachment.type = MessageAttachmentType.IMG
+        attachment.type = AttachmentType.IMG
         attachment.isGif = true
         break
       case 'mp4':
       case 'mov':
       case 'webm':
-        attachment.type = MessageAttachmentType.VIDEO
+        attachment.type = AttachmentType.VIDEO
         break
       case 'mp3':
       case 'flac':
       case 'wav':
       case 'ogg':
-        attachment.type = MessageAttachmentType.AUDIO
+        attachment.type = AttachmentType.AUDIO
         attachment.isVoiceNote = true
         break
     }
