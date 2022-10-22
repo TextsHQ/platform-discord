@@ -267,9 +267,9 @@ function mapMessageType(message: DiscordMessage): Partial<Message> | undefined {
       return {
         isAction: true,
         parseTemplate: true,
-        text: `${message.mentions.map(m => `{{${m.id}}}`).join(', ')} joined`,
+        text: `{{sender}} added ${message.mentions.map(m => `{{${m.id}}}`).join(', ')}`,
         action: {
-          type: MessageActionType.THREAD_PARTICIPANTS_REMOVED,
+          type: MessageActionType.THREAD_PARTICIPANTS_ADDED,
           participantIDs: message.mentions.map(m => m.id),
           actorParticipantID: message.author.id,
         },
