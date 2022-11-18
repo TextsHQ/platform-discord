@@ -5,7 +5,7 @@ const flatCases = [
     text: '**bold** _italic_ *italic* __underline__ ~~strikethrough~~',
     result: {
       text: 'bold italic italic underline strikethrough',
-      textAttributes: {
+      attributes: {
         entities: [
           {
             from: 0,
@@ -40,7 +40,7 @@ const flatCases = [
     text: '**it*',
     result: {
       text: '*it',
-      textAttributes: {
+      attributes: {
         entities: [
           {
             from: 1,
@@ -55,7 +55,7 @@ const flatCases = [
     text: '*abc*🤔 **xyz** 123',
     result: {
       text: 'abc🤔 xyz 123',
-      textAttributes: {
+      attributes: {
         entities: [
           {
             from: 0,
@@ -75,7 +75,7 @@ const flatCases = [
     text: 'Test _漢字_ **世界** 12',
     result: {
       text: 'Test 漢字 世界 12',
-      textAttributes: {
+      attributes: {
         entities: [
           {
             from: 5,
@@ -95,7 +95,7 @@ const flatCases = [
     text: 'Inline ` code ` should work',
     result: {
       text: 'Inline  code  should work',
-      textAttributes: {
+      attributes: {
         entities: [
           {
             from: 7,
@@ -110,7 +110,7 @@ const flatCases = [
     text: '```code``` and ```\n  block\nshould work\n``` as well',
     result: {
       text: 'code and \n  block\nshould work\n as well',
-      textAttributes: {
+      attributes: {
         entities: [
           {
             from: 0,
@@ -132,7 +132,7 @@ const flatCases = [
     text: 'a <@!1234> b',
     result: {
       text: 'a @user1 b',
-      textAttributes: {
+      attributes: {
         entities: [
           {
             from: 2,
@@ -150,7 +150,7 @@ const flatCases = [
     text: 'a <a:pika:123> b',
     result: {
       text: 'a :pika: b',
-      textAttributes: {
+      attributes: {
         entities: [
           {
             from: 2,
@@ -176,7 +176,7 @@ const nestedCases = [
       '***bold-italic*** __*under-italic*__ __**under-bold**__ __***under-bold-italic***__',
     result: {
       text: 'bold-italic under-italic under-bold under-bold-italic',
-      textAttributes: {
+      attributes: {
         entities: [
           {
             from: 0,
@@ -223,7 +223,7 @@ const nestedCases = [
     text: 'x **b _it_ ~~st~~**',
     result: {
       text: 'x b it st',
-      textAttributes: {
+      attributes: {
         entities: [
           {
             from: 4,

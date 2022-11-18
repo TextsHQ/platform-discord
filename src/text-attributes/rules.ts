@@ -1,17 +1,25 @@
-import type { TextAttributes, TextEntity } from '@textshq/platform-sdk'
-import markdown from 'simple-markdown'
+import type { AttributedText, TextEntity } from '@textshq/platform-sdk'
+import markdown, { anyScopeRegex, blockRegex, inlineRegex } from 'simple-markdown'
 import { getEmojiURL } from '../util'
 
 // TODO: Handle nesting in rules
 
-interface ParserRule extends markdown.SingleNodeParserRule {
-  parse: (capture: markdown.Capture, parse: markdown.Parser, state: markdown.State) => TextEntity
+interface ParsedTextEntity extends TextEntity {
+  ignore?: boolean;
+  type?: string;
 }
 
-function updateState(capture: markdown.Capture, state: markdown.State): markdown.State {
-  const [captured] = capture
-  if (!captured) return state
-  state.offset += captured.length
+interface ParserRule extends markdown.SingleNodeParserRule {
+  parse: (capture: markdown.Capture, parse: markdown.Parser, state: markdown.State) => ParsedTextEntity
+}
+
+function updateState(capture: markdown.Capture, state: markdown.State, replaceWith?: string): markdown.State {
+  const [captured, content] = capture
+  const finalContent = replaceWith ?? content ?? captured
+  if (!finalContent) return state
+  state.offset += [...finalContent].length
+  state.fullText += finalContent
+
   return state
 }
 
@@ -28,6 +36,7 @@ const parserRules: { [key: string]: ParserRule } = {
         from: oldOffset,
         to: state.offset,
         replaceWith: captured,
+        ignore: true
       }
     },
   },
@@ -64,7 +73,7 @@ const parserRules: { [key: string]: ParserRule } = {
       return {
         from: oldOffset,
         to: state.offset,
-        replaceWith: text,
+        // replaceWith: text,
         bold: true,
       }
     },
@@ -81,7 +90,7 @@ const parserRules: { [key: string]: ParserRule } = {
       return {
         from: oldOffset,
         to: state.offset,
-        replaceWith: text,
+        // replaceWith: text,
         underline: true,
       }
     },
@@ -90,15 +99,17 @@ const parserRules: { [key: string]: ParserRule } = {
   em: {
     ...markdown.defaultRules.em,
     parse: (capture, parse, state) => {
-      const oldOffset = state.offset
-      state = updateState(capture, state)
-
       const [, textUnderline, textAsterisk] = capture
+      const oldOffset = state.offset
+
+      const replaceWith = textUnderline ?? textAsterisk
+
+      state = updateState(capture, state, replaceWith)
 
       return {
         from: oldOffset,
         to: state.offset,
-        replaceWith: textUnderline ?? textAsterisk,
+        // replaceWith: textUnderline ?? textAsterisk,
         italic: true,
       }
     },
@@ -115,7 +126,7 @@ const parserRules: { [key: string]: ParserRule } = {
       return {
         from: oldOffset,
         to: state.offset,
-        replaceWith: text,
+        // replaceWith: text,
         strikethrough: true,
       }
     },
@@ -191,28 +202,44 @@ const parserRules: { [key: string]: ParserRule } = {
     },
   },
 
-  // inlineCode: {
-  //   ...markdown.defaultRules.inlineCode,
-  //   parse: (capture, parse, state) => {
-  //     const [, text] = capture
-  //     const { oldOffset, newState } = updateState(capture, state)
-  //     state = newState
+  inlineCode: {
+    ...markdown.defaultRules.inlineCode,
+    order: 2,
+    // match: inlineRegex(/^(`[^\n`]+`)/gi),  // TODO: Match escaped backticks
+    parse: (capture, parse, state) => {
+      const [matched,, content] = capture
+      const oldOffset = state.offset
+      state = updateState(capture, state, content)
 
-  //     return {
-  //       from: oldOffset,
-  //       to: state.offset,
-  //       replaceWith: text,
-  //       code: true,
-  //     }
-  //   },
-  // },
+      return {
+        from: oldOffset,
+        to: state.offset,
+        // replaceWith: text,
+        code: true,
+      }
+    },
+  },
 
-  // codeBlock: {
-  //   ...markdown.defaultRules.codeBlock,
-  //   parse: (capture, parse, state) => {
-  //     return { content: '' }
-  //   },
-  // }
+  codeBlock: {
+    ...markdown.defaultRules.codeBlock,
+    order: 1,
+    match: anyScopeRegex(/(?:```([^(```)\n]*)```)|(?:```([a-zA-Z0-9]*)([^```]*)```)/gim),
+    parse: (capture, parse, state) => {
+      const [matched, inlineContent, codeLanguage, multilineContent] = capture
+      const oldOffset = state.offset
+
+      const replacedContent = inlineContent || multilineContent
+      state = updateState(capture, state, replacedContent)
+
+      return {
+        from: oldOffset,
+        to: state.offset,
+        code: true,
+        pre: true,
+        codeLanguage: !!codeLanguage ? codeLanguage : undefined
+      }
+    },
+  },
 
   spoiler: {
     order: 0,
@@ -236,16 +263,16 @@ const parserRules: { [key: string]: ParserRule } = {
     order: markdown.defaultRules.strong.order,
     match: source => /^<(a?):(\w+):(\d+)>/.exec(source),
     parse: (capture, parse, state) => {
-      const oldOffset = state.offset
-      state = updateState(capture, state)
-
       const [, animatedPrefix, name, id] = capture
       const emojiURL = getEmojiURL(id, animatedPrefix === 'a')
+      const oldOffset = state.offset
+
+      const replacedContent = `:${name}:`
+      state = updateState(capture, state, replacedContent)
 
       return {
         from: oldOffset,
         to: state.offset,
-        replaceWith: `:${name}:`,
         replaceWithMedia: {
           mediaType: 'img',
           srcURL: emojiURL,
@@ -262,16 +289,17 @@ const parserRules: { [key: string]: ParserRule } = {
     order: markdown.defaultRules.strong.order,
     match: source => /^<@!?([0-9]*)>/.exec(source),
     parse: (capture, parse, state) => {
-      const oldOffset = state.offset
-      state = updateState(capture, state)
-
       const [, userID] = capture
       const username = state.discordCallbacks.getUserName(userID)
+      const oldOffset = state.offset
+
+      const replacedContent = `@${username}`
+      state = updateState(capture, state, replacedContent)
 
       return {
         from: oldOffset,
         to: state.offset,
-        replaceWith: `@${username}`,
+        // replaceWith: ,
         mentionedUser: {
           username,
           id: userID,
@@ -321,17 +349,27 @@ const parserRules: { [key: string]: ParserRule } = {
   // }
 }
 
-function textEntitiesJoiner(nodes: Array<markdown.SingleASTNode>, nestedOutput: markdown.Output<TextEntity>, state: markdown.State): TextAttributes {
-  // TODO: Handle `nestedOutput` and `state` if needed
+function attributedTextJoiner(nodes: Array<markdown.SingleASTNode>, nestedOutput: markdown.Output<TextEntity>, state: markdown.State): AttributedText {
+    // TODO: Handle `nestedOutput` and `state`
+  const entities = (nodes as unknown as ParsedTextEntity[])
+    .filter(n => !n.ignore)
+    .map(n => ({
+      ...n,
+      type: ["strong", "em", "u", "strike", "inlineCode", "codeBlock", "discordUser", "discordEmoji"].includes(n.type ?? "") ? undefined : n.type
+    }))
+
   return {
-    entities: (nodes as unknown as TextEntity[]),
-    heDecode: false,
+    text: state.fullText,
+    attributes: {
+      entities
+      // heDecode: false,
+    }
   }
 }
 
 export const rules: markdown.ParserRules = {
   Array: {
-    textEntities: textEntitiesJoiner,
+    attributedText: attributedTextJoiner,
   },
   ...parserRules,
 }

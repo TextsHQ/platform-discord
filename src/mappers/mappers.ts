@@ -110,7 +110,8 @@ export function mapMessage(message: DiscordMessage, currentUserID?: string, reac
   if (mapped.text && mapped.text.length > 0) {
     const getUserName = (id: string): string => message.mentions.find(m => m.id === id)?.username || id
     const parsed = parse(mapped.text, { getUserName })
-    mapped.textAttributes = parsed
+    mapped.textAttributes = parsed.attributes
+    mapped.text = parsed.text
   }
 
   return mapped
