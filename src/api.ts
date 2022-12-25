@@ -1,4 +1,5 @@
 import { PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Message, MessageContent, PaginationArg, ActivityType, MessageSendOptions, texts, LoginCreds, Thread, AccountInfo, ServerEventType, NotificationsInfo } from '@textshq/platform-sdk'
+import { mapCurrentUser } from './mappers/mappers'
 import DiscordNetworkAPI from './network-api'
 import { getDataURI } from './util'
 
@@ -16,6 +17,15 @@ export default class Discord implements PlatformAPI {
 
   // private connState: ConnectionState = { status: ConnectionStatus.UNKNOWN }
 
+  private async afterAuth() {
+    const res = await this.api.getMe()
+    const currentUser = mapCurrentUser(res!.json)
+    this.api.currentUser = currentUser
+    this.api.usernameIDMap.set(currentUser.username!, currentUser.id)
+    this.api.startPolling = this.startPolling
+    await this.api.getUserFriends()
+  }
+
   init = async (session?: string, accountInfo?: AccountInfo, prefs?: Record<string, any>) => {
     this.accountID = accountInfo?.accountID
     this.api.accountID = this.accountID
@@ -24,7 +34,7 @@ export default class Discord implements PlatformAPI {
     if (!session) return
 
     await this.api.login(session)
-    this.api.startPolling = this.startPolling
+    this.afterAuth()
   }
 
   dispose = () => {
@@ -33,7 +43,7 @@ export default class Discord implements PlatformAPI {
     this.api.disconnect()
   }
 
-  getCurrentUser = () => this.api.getCurrentUser()
+  getCurrentUser = () => this.api.currentUser!
 
   login = async (creds?: LoginCreds): Promise<LoginResult> => {
     if (!creds?.jsCodeResult) return { type: 'error', errorMessage: 'Token was empty' }
@@ -143,7 +153,7 @@ export default class Discord implements PlatformAPI {
     const action = async (): Promise<boolean> => {
       texts.log(`${LOG_PREFIX} Polling...`)
       try {
-        const user = await this.api.getCurrentUser()
+        const user = await this.api.getMe()
         if (user) {
           texts.log(`${LOG_PREFIX} Poll successful!`)
           await this.stopPolling(true)

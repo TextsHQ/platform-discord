@@ -5,16 +5,16 @@ import { uniqBy } from 'lodash'
 import { texts, CurrentUser, MessageContent, PaginationArg, Thread, Message, ServerEventType, OnServerEventCallback, ActivityType, User, MessageSendOptions, ReAuthError, PresenceMap, Paginated, FetchOptions, ServerEvent, CustomEmojiMap, UserPresence } from '@textshq/platform-sdk'
 import { APIChannel, APIEmoji, APIGuild, APIReaction, APIUser, ChannelType, GatewayPresenceUpdateData, Snowflake } from 'discord-api-types/v9'
 
-import { mapCurrentUser, mapMessage, mapPresence, mapReaction, mapThread, mapUser } from './mappers/mappers'
+import { mapMessage, mapPresence, mapReaction, mapThread, mapUser } from './mappers/mappers'
 import WSClient from './websocket/wsclient'
 import { GatewayCloseCode, GatewayMessageType } from './websocket/constants'
 import { defaultPacker } from './packers'
 import { generateScienceClientUUID, getEmojiURL, sleep } from './util'
 import { generateSnowflake } from './common-util'
 import { ENABLE_GUILDS, ENABLE_DM_GUILD_MEMBERS, ENABLE_DISCORD_ANALYTICS } from './preferences'
-import type { DiscordEmoji, DiscordMessage, DiscordReactionDetails, DiscordScienceEvent } from './types'
 import { IGNORED_CHANNEL_TYPES, ScienceEventType, USER_AGENT } from './constants'
 import { SUPER_PROPERTIES } from './discord-constants'
+import type { DiscordEmoji, DiscordMessage, DiscordReactionDetails, DiscordScienceEvent } from './types'
 
 import _emojis from './resources/emojis.json'
 import _emojiShortcuts from './resources/shortcuts.json'
@@ -51,7 +51,7 @@ export default class DiscordNetworkAPI {
   }
 
   // username-to-id mappings
-  private userMappings = new Map<string | undefined, string>()
+  usernameIDMap = new Map<string, string>()
 
   private readStateMap = new Map<string, string>()
 
@@ -106,7 +106,7 @@ export default class DiscordNetworkAPI {
   }
 
   logout = async (provider?: 'gcm', pushToken?: string) => {
-    this.fetch({ method: 'POST', url: 'auth/logout', json: provider ? { provider, token: pushToken } : { provider: null, voip_provider: null } })
+    await this.fetch({ method: 'POST', url: 'auth/logout', json: provider ? { provider, token: pushToken } : { provider: null, voip_provider: null } })
     // TODO: Check if disconnecting from WS is needed here
   }
 
@@ -141,31 +141,22 @@ export default class DiscordNetworkAPI {
     this.setupGatewayListeners()
   }
 
-  getCurrentUser = async (): Promise<CurrentUser> => {
-    const res = await this.fetch({ method: 'GET', url: 'users/@me' })
-    if (!res || res.statusCode < 200 || res.statusCode > 204 || !res.json) throw new Error(getErrorMessage(res))
-
-    const currentUser = mapCurrentUser(res.json)
-    this.currentUser = currentUser
-    if (currentUser.id && currentUser.displayText) this.userMappings.set(currentUser.displayText, currentUser.id)
-
-    await this.getUserFriends()
-
-    return currentUser
+  getMe = async () => {
+    const res = await this.fetch({ method: 'GET', url: 'users/@me', checkError: true })
+    return res
   }
 
   getThreads = async (folderName: string, pagination?: PaginationArg): Promise<Paginated<Thread>> => {
     await this.waitUntilReady()
 
-    const res = await this.fetch({ method: 'GET', url: 'users/@me/channels' })
-    if (!res || res.statusCode < 200 || res.statusCode > 204 || !res.json) throw new Error(getErrorMessage(res))
+    const res = await this.fetch({ method: 'GET', url: 'users/@me/channels', checkError: true })
 
-    const threads: Thread[] = (res.json as APIChannel[])
+    const threads: Thread[] = (res!.json as APIChannel[])
       .sort((a, b) => +a.last_message_id! - +b.last_message_id!)
       .reverse()
       .map(t => mapThread(t, this.readStateMap.get(t.id), this.mutedChannels.has(t.id), this.currentUser))
 
-    threads.flatMap(t => t.participants.items).forEach(p => this.userMappings.set(p.username, p.id))
+    threads.flatMap(t => t.participants.items).forEach(p => this.usernameIDMap.set(p.username!, p.id))
 
     // TODO: App doesn't display empty channels
     const items = ENABLE_GUILDS ? threads.concat([...this.channelsMap?.values() ?? []].flat()) : threads
@@ -180,10 +171,11 @@ export default class DiscordNetworkAPI {
       method: 'POST',
       url: 'users/@me/channels',
       json: userIDs.length === 1 ? { recipient_id: userIDs[0] } : { recipients: userIDs },
+      checkError: true
     })
+    const json = res!.json
 
-    if (!res || res.statusCode < 200 || res.statusCode > 204 || !res.json) throw new Error(getErrorMessage(res))
-    return mapThread(res.json, undefined, this.mutedChannels.has(res.json.id), this.currentUser)
+    return mapThread(json, undefined, this.mutedChannels.has(json.id), this.currentUser)
   }
 
   /** https://discord.com/developers/docs/resources/channel#deleteclose-channel */
@@ -191,14 +183,14 @@ export default class DiscordNetworkAPI {
     await this.fetch({ method: 'DELETE', url: `channels/${threadID}` })
   }
 
-  blockUser = async (userID: string) => {
-    const res = await this.fetch({
-      method: 'PUT',
-      url: `users/@me/relationships/${userID}`,
-      json: { type: 2 },
-    })
-    return res?.statusCode === 204
-  }
+  // private blockUser = async (userID: string) => {
+  //   const res = await this.fetch({
+  //     method: 'PUT',
+  //     url: `users/@me/relationships/${userID}`,
+  //     json: { type: 2 },
+  //   })
+  //   return res?.statusCode === 204
+  // }
 
   reportThread = async (threadID: string, _messageID?: string) => {
     // TODO: Review - this getMessages call is untested
@@ -304,10 +296,9 @@ export default class DiscordNetworkAPI {
     }
 
     const paginationQuery = options.before ? `before=${options.before}` : options.after ? `after=${options.after}` : ''
-    const res = await this.fetch({ method: 'GET', url: `channels/${threadID}/messages?limit=${limit}&${paginationQuery}` })
-    if (!res || res.statusCode < 200 || res.statusCode > 204 || !res.json) throw new Error(getErrorMessage(res))
+    const res = await this.fetch({ method: 'GET', url: `channels/${threadID}/messages?limit=${limit}&${paginationQuery}`, checkError: true })
 
-    const json: DiscordMessage[] = res.json
+    const json: DiscordMessage[] = res!.json
     const messages = (await Promise.all(json.map(m => this.getMessageReactions(m, threadID)))).filter(Boolean) as Message[]
 
     if (ENABLE_GUILDS) {
@@ -394,10 +385,10 @@ export default class DiscordNetworkAPI {
       headers: requestContent.headers,
       json: requestContent.json,
       body: requestContent.body,
+      checkError: true,
     })
 
-    if (!res || res.statusCode < 200 || res.statusCode > 204 || !res.json) throw new Error(getErrorMessage(res))
-    return [mapMessage(res.json, this.currentUser?.id) as Message]
+    return [mapMessage(res!.json, this.currentUser?.id) as Message]
   }
 
   editMessage = async (threadID: string, messageID: string, content: MessageContent, options?: MessageSendOptions): Promise<boolean> => {
@@ -405,29 +396,25 @@ export default class DiscordNetworkAPI {
 
     const text = content.text ? this.mapMentionsAndEmojis(content.text) : ''
 
-    const res = await this.fetch({ url: `channels/${threadID}/messages/${messageID}`, method: 'PATCH', json: { content: text } })
-    if (!res || res.statusCode < 200 || res.statusCode > 204 || !res.json) throw new Error(getErrorMessage(res))
+    await this.fetch({ url: `channels/${threadID}/messages/${messageID}`, method: 'PATCH', json: { content: text }, checkError: true })
     return true
   }
 
   searchMessages = async (typed: string, threadID: string, pagination?: PaginationArg): Promise<Paginated<Message>> => {
     await this.waitUntilReady()
 
-    const res = await this.fetch({ url: `channels/${threadID}/messages/search?content=${encodeURIComponent(typed)}`, method: 'GET' })
-    if (!res || res.statusCode < 200 || res.statusCode > 204) throw new Error(getErrorMessage(res))
-    const messages: Message[] = res.json?.messages
+    const res = await this.fetch({ url: `channels/${threadID}/messages/search?content=${encodeURIComponent(typed)}`, method: 'GET', checkError: true })
+    const messages: Message[] = res!.json?.messages
     return { items: messages, hasMore: false }
   }
 
   patchChannel = async (channelID: string, patches: { name?: string, icon?: string }) => {
-    const res = await this.fetch({ url: `channels/${channelID}`, method: 'PATCH', json: patches })
-    if (!res || res.statusCode < 200 || res.statusCode > 204) throw new Error(getErrorMessage(res))
+    await this.fetch({ url: `channels/${channelID}`, method: 'PATCH', json: patches, checkError: true })
   }
 
   patchSettings = async (threadID: string, overrides: any) => {
     const json = { channel_overrides: { [threadID]: overrides } }
-    const res = await this.fetch({ url: 'users/@me/guilds/@me/settings', method: 'PATCH', json })
-    if (!res || res.statusCode < 200 || res.statusCode > 204) throw new Error(getErrorMessage(res))
+    await this.fetch({ url: 'users/@me/guilds/@me/settings', method: 'PATCH', json, checkError: true })
   }
 
   muteThread = async (threadID: string, mutedUntil: Date | 'forever' | undefined) => {
@@ -444,18 +431,15 @@ export default class DiscordNetworkAPI {
     if (!forEveryone) return
     await this.waitUntilReady()
 
-    const res = await this.fetch({ method: 'DELETE', url: `channels/${threadID}/messages/${messageID}` })
-    if (!res || res.statusCode < 200 || res.statusCode > 204) throw new Error(getErrorMessage(res))
+    await this.fetch({ method: 'DELETE', url: `channels/${threadID}/messages/${messageID}`, checkError: true })
   }
 
   sendReadReceipt = async (threadID: string, messageID: string) => {
     await this.waitUntilReady()
 
-    const res = await this.fetch({ method: 'POST', url: `channels/${threadID}/messages/${messageID}/ack`, json: { token: this.lastAckToken } })
-    if (!res) throw new Error(getErrorMessage(res))
-    this.lastAckToken = res.json?.token
+    const res = await this.fetch({ method: 'POST', url: `channels/${threadID}/messages/${messageID}/ack`, json: { token: this.lastAckToken }, checkError: true })
+    this.lastAckToken = res!.json?.token
 
-    if (res.statusCode < 200 || res.statusCode > 204) throw new Error(getErrorMessage(res))
     this.readStateMap.set(threadID, messageID!)
 
     const properties = {
@@ -476,8 +460,7 @@ export default class DiscordNetworkAPI {
     const emoji = this.allCustomEmojis?.find(e => e.displayName === reactionKey)
     if (emoji) reactionKey = emoji.reactionKey.slice(2, -1)
 
-    const res = await this.fetch({ method: 'PUT', url: `channels/${threadID}/messages/${messageID}/reactions/${encodeURIComponent(reactionKey)}/@me` })
-    if (!res || res.statusCode < 200 || res.statusCode > 204) throw new Error(getErrorMessage(res))
+    await this.fetch({ method: 'PUT', url: `channels/${threadID}/messages/${messageID}/reactions/${encodeURIComponent(reactionKey)}/@me`, checkError: true })
   }
 
   removeReaction = async (threadID: string, messageID: string, reactionKey: string) => {
@@ -486,8 +469,7 @@ export default class DiscordNetworkAPI {
     const emoji = this.allCustomEmojis?.find(e => e.displayName === reactionKey)
     if (emoji) reactionKey = emoji.reactionKey.slice(2, -1)
 
-    const res = await this.fetch({ method: 'DELETE', url: `channels/${threadID}/messages/${messageID}/reactions/${encodeURIComponent(reactionKey)}/@me` })
-    if (!res || res.statusCode < 200 || res.statusCode > 204) throw new Error(getErrorMessage(res))
+    await this.fetch({ method: 'DELETE', url: `channels/${threadID}/messages/${messageID}/reactions/${encodeURIComponent(reactionKey)}/@me`, checkError: true })
   }
 
   setTyping = async (type: ActivityType, threadID?: string): Promise<void> => {
@@ -498,9 +480,7 @@ export default class DiscordNetworkAPI {
     await this.waitUntilReady()
 
     const method = remove ? 'DELETE' : 'PUT'
-    const res = await this.fetch({ method, url: `channels/${threadID}/recipients/${participantID}` })
-
-    if (!res || res.statusCode < 200 || res.statusCode > 204) throw new Error(getErrorMessage(res))
+    await this.fetch({ method, url: `channels/${threadID}/recipients/${participantID}`, checkError: true })
   }
 
   getUsersPresence = async () => {
@@ -530,10 +510,9 @@ export default class DiscordNetworkAPI {
     // TODO: State sync
   }
 
-  private getUserFriends = async () => {
-    const res = await this.fetch({ method: 'GET', url: 'users/@me/relationships' })
-    if (!res || res.statusCode < 200 || res.statusCode > 204 || !res.json) throw new Error(getErrorMessage(res))
-    this.userFriends = (res.json as { type: number, user: APIUser }[])
+  getUserFriends = async () => {
+    const res = await this.fetch({ method: 'GET', url: 'users/@me/relationships', checkError: true })
+    this.userFriends = (res!.json as { type: number, user: APIUser }[])
       ?.filter(f => f.type === 1) // Only friends
       .map(f => mapUser(f.user))
 
@@ -548,7 +527,7 @@ export default class DiscordNetworkAPI {
     return text
       ?.replace(mentionRegex, (match, username) => { // mentions
         if (!mapMentions) return match
-        const userID = this.userMappings.get(username)
+        const userID = this.usernameIDMap.get(username)
         if (userID) return `<@!${userID}>`
         return match
       })
@@ -617,7 +596,7 @@ export default class DiscordNetworkAPI {
 
         if (ENABLE_DISCORD_ANALYTICS) this.analyticsToken = d.analytics_token
 
-        this.userMappings = new Map((d.users as APIUser[])?.map(r => [(r.username + '#' + r.discriminator), r.id]))
+        this.usernameIDMap = new Map((d.users as APIUser[])?.map(r => [(r.username + '#' + r.discriminator), r.id]))
         this.readStateMap = new Map(d.read_state?.entries.map((s: { id: Snowflake, last_message_id: Snowflake }) => [s.id, s.last_message_id]))
 
         if (d.user.premium_type && d.user.premium_type !== 0) {
@@ -876,7 +855,7 @@ export default class DiscordNetworkAPI {
       case GatewayMessageType.MESSAGE_CREATE: {
         if (!ENABLE_GUILDS && d.guild_id) return
 
-        d.mentions.forEach((m: APIUser) => this.userMappings.set((m.username + '#' + m.discriminator), m.id))
+        d.mentions.forEach((m: APIUser) => this.usernameIDMap.set((m.username + '#' + m.discriminator), m.id))
 
         if (ENABLE_GUILDS && d.author) {
           const sender = mapUser(d.author)
@@ -1142,7 +1121,7 @@ export default class DiscordNetworkAPI {
     while (!this.ready) await sleep(SLEEP_TIME)
   }
 
-  private fetch = async ({ url, headers = {}, json, ...rest }: FetchOptions & { url: string, json?: any }): Promise<{ statusCode: number, json?: any } | undefined> => {
+  private fetch = async ({ url, headers = {}, json, checkError, ...rest }: FetchOptions & { url: string, json?: any, checkError?: boolean }): Promise<{ statusCode: number, json?: any } | undefined> => {
     try {
       const opts: FetchOptions = {
         // TODO: timeout: 10000,
@@ -1166,6 +1145,7 @@ export default class DiscordNetworkAPI {
         throw Error(`expected json, got html, status code=${res.statusCode}, title=${title}`)
       }
       const responseJSON = hasBody ? JSON.parse(res.body) : undefined
+      if (checkError && (!res || res.statusCode < 200 || res.statusCode > 204 || !responseJSON)) throw new Error(getErrorMessage(res))
       return {
         statusCode: res.statusCode,
         json: responseJSON,
