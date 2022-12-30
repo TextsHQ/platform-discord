@@ -13,7 +13,7 @@ const info: PlatformInfo = {
   `,
   loginMode: 'browser',
   browserLogins: [{
-    loginURL: 'https://discord.com/login',
+    url: 'https://discord.com/login',
     windowWidth: 950,
     windowHeight: 650,
     runJSOnClose: 'token',
