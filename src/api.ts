@@ -34,7 +34,7 @@ export default class Discord implements PlatformAPI {
     if (!session) return
 
     await this.api.login(session)
-    this.afterAuth()
+    await this.afterAuth()
   }
 
   dispose = () => {
@@ -48,6 +48,7 @@ export default class Discord implements PlatformAPI {
   login = async (creds?: LoginCreds): Promise<LoginResult> => {
     if (!creds?.jsCodeResult) return { type: 'error', errorMessage: 'Token was empty' }
     await this.api.login(creds.jsCodeResult)
+    await this.afterAuth()
     return { type: 'success' }
   }
 
