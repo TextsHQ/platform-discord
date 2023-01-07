@@ -33,10 +33,8 @@ const WS_OPTIONS: GatewayConnectionOptions = {
   // compress: 'zlib-stream'
 }
 
-const getErrorMessage = (res?: { statusCode: number, json?: any }): string => {
-  if (res) return res.json?.message || `Invalid response: ${res.statusCode}`
-  return 'No response'
-}
+const getErrorMessage = (res: { statusCode: number, json?: any }): string =>
+  (res ? (res.json?.message || `Invalid response: ${res.statusCode}`) : 'No response')
 
 export default class DiscordNetworkAPI {
   private client?: WSClient
@@ -259,16 +257,15 @@ export default class DiscordNetworkAPI {
   createDevice = async (token: string) => {
     await this.waitUntilReady()
 
-    const res = await this.fetch({
+    await this.fetch({
       method: 'POST',
       url: 'users/@me/devices',
       json: {
         provider: 'gcm',
         token,
       },
+      checkError: true,
     })
-
-    if (res?.statusCode !== 204) throw new Error(getErrorMessage(res))
   }
 
   getMessageReactions = async (message: DiscordMessage, threadID: string) => {
@@ -1136,18 +1133,18 @@ export default class DiscordNetworkAPI {
       if (json) opts.headers!['Content-Type'] = 'application/json'
 
       const res = await this.httpClient.requestAsString(`${API_ENDPOINT}/${url}`, opts)
-      // eslint-disable-next-line @typescript-eslint/no-throw-literal
-      if (res.statusCode === 401) throw new ReAuthError('Unauthorized')
-      const hasBody = res.body?.length
-      if (hasBody && res.body[0] === '<') {
-        texts.log(res.statusCode, url, res.body)
-        const [, title] = /<title[^>]*>(.*?)<\/title>/.exec(res.body) || []
-        throw Error(`expected json, got html, status code=${res.statusCode}, title=${title}`)
+      const { statusCode, body } = res
+      if (statusCode === 401) throw new ReAuthError('Unauthorized')
+      const hasBody = body?.length
+      if (hasBody && body[0] === '<') {
+        texts.log(statusCode, url, body)
+        const [, title] = /<title[^>]*>(.*?)<\/title>/.exec(body) || []
+        throw Error(`expected json, got html, status code=${statusCode}, title=${title}`)
       }
-      const responseJSON = hasBody ? JSON.parse(res.body) : undefined
-      if (checkError && (!res || res.statusCode < 200 || res.statusCode > 204 || !responseJSON)) throw new Error(getErrorMessage(res))
+      const responseJSON = hasBody ? JSON.parse(body) : undefined
+      if (checkError && (statusCode < 200 || statusCode > 204 || (statusCode !== 204 && !responseJSON))) throw new Error(getErrorMessage(res))
       return {
-        statusCode: res.statusCode,
+        statusCode: statusCode,
         json: responseJSON,
       }
     } catch (err: any) {
