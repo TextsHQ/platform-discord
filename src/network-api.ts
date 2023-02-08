@@ -640,19 +640,19 @@ export default class DiscordNetworkAPI {
 
       case GatewayMessageType.RESUMED: {
         // TODO: RESUMED
-        texts.log(t, d)
+        // texts.log(t, d)
         break
       }
 
       case GatewayMessageType.RECONNECT: {
         // TODO: RECONNECT
-        texts.log(t, d)
+        // texts.log(t, d)
         break
       }
 
       case GatewayMessageType.INVALID_SESSION: {
         // TODO: INVALID_SESSION
-        texts.log(t, d)
+        // texts.log(t, d)
         break
       }
 
@@ -727,43 +727,43 @@ export default class DiscordNetworkAPI {
 
       case GatewayMessageType.CHANNEL_PINS_UPDATE: {
         // TODO: CHANNEL_PINS_UPDATE
-        texts.log(t, d)
+        // texts.log(t, d)
         break
       }
 
       case GatewayMessageType.THREAD_CREATE: {
         // TODO: THREAD_CREATE
-        texts.log(t, d)
+        // texts.log(t, d)
         break
       }
 
       case GatewayMessageType.THREAD_UPDATE: {
         // TODO: THREAD_UPDATE
-        texts.log(t, d)
+        // texts.log(t, d)
         break
       }
 
       case GatewayMessageType.THREAD_DELETE: {
         // TODO: THREAD_DELETE
-        texts.log(t, d)
+        // texts.log(t, d)
         break
       }
 
       case GatewayMessageType.THREAD_LIST_SYNC: {
         // TODO: THREAD_LIST_SYNC
-        texts.log(t, d)
+        // texts.log(t, d)
         break
       }
 
       case GatewayMessageType.THREAD_MEMBER_UPDATE: {
         // TODO: THREAD_MEMBER_UPDATE
-        texts.log(t, d)
+        // texts.log(t, d)
         break
       }
 
       case GatewayMessageType.THREAD_MEMBERS_UPDATE: {
         // TODO: THREAD_MEMBERS_UPDATE
-        texts.log(t, d)
+        // texts.log(t, d)
         break
       }
 
@@ -1013,7 +1013,7 @@ export default class DiscordNetworkAPI {
 
       case GatewayMessageType.USER_UPDATE: {
         // TODO: USER_UPDATE
-        texts.log(t, d)
+        // texts.log(t, d)
         break
       }
 
@@ -1021,7 +1021,7 @@ export default class DiscordNetworkAPI {
 
       case GatewayMessageType.CHANNEL_UNREAD_UPDATE: {
         // TODO: CHANNEL_UNREAD_UPDATE
-        texts.log(t, d)
+        // texts.log(t, d)
         break
       }
 
