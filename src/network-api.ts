@@ -2,7 +2,7 @@ import path from 'path'
 import FormData from 'form-data'
 import { promises as fs } from 'fs'
 import { uniqBy } from 'lodash'
-import { texts, CurrentUser, MessageContent, PaginationArg, Thread, Message, ServerEventType, OnServerEventCallback, ActivityType, User, MessageSendOptions, ReAuthError, PresenceMap, Paginated, FetchOptions, ServerEvent, CustomEmojiMap, UserPresence } from '@textshq/platform-sdk'
+import { texts, MessageContent, PaginationArg, Thread, Message, ServerEventType, OnServerEventCallback, ActivityType, User, MessageSendOptions, ReAuthError, PresenceMap, Paginated, FetchOptions, ServerEvent, CustomEmojiMap, UserPresence } from '@textshq/platform-sdk'
 import { APIChannel, APIEmoji, APIGuild, APIReaction, APIUser, ChannelType, GatewayPresenceUpdateData, Snowflake } from 'discord-api-types/v9'
 
 import { mapMessage, mapPresence, mapReaction, mapThread, mapUser } from './mappers/mappers'
@@ -84,7 +84,7 @@ export default class DiscordNetworkAPI {
 
   ready = false
 
-  currentUser?: CurrentUser
+  currentUser?: User
 
   userFriends: User[] = []
 

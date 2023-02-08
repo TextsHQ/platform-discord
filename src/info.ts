@@ -34,7 +34,6 @@ const info: PlatformInfo = {
   deletionMode: MessageDeletionMode.DELETE_FOR_EVERYONE,
   reactions: {
     supported: {},
-    supportsDynamicReactions: true,
     canReactWithAllEmojis: true,
     allowsMultipleReactionsToSingleMessage: true,
   },

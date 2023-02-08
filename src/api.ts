@@ -1,5 +1,5 @@
 import { PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Message, MessageContent, PaginationArg, ActivityType, MessageSendOptions, texts, LoginCreds, Thread, AccountInfo, ServerEventType, NotificationsInfo } from '@textshq/platform-sdk'
-import { mapCurrentUser } from './mappers/mappers'
+import { mapUser } from './mappers/mappers'
 import DiscordNetworkAPI from './network-api'
 import { getDataURI } from './util'
 
@@ -19,7 +19,7 @@ export default class Discord implements PlatformAPI {
 
   private async afterAuth() {
     const res = await this.api.getMe()
-    const currentUser = mapCurrentUser(res!.json)
+    const currentUser = mapUser(res!.json)
     this.api.currentUser = currentUser
     this.api.usernameIDMap.set(currentUser.username!, currentUser.id)
     this.api.startPolling = this.startPolling

@@ -39,14 +39,6 @@ export function mapUser(user: APIUser): User {
   }
 }
 
-export function mapCurrentUser(user: APIUser): CurrentUser {
-  const mapped = mapUser(user)
-  return {
-    displayText: mapped.username!,
-    ...mapped,
-  }
-}
-
 export function mapThread(thread: APIChannel, lastReadMessageID?: string, isMuted?: boolean, currentUser?: User): Thread {
   const type: ThreadType = THREAD_TYPES[thread.type]!
 
