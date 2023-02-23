@@ -74,7 +74,11 @@ export function mapTextAttributes(src: string, getUserName: (id: string) => stri
   while (input.length) {
     if (curToken) {
       const closingIndex = findClosingIndex(input, curToken)
-      if (closingIndex > 0) {
+      const isClosingIndexLastCharacter = closingIndex === input.length - 1
+      const isClosingIndexBeforeASpace = input.at(closingIndex + 1) === ' '
+      // Apply this curlToken style if and only if the character right after the closing tag
+      // is a space OR if the closing tag is the last character of the input.
+      if (closingIndex > 0 && (isClosingIndexLastCharacter || isClosingIndexBeforeASpace)) {
         // A valid closingIndex is found, it's a valid token!
         const content = input.slice(0, closingIndex).join('') // .replace(/^\s+|\s+$/g, '')
         // See if we can find nested entities.
