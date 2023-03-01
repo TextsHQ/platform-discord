@@ -321,8 +321,6 @@ export default class DiscordNetworkAPI {
   }
 
   sendMessage = async (threadID: string, content: MessageContent, options?: MessageSendOptions) => {
-    await this.waitUntilReady()
-
     const text = content.text ? this.mapMentionsAndEmojis(content.text) : undefined
 
     type RequestContent = {
