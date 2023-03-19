@@ -16,7 +16,7 @@
     "erlpack": "^0.1.4"
   },
   "dependencies": {
-    "@textshq/platform-sdk": "https://github.com/TextsHQ/platform-sdk",
+    "@textshq/platform-sdk": "https://github.com/TextsHQ/platform-sdk#b5168dae5f43c525bde522b9f80a54b132bc2de9",
     "discord-api-types": "^0.22.0",
     "erlpack": "^0.1.4",
     "form-data": "^4.0.0",
@@ -33,7 +33,7 @@
     "@types/ws": "^7.4.7",
     "eslint": "^8.30.0",
     "jest": "^27.5.1",
-    "typescript": "^4.9.4"
+    "typescript": "^5.0.2"
   },
-  "packageManager": "yarn@3.3.1"
+  "packageManager": "yarn@3.5.0"
 }
