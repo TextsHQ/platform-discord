@@ -3,6 +3,7 @@ import FormData from 'form-data'
 import { promises as fs } from 'fs'
 import { uniqBy } from 'lodash'
 import { texts, MessageContent, PaginationArg, Thread, Message, ServerEventType, OnServerEventCallback, ActivityType, User, MessageSendOptions, ReAuthError, PresenceMap, Paginated, FetchOptions, ServerEvent, CustomEmojiMap, UserPresence } from '@textshq/platform-sdk'
+import { ExpectedJSONGotHTMLError } from '@textshq/platform-sdk/dist/json'
 import { APIChannel, APIEmoji, APIGuild, APIReaction, APIUser, ChannelType, GatewayPresenceUpdateData, Snowflake } from 'discord-api-types/v9'
 
 import { mapMessage, mapPresence, mapReaction, mapThread, mapUser } from './mappers/mappers'
@@ -1136,13 +1137,12 @@ export default class DiscordNetworkAPI {
       const hasBody = body?.length
       if (hasBody && body[0] === '<') {
         texts.log(statusCode, url, body)
-        const [, title] = /<title[^>]*>(.*?)<\/title>/.exec(body) || []
-        throw Error(`expected json, got html, status code=${statusCode}, title=${title}`)
+        throw new ExpectedJSONGotHTMLError(statusCode, body)
       }
       const responseJSON = hasBody ? JSON.parse(body) : undefined
       if (checkError && (statusCode < 200 || statusCode > 204 || (statusCode !== 204 && !responseJSON))) throw new Error(getErrorMessage(res))
       return {
-        statusCode: statusCode,
+        statusCode,
         json: responseJSON,
       }
     } catch (err: any) {

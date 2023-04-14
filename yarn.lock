@@ -1935,7 +1935,7 @@ __metadata:
   resolution: "@textshq/platform-discord@workspace:."
   dependencies:
     "@textshq/eslint-config": "https://github.com/TextsHQ/eslint-config#main"
-    "@textshq/platform-sdk": "https://github.com/TextsHQ/platform-sdk#ad5cbc49ffac074860ed49e31bb7d998c20b2ba4"
+    "@textshq/platform-sdk": "https://github.com/TextsHQ/platform-sdk#7f6b27bf4cba452902a5b95b7e0925a2de4aaa1b"
     "@textshq/platform-test-lib": "https://github.com/TextsHQ/platform-test-lib"
     "@types/eslint": ^8.4.10
     "@types/jest": ^27.4.1
@@ -1953,6 +1953,16 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@textshq/platform-sdk@https://github.com/TextsHQ/platform-sdk#7f6b27bf4cba452902a5b95b7e0925a2de4aaa1b":
+  version: 0.4.4
+  resolution: "@textshq/platform-sdk@https://github.com/TextsHQ/platform-sdk.git#commit=7f6b27bf4cba452902a5b95b7e0925a2de4aaa1b"
+  dependencies:
+    emoji-regex: ^10.1.0
+    qrcode.react: ^3.1.0
+  checksum: 3d11c53b50c657a5c0531cbd9997306aaf1d1878261d7c243ee1e27d30dd17f6d223003e4f76fdc8aada27c98c09908a3166bfcfc7cc8b4edd0d063baeace8a7
+  languageName: node
+  linkType: hard
+
 "@textshq/platform-sdk@https://github.com/TextsHQ/platform-sdk#a42fae668979080be60dd8fad5a43c0c810734b1":
   version: 0.4.4
   resolution: "@textshq/platform-sdk@https://github.com/TextsHQ/platform-sdk.git#commit=a42fae668979080be60dd8fad5a43c0c810734b1"
@@ -1960,16 +1970,6 @@ __metadata:
     emoji-regex: ^10.1.0
     qrcode.react: ^3.1.0
   checksum: 732c498484a95a31dfb09a2c2116ff444f2729343555b5e67c72d12cdf600f29a4f80b94e980d1c8846b6da886fb6904be13cb562b6b9096b06ab8bbf1d945f1
-  languageName: node
-  linkType: hard
-
-"@textshq/platform-sdk@https://github.com/TextsHQ/platform-sdk#ad5cbc49ffac074860ed49e31bb7d998c20b2ba4":
-  version: 0.4.4
-  resolution: "@textshq/platform-sdk@https://github.com/TextsHQ/platform-sdk.git#commit=ad5cbc49ffac074860ed49e31bb7d998c20b2ba4"
-  dependencies:
-    emoji-regex: ^10.1.0
-    qrcode.react: ^3.1.0
-  checksum: 8103b141724b830c5ce21a074bbc1370775ce160af5e78c73594e06e834684737a2188915daa83bdf8f2e1443f3e38ff7f3fa5acff61c2ed80bc87b93cfef76c
   languageName: node
   linkType: hard
 
