@@ -264,23 +264,27 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
 function mapMessageType(message: DiscordMessage): Partial<Message> | undefined {
   switch (message.type) {
     case MessageType.RecipientAdd: {
+      const ids = message.mentions?.map(m => `{{${m.id}}}`).join(', ')
+      const text = `{{${message.author.id}}} added ${ids}`
       return {
         isAction: true,
         parseTemplate: true,
-        text: `{{sender}} added ${message.mentions.map(m => `{{${m.id}}}`).join(', ')}`,
+        text,
         action: {
           type: MessageActionType.THREAD_PARTICIPANTS_ADDED,
-          participantIDs: message.mentions.map(m => m.id),
+          participantIDs: [message.author.id],
           actorParticipantID: message.author.id,
         },
       }
     }
 
     case MessageType.RecipientRemove: {
+      const ids = message.mentions?.map(m => `{{${m.id}}}`).join(', ')
+      const text = `{{${message.author.id}}} removed ${ids}`
       return {
         isAction: true,
         parseTemplate: true,
-        text: `${message.mentions.map(m => `{{${m.id}}}`).join(', ')} left`,
+        text,
         action: {
           type: MessageActionType.THREAD_PARTICIPANTS_REMOVED,
           participantIDs: message.mentions.map(m => m.id),
