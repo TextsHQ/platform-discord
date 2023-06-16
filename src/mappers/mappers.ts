@@ -44,13 +44,11 @@ export function mapUser(user: _APIUser): User {
 export function mapThread(thread: APIChannel, lastReadMessageID?: string, isMuted?: boolean, currentUser?: User): Thread {
   const type: ThreadType = THREAD_TYPES[thread.type]!
 
-  // @ts-expect-error
-  const participants: User[] = thread.recipients?.map(mapUser) ?? []
+  const participants: User[] = 'recipients' in thread ? thread.recipients.map(mapUser) : []
   participants.sort((a, b) => ((a.username ?? '') < (b.username ?? '') ? 1 : -1))
   if (currentUser) participants.push(currentUser)
 
-  // @ts-expect-error
-  const timestamp = getTimestampFromSnowflake(thread.last_message_id ?? undefined)
+  const timestamp = getTimestampFromSnowflake('last_message_id' in thread ? thread.last_message_id : undefined)
   const lastMessageTimestamp = getTimestampFromSnowflake(lastReadMessageID)
 
   return {
@@ -59,13 +57,10 @@ export function mapThread(thread: APIChannel, lastReadMessageID?: string, isMute
     title: thread.name,
     isUnread: (timestamp ?? 0) > (lastMessageTimestamp ?? 0),
     lastReadMessageID: lastReadMessageID ? String(lastReadMessageID) : undefined,
-    // @ts-expect-error
-    isReadOnly: thread.recipients?.[0]?.system ?? false,
+    isReadOnly: 'recipients' in thread ? thread.recipients?.[0]?.system : false,
     type,
-    // @ts-expect-error
-    imgURL: thread.icon ? getThreadIcon(thread.id, thread.icon) : undefined,
-    // @ts-expect-error
-    description: thread.topic ?? undefined,
+    imgURL: 'icon' in thread ? getThreadIcon(thread.id, thread.icon) : undefined,
+    description: 'topic' in thread ? thread.topic : undefined,
     timestamp,
     mutedUntil: isMuted ? 'forever' : undefined,
     messages: {
@@ -76,8 +71,7 @@ export function mapThread(thread: APIChannel, lastReadMessageID?: string, isMute
       hasMore: false,
       items: participants,
     },
-    // @ts-expect-error
-    partialLastMessage: thread.last_message_id ? { id: thread.last_message_id } : undefined,
+    partialLastMessage: 'last_message_id' in thread ? { id: thread.last_message_id } : undefined,
   }
 }
 
