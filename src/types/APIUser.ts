@@ -1,5 +1,5 @@
-import { APIUser } from "discord-api-types/v10";
+import { APIUser } from 'discord-api-types/v9'
 
 export type _APIUser = APIUser & {
-  global_name?: string;
+  global_name?: string
 }

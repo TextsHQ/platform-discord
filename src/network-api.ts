@@ -5,7 +5,6 @@ import { uniqBy } from 'lodash'
 import { texts, MessageContent, PaginationArg, Thread, Message, ServerEventType, OnServerEventCallback, ActivityType, User, MessageSendOptions, ReAuthError, PresenceMap, Paginated, FetchOptions, ServerEvent, CustomEmojiMap, UserPresence } from '@textshq/platform-sdk'
 import { ExpectedJSONGotHTMLError } from '@textshq/platform-sdk/dist/json'
 import { APIChannel, APIEmoji, APIGuild, APIReaction, APIUser, ChannelType, GatewayPresenceUpdateData, Snowflake } from 'discord-api-types/v9'
-import * as Gateway from 'discord-api-types/gateway/v9'
 
 import { mapMessage, mapPresence, mapReaction, mapThread, mapUser } from './mappers/mappers'
 import WSClient from './websocket/wsclient'
@@ -172,7 +171,7 @@ export default class DiscordNetworkAPI {
       method: 'POST',
       url: 'users/@me/channels',
       json: userIDs.length === 1 ? { recipient_id: userIDs[0] } : { recipients: userIDs },
-      checkError: true
+      checkError: true,
     })
     const json = res!.json
 
@@ -204,7 +203,7 @@ export default class DiscordNetworkAPI {
     // TODO: Review - this getMessages call is untested
     const messageID = _messageID || await this.getMessages(threadID, { direction: 'after', cursor: '0' }).then(m => m?.[0]?.id)
 
-    const referer = "https://discord.com/message-requests"
+    const referer = 'https://discord.com/message-requests'
 
     // I don't think it's really needed, and it's slowing down the flow :/
     // const res1 = await this.fetch({
@@ -217,24 +216,24 @@ export default class DiscordNetworkAPI {
     // const { root_node_id } = res1.json
 
     const json2 = {
-      version: "1.0",       // don't know
-      variant: "1",         // don't know
-      language: "en",       // client (message?) lang?
-      breadcrumbs: [        // UX flow breadcrumbs?
-          32  // root_node_id   // possibly? maybe? not sure
+      version: '1.0', // don't know
+      variant: '1', // don't know
+      language: 'en', // client (message?) lang?
+      breadcrumbs: [ // UX flow breadcrumbs?
+        32, // root_node_id   // possibly? maybe? not sure
       ],
-      elements: {},         // don't know
-      name: "first_dm",     // report type?
+      elements: {}, // don't know
+      name: 'first_dm', // report type?
       channel_id: threadID,
-      message_id: messageID
+      message_id: messageID,
     }
     const res2 = await this.fetch({
-      url: "reporting/first_dm",
-      method: "POST",
+      url: 'reporting/first_dm',
+      method: 'POST',
       headers: {
-        referer
+        referer,
       },
-      json: json2
+      json: json2,
     })
 
     // texts.log(`${LOG_PREFIX} reported thread`, res1?.statusCode, res1?.json, res2?.statusCode, res2?.json)

@@ -46,9 +46,7 @@ export default class Discord implements PlatformAPI {
   getCurrentUser = () => this.api.currentUser!
 
   login = async (creds?: LoginCreds): Promise<LoginResult> => {
-    // @ts-expect-error
-    if (!creds?.jsCodeResult) return { type: 'error', errorMessage: 'Token was empty' }
-    // @ts-expect-error
+    if (!creds || !('jsCodeResult' in creds) || !creds.jsCodeResult) return { type: 'error', errorMessage: 'Token was empty' }
     await this.api.login(creds.jsCodeResult)
     await this.afterAuth()
     return { type: 'success' }

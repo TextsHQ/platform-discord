@@ -1,5 +1,5 @@
-import { CurrentUser, Message, MessageActionType, Attachment, AttachmentType, MessageLink, MessageReaction, Thread, ThreadType, User, PartialWithID, UserPresence, texts } from '@textshq/platform-sdk'
-import { APIUser, APIChannel, EmbedType, MessageActivityType, APIAttachment, MessageType, GatewayPresenceUpdateData } from 'discord-api-types/v9'
+import { Message, MessageActionType, Attachment, AttachmentType, MessageLink, MessageReaction, Thread, ThreadType, User, PartialWithID, UserPresence, texts } from '@textshq/platform-sdk'
+import { APIChannel, EmbedType, MessageActivityType, APIAttachment, MessageType, GatewayPresenceUpdateData } from 'discord-api-types/v9'
 import { uniqBy } from 'lodash'
 
 import { IGNORED_MESSAGE_TYPES, StickerFormat, THREAD_TYPES } from '../constants'
@@ -32,7 +32,7 @@ export const mapPresence = (userID: string, presence: GatewayPresenceUpdateData)
 }
 
 export function mapUser(user: _APIUser): User {
-  const username = user.discriminator.length == 4 ? `${user.username}#${user.discriminator}` : user.username
+  const username = user.discriminator.length === 4 ? `${user.username}#${user.discriminator}` : user.username
   return {
     id: user.id,
     fullName: user.global_name ?? user.username,
@@ -343,19 +343,6 @@ function mapMessageType(message: DiscordMessage): Partial<Message> | undefined {
         parseTemplate: true,
         linkedMessageID: message.message_reference?.message_id,
         text: `{{${message.author.id}}} pinned a message`,
-      }
-    }
-
-    case MessageType.RecipientAdd: {
-      return {
-        isAction: true,
-        parseTemplate: true,
-        text: `{{${message.author.id}}} joined`,
-        action: {
-          type: MessageActionType.THREAD_PARTICIPANTS_ADDED,
-          participantIDs: [message.author.id],
-          actorParticipantID: message.author.id,
-        },
       }
     }
 

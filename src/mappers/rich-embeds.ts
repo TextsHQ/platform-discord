@@ -64,18 +64,24 @@ const handleTweetEmbed = (embed: APIEmbed, message: DiscordMessage, path: string
     */
     if ((embed.image || embed.video) && !(embed.title || embed.description || embed.footer || embed.color)) return
 
-    const images = [embed.image, ...(message.embeds?.filter(e => e.url === embed.url && (e.image || e.video) && !e.timestamp).map(e => e.image))].filter(Boolean).map(image => ({
-      id: image?.url!,
-      srcURL: image?.url,
-      type: AttachmentType.IMG,
-      size: image?.width && image?.height ? { width: image.width, height: image.height } : undefined,
-    }))
+    const images = [
+      embed.image,
+      ...(message.embeds.filter(e => e.url === embed.url && (e.image || e.video) && !e.timestamp).map(e => e.image)),
+    ]
+      .filter(Boolean)?.map(image => ({
+        id: image?.url!,
+        srcURL: image?.url,
+        type: AttachmentType.IMG,
+        size: image?.width && image?.height ? { width: image.width, height: image.height } : undefined,
+      }))
+
     const video = embed.video ? {
       id: embed.video.url,
       srcURL: embed.thumbnail?.url,
       type: AttachmentType.IMG,
       size: embed.thumbnail?.width && embed.thumbnail?.height ? { width: embed.thumbnail.width, height: embed.thumbnail.height } : undefined,
     } : undefined
+
     const tweet: Tweet = {
       id: tweetID,
       user: {
@@ -88,6 +94,7 @@ const handleTweetEmbed = (embed: APIEmbed, message: DiscordMessage, path: string
       url: embed.url,
       attachments: [...images, video].filter(Boolean) as Attachment[],
     }
+
     return { tweet }
   } else {
     // general Twitter URL

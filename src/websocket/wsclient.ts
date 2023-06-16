@@ -110,8 +110,8 @@ class WSClient {
     this.ws.on('open', this.wsOpen)
     this.ws.on('close', this.wsClose)
     this.ws.on('message', this.wsMessage)
-    this.ws.on('error', this.wsError)
-    this.ws.on('unexpected-response', this.wsUnexpectedResponse)
+    this.ws.on('error', WSClient.wsError)
+    this.ws.on('unexpected-response', WSClient.wsUnexpectedResponse)
   }
 
   private wsOpen = () => {
@@ -143,14 +143,6 @@ class WSClient {
       texts.error(LOG_PREFIX, 'Error unpacking', e, data)
       this.onError?.(e as Error)
     }
-  }
-
-  private wsError = (err: Error) => {
-    texts.log(LOG_PREFIX, `WebSocket error: ${err}`)
-  }
-
-  private wsUnexpectedResponse = (request: ClientRequest, response: IncomingMessage) => {
-    texts.log(LOG_PREFIX, 'WebSocket unexpected response!', request, response)
   }
 
   private handleMessage = (message: GatewayMessage) => {
@@ -318,6 +310,14 @@ class WSClient {
       default:
         break
     }
+  }
+
+  private static wsError = (err: Error) => {
+    if (DEBUG) texts.log(LOG_PREFIX, `WebSocket error: ${err}`)
+  }
+
+  private static wsUnexpectedResponse = (request: ClientRequest, response: IncomingMessage) => {
+    if (DEBUG) texts.log(LOG_PREFIX, 'WebSocket unexpected response!', request, response)
   }
 }
 
