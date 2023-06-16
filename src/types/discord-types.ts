@@ -1,5 +1,5 @@
 import type { APIMessage, APIPartialEmoji, APIUser } from 'discord-api-types/v9'
-import type { ScienceEventType } from './constants'
+import type { ScienceEventType } from '../constants'
 
 export type DiscordMessage = APIMessage & {
   call?: {

@@ -5,6 +5,7 @@ import { uniqBy } from 'lodash'
 import { texts, MessageContent, PaginationArg, Thread, Message, ServerEventType, OnServerEventCallback, ActivityType, User, MessageSendOptions, ReAuthError, PresenceMap, Paginated, FetchOptions, ServerEvent, CustomEmojiMap, UserPresence } from '@textshq/platform-sdk'
 import { ExpectedJSONGotHTMLError } from '@textshq/platform-sdk/dist/json'
 import { APIChannel, APIEmoji, APIGuild, APIReaction, APIUser, ChannelType, GatewayPresenceUpdateData, Snowflake } from 'discord-api-types/v9'
+import * as Gateway from 'discord-api-types/gateway/v9'
 
 import { mapMessage, mapPresence, mapReaction, mapThread, mapUser } from './mappers/mappers'
 import WSClient from './websocket/wsclient'
@@ -15,7 +16,7 @@ import { generateSnowflake } from './common-util'
 import { ENABLE_GUILDS, ENABLE_DM_GUILD_MEMBERS, ENABLE_DISCORD_ANALYTICS } from './preferences'
 import { IGNORED_CHANNEL_TYPES, ScienceEventType, USER_AGENT } from './constants'
 import { SUPER_PROPERTIES } from './discord-constants'
-import type { DiscordEmoji, DiscordMessage, DiscordReactionDetails, DiscordScienceEvent } from './types'
+import type { DiscordEmoji, DiscordMessage, DiscordReactionDetails, DiscordScienceEvent } from './types/discord-types'
 
 import _emojis from './resources/emojis.json'
 import _emojiShortcuts from './resources/shortcuts.json'
@@ -151,6 +152,7 @@ export default class DiscordNetworkAPI {
     const res = await this.fetch({ method: 'GET', url: 'users/@me/channels', checkError: true })
 
     const threads: Thread[] = (res!.json as APIChannel[])
+      // @ts-expect-error We're not checking categories
       .sort((a, b) => +a.last_message_id! - +b.last_message_id!)
       .reverse()
       .map(t => mapThread(t, this.readStateMap.get(t.id), this.mutedChannels.has(t.id), this.currentUser))
@@ -520,6 +522,7 @@ export default class DiscordNetworkAPI {
     const emojiRegex = /:([a-zA-Z0-9-_]*)(~\d*)?:/gi
 
     // TODO: Check if user has swapping emojis enabled
+    // TODO: Fix mappings for users without discriminators
     return text
       ?.replace(mentionRegex, (match, username) => { // mentions
         if (!mapMentions) return match

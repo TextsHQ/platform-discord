@@ -1,3 +1,4 @@
+import { GatewayReceivePayload } from 'discord-api-types/v9'
 import type { OPCode, GatewayMessageType } from './constants'
 
 /**

@@ -3,7 +3,7 @@ import type { Attachment, MessageLink, Tweet } from '@textshq/platform-sdk'
 import type { APIEmbed } from 'discord-api-types/v9'
 
 import { mapMimeType, parseMediaURL } from '../util'
-import type { DiscordMessage } from '../types'
+import type { DiscordMessage } from '../types/discord-types'
 
 // TODO: Article embed (shows up as unknown)
 export const handleArticleEmbed = (embed: APIEmbed) => {

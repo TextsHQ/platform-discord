@@ -6,7 +6,8 @@ import { IGNORED_MESSAGE_TYPES, StickerFormat, THREAD_TYPES } from '../constants
 import { getEmojiURL, getLottieStickerURL, getPNGStickerURL, getThreadIcon, getTimestampFromSnowflake, getUserAvatar } from '../util'
 import { mapTextAttributes } from '../text-attributes'
 import { handleArticleEmbed, handleGifvEmbed, handleImageEmbed, handleLinkEmbed, handleRichEmbed, handleVideoEmbed } from './rich-embeds'
-import type { DiscordMessage, DiscordReactionDetails } from '../types'
+import type { DiscordMessage, DiscordReactionDetails } from '../types/discord-types'
+import { _APIUser } from '../types/APIUser'
 
 export const mapReaction = (reaction: DiscordReactionDetails, participantID: string): MessageReaction => {
   // reaction.emoji = { id: '352592187265122304', name: 'pat' }
@@ -30,11 +31,12 @@ export const mapPresence = (userID: string, presence: GatewayPresenceUpdateData)
   }
 }
 
-export function mapUser(user: APIUser): User {
+export function mapUser(user: _APIUser): User {
+  const username = user.discriminator.length == 4 ? `${user.username}#${user.discriminator}` : user.username
   return {
     id: user.id,
-    fullName: user.username,
-    username: `${user.username}#${user.discriminator}`,
+    fullName: user.global_name ?? user.username,
+    username,
     imgURL: user.avatar ? getUserAvatar(user.id, user.avatar) : undefined,
   }
 }
@@ -42,10 +44,12 @@ export function mapUser(user: APIUser): User {
 export function mapThread(thread: APIChannel, lastReadMessageID?: string, isMuted?: boolean, currentUser?: User): Thread {
   const type: ThreadType = THREAD_TYPES[thread.type]!
 
+  // @ts-expect-error
   const participants: User[] = thread.recipients?.map(mapUser) ?? []
   participants.sort((a, b) => ((a.username ?? '') < (b.username ?? '') ? 1 : -1))
   if (currentUser) participants.push(currentUser)
 
+  // @ts-expect-error
   const timestamp = getTimestampFromSnowflake(thread.last_message_id ?? undefined)
   const lastMessageTimestamp = getTimestampFromSnowflake(lastReadMessageID)
 
@@ -55,9 +59,12 @@ export function mapThread(thread: APIChannel, lastReadMessageID?: string, isMute
     title: thread.name,
     isUnread: (timestamp ?? 0) > (lastMessageTimestamp ?? 0),
     lastReadMessageID: lastReadMessageID ? String(lastReadMessageID) : undefined,
+    // @ts-expect-error
     isReadOnly: thread.recipients?.[0]?.system ?? false,
     type,
+    // @ts-expect-error
     imgURL: thread.icon ? getThreadIcon(thread.id, thread.icon) : undefined,
+    // @ts-expect-error
     description: thread.topic ?? undefined,
     timestamp,
     mutedUntil: isMuted ? 'forever' : undefined,
@@ -69,6 +76,7 @@ export function mapThread(thread: APIChannel, lastReadMessageID?: string, isMute
       hasMore: false,
       items: participants,
     },
+    // @ts-expect-error
     partialLastMessage: thread.last_message_id ? { id: thread.last_message_id } : undefined,
   }
 }
@@ -338,7 +346,7 @@ function mapMessageType(message: DiscordMessage): Partial<Message> | undefined {
       }
     }
 
-    case MessageType.GuildMemberJoin: {
+    case MessageType.RecipientAdd: {
       return {
         isAction: true,
         parseTemplate: true,
