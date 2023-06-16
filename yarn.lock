@@ -2047,7 +2047,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@textshq/eslint-config@https://github.com/TextsHQ/eslint-config#main":
+"@textshq/eslint-config@https://github.com/TextsHQ/eslint-config#1643cad9437bfe0491504c6f9428dc0c1264d8ff":
   version: 1.0.5
   resolution: "@textshq/eslint-config@https://github.com/TextsHQ/eslint-config.git#commit=1643cad9437bfe0491504c6f9428dc0c1264d8ff"
   dependencies:
@@ -2068,9 +2068,9 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@textshq/platform-discord@workspace:."
   dependencies:
-    "@textshq/eslint-config": "https://github.com/TextsHQ/eslint-config#main"
-    "@textshq/platform-sdk": "https://github.com/TextsHQ/platform-sdk#main"
-    "@textshq/platform-test-lib": "https://github.com/TextsHQ/platform-test-lib"
+    "@textshq/eslint-config": "https://github.com/TextsHQ/eslint-config#1643cad9437bfe0491504c6f9428dc0c1264d8ff"
+    "@textshq/platform-sdk": "https://github.com/TextsHQ/platform-sdk#6e00b98569f8c03e01ff4534fa457035d9947acc"
+    "@textshq/platform-test-lib": "https://github.com/TextsHQ/platform-test-lib#3d6a0d9452ccc24c3f07ec27b9f2730438392de2"
     "@types/eslint": ^8.4.10
     "@types/jest": ^27.4.1
     "@types/lodash": ^4.14.181
@@ -2087,6 +2087,16 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@textshq/platform-sdk@https://github.com/TextsHQ/platform-sdk#6e00b98569f8c03e01ff4534fa457035d9947acc":
+  version: 0.4.4
+  resolution: "@textshq/platform-sdk@https://github.com/TextsHQ/platform-sdk.git#commit=6e00b98569f8c03e01ff4534fa457035d9947acc"
+  dependencies:
+    emoji-regex: ^10.1.0
+    qrcode.react: ^3.1.0
+  checksum: 070f4b2bb629977917bac61fdbb3ec910d996d18b9b48df96522ed248a52d9a531a8449bfcc5972d36677d60056700002f231071281f0165aa6e39fd4db0d389
+  languageName: node
+  linkType: hard
+
 "@textshq/platform-sdk@https://github.com/TextsHQ/platform-sdk#ad5cbc49ffac074860ed49e31bb7d998c20b2ba4":
   version: 0.4.4
   resolution: "@textshq/platform-sdk@https://github.com/TextsHQ/platform-sdk.git#commit=ad5cbc49ffac074860ed49e31bb7d998c20b2ba4"
@@ -2097,17 +2107,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@textshq/platform-sdk@https://github.com/TextsHQ/platform-sdk#main":
-  version: 0.4.4
-  resolution: "@textshq/platform-sdk@https://github.com/TextsHQ/platform-sdk.git#commit=6e00b98569f8c03e01ff4534fa457035d9947acc"
-  dependencies:
-    emoji-regex: ^10.1.0
-    qrcode.react: ^3.1.0
-  checksum: 070f4b2bb629977917bac61fdbb3ec910d996d18b9b48df96522ed248a52d9a531a8449bfcc5972d36677d60056700002f231071281f0165aa6e39fd4db0d389
-  languageName: node
-  linkType: hard
-
-"@textshq/platform-test-lib@https://github.com/TextsHQ/platform-test-lib":
+"@textshq/platform-test-lib@https://github.com/TextsHQ/platform-test-lib#3d6a0d9452ccc24c3f07ec27b9f2730438392de2":
   version: 0.1.0
   resolution: "@textshq/platform-test-lib@https://github.com/TextsHQ/platform-test-lib.git#commit=3d6a0d9452ccc24c3f07ec27b9f2730438392de2"
   dependencies:

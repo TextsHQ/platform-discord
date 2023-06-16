@@ -7,8 +7,8 @@
   ],
   "scripts": {
     "prepack": "tsc",
-    "build": "yarn tsc",
-    "watch": "yarn tsc --watch",
+    "build": "tsc",
+    "dev": "tsc --watch",
     "lint": "eslint src --ext ts,tsx,js,jsx --cache",
     "test": "jest"
   },
@@ -16,7 +16,7 @@
     "erlpack": "^0.1.4"
   },
   "dependencies": {
-    "@textshq/platform-sdk": "https://github.com/TextsHQ/platform-sdk#main",
+    "@textshq/platform-sdk": "https://github.com/TextsHQ/platform-sdk#6e00b98569f8c03e01ff4534fa457035d9947acc",
     "discord-api-types": "^0.37.45",
     "erlpack": "^0.1.4",
     "form-data": "^4.0.0",
@@ -24,8 +24,8 @@
     "ws": "^8.2.1"
   },
   "devDependencies": {
-    "@textshq/eslint-config": "https://github.com/TextsHQ/eslint-config#main",
-    "@textshq/platform-test-lib": "https://github.com/TextsHQ/platform-test-lib",
+    "@textshq/eslint-config": "https://github.com/TextsHQ/eslint-config#1643cad9437bfe0491504c6f9428dc0c1264d8ff",
+    "@textshq/platform-test-lib": "https://github.com/TextsHQ/platform-test-lib#3d6a0d9452ccc24c3f07ec27b9f2730438392de2",
     "@types/eslint": "^8.4.10",
     "@types/jest": "^27.4.1",
     "@types/lodash": "^4.14.181",
