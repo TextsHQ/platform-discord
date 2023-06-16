@@ -1,12 +1,13 @@
-import { CurrentUser, Message, MessageActionType, Attachment, AttachmentType, MessageLink, MessageReaction, Thread, ThreadType, User, PartialWithID, UserPresence, texts } from '@textshq/platform-sdk'
-import { APIUser, APIChannel, EmbedType, MessageActivityType, APIAttachment, MessageType, GatewayPresenceUpdateData } from 'discord-api-types/v9'
+import { Message, MessageActionType, Attachment, AttachmentType, MessageLink, MessageReaction, Thread, ThreadType, User, PartialWithID, UserPresence, texts } from '@textshq/platform-sdk'
+import { APIChannel, EmbedType, MessageActivityType, APIAttachment, MessageType, GatewayPresenceUpdateData } from 'discord-api-types/v9'
 import { uniqBy } from 'lodash'
 
 import { IGNORED_MESSAGE_TYPES, StickerFormat, THREAD_TYPES } from '../constants'
 import { getEmojiURL, getLottieStickerURL, getPNGStickerURL, getThreadIcon, getTimestampFromSnowflake, getUserAvatar } from '../util'
 import { mapTextAttributes } from '../text-attributes'
 import { handleArticleEmbed, handleGifvEmbed, handleImageEmbed, handleLinkEmbed, handleRichEmbed, handleVideoEmbed } from './rich-embeds'
-import type { DiscordMessage, DiscordReactionDetails } from '../types'
+import type { DiscordMessage, DiscordReactionDetails } from '../types/discord-types'
+import { _APIUser } from '../types/APIUser'
 
 export const mapReaction = (reaction: DiscordReactionDetails, participantID: string): MessageReaction => {
   // reaction.emoji = { id: '352592187265122304', name: 'pat' }
@@ -30,11 +31,12 @@ export const mapPresence = (userID: string, presence: GatewayPresenceUpdateData)
   }
 }
 
-export function mapUser(user: APIUser): User {
+export function mapUser(user: _APIUser): User {
+  const username = user.discriminator.length === 4 ? `${user.username}#${user.discriminator}` : user.username
   return {
     id: user.id,
-    fullName: user.username,
-    username: `${user.username}#${user.discriminator}`,
+    fullName: user.global_name ?? user.username,
+    username,
     imgURL: user.avatar ? getUserAvatar(user.id, user.avatar) : undefined,
   }
 }
@@ -42,11 +44,11 @@ export function mapUser(user: APIUser): User {
 export function mapThread(thread: APIChannel, lastReadMessageID?: string, isMuted?: boolean, currentUser?: User): Thread {
   const type: ThreadType = THREAD_TYPES[thread.type]!
 
-  const participants: User[] = thread.recipients?.map(mapUser) ?? []
+  const participants: User[] = 'recipients' in thread ? thread.recipients.map(mapUser) : []
   participants.sort((a, b) => ((a.username ?? '') < (b.username ?? '') ? 1 : -1))
   if (currentUser) participants.push(currentUser)
 
-  const timestamp = getTimestampFromSnowflake(thread.last_message_id ?? undefined)
+  const timestamp = getTimestampFromSnowflake('last_message_id' in thread ? thread.last_message_id : undefined)
   const lastMessageTimestamp = getTimestampFromSnowflake(lastReadMessageID)
 
   return {
@@ -55,10 +57,10 @@ export function mapThread(thread: APIChannel, lastReadMessageID?: string, isMute
     title: thread.name,
     isUnread: (timestamp ?? 0) > (lastMessageTimestamp ?? 0),
     lastReadMessageID: lastReadMessageID ? String(lastReadMessageID) : undefined,
-    isReadOnly: thread.recipients?.[0]?.system ?? false,
+    isReadOnly: 'recipients' in thread ? thread.recipients?.[0]?.system : false,
     type,
-    imgURL: thread.icon ? getThreadIcon(thread.id, thread.icon) : undefined,
-    description: thread.topic ?? undefined,
+    imgURL: 'icon' in thread ? getThreadIcon(thread.id, thread.icon) : undefined,
+    description: 'topic' in thread ? thread.topic : undefined,
     timestamp,
     mutedUntil: isMuted ? 'forever' : undefined,
     messages: {
@@ -69,7 +71,7 @@ export function mapThread(thread: APIChannel, lastReadMessageID?: string, isMute
       hasMore: false,
       items: participants,
     },
-    partialLastMessage: thread.last_message_id ? { id: thread.last_message_id } : undefined,
+    partialLastMessage: 'last_message_id' in thread ? { id: thread.last_message_id } : undefined,
   }
 }
 
@@ -256,23 +258,27 @@ function mapAttachments(message: DiscordMessage): Partial<Message> {
 function mapMessageType(message: DiscordMessage): Partial<Message> | undefined {
   switch (message.type) {
     case MessageType.RecipientAdd: {
+      const ids = message.mentions?.map(m => `{{${m.id}}}`).join(', ')
+      const text = `{{${message.author.id}}} added ${ids}`
       return {
         isAction: true,
         parseTemplate: true,
-        text: `{{sender}} added ${message.mentions.map(m => `{{${m.id}}}`).join(', ')}`,
+        text,
         action: {
           type: MessageActionType.THREAD_PARTICIPANTS_ADDED,
-          participantIDs: message.mentions.map(m => m.id),
+          participantIDs: [message.author.id],
           actorParticipantID: message.author.id,
         },
       }
     }
 
     case MessageType.RecipientRemove: {
+      const ids = message.mentions?.map(m => `{{${m.id}}}`).join(', ')
+      const text = `{{${message.author.id}}} removed ${ids}`
       return {
         isAction: true,
         parseTemplate: true,
-        text: `${message.mentions.map(m => `{{${m.id}}}`).join(', ')} left`,
+        text,
         action: {
           type: MessageActionType.THREAD_PARTICIPANTS_REMOVED,
           participantIDs: message.mentions.map(m => m.id),
@@ -335,19 +341,6 @@ function mapMessageType(message: DiscordMessage): Partial<Message> | undefined {
         parseTemplate: true,
         linkedMessageID: message.message_reference?.message_id,
         text: `{{${message.author.id}}} pinned a message`,
-      }
-    }
-
-    case MessageType.GuildMemberJoin: {
-      return {
-        isAction: true,
-        parseTemplate: true,
-        text: `{{${message.author.id}}} joined`,
-        action: {
-          type: MessageActionType.THREAD_PARTICIPANTS_ADDED,
-          participantIDs: [message.author.id],
-          actorParticipantID: message.author.id,
-        },
       }
     }
 

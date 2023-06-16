@@ -1,4 +1,4 @@
-import { PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Message, MessageContent, PaginationArg, ActivityType, MessageSendOptions, texts, LoginCreds, Thread, AccountInfo, ServerEventType, NotificationsInfo } from '@textshq/platform-sdk'
+import { PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Message, MessageContent, PaginationArg, ActivityType, MessageSendOptions, texts, LoginCreds, Thread, ServerEventType, NotificationsInfo, SerializedSession, ClientContext } from '@textshq/platform-sdk'
 import { mapUser } from './mappers/mappers'
 import DiscordNetworkAPI from './network-api'
 import { getDataURI } from './util'
@@ -26,8 +26,8 @@ export default class Discord implements PlatformAPI {
     await this.api.getUserFriends()
   }
 
-  init = async (session?: string, accountInfo?: AccountInfo, prefs?: Record<string, any>) => {
-    this.accountID = accountInfo?.accountID
+  init = async (session: SerializedSession, context: ClientContext, prefs?: Record<string, boolean | string>) => {
+    this.accountID = context?.accountID
     this.api.accountID = this.accountID
 
     texts.log(LOG_PREFIX, 'Hello, world!')
@@ -46,7 +46,7 @@ export default class Discord implements PlatformAPI {
   getCurrentUser = () => this.api.currentUser!
 
   login = async (creds?: LoginCreds): Promise<LoginResult> => {
-    if (!creds?.jsCodeResult) return { type: 'error', errorMessage: 'Token was empty' }
+    if (!creds || !('jsCodeResult' in creds) || !creds.jsCodeResult) return { type: 'error', errorMessage: 'Token was empty' }
     await this.api.login(creds.jsCodeResult)
     await this.afterAuth()
     return { type: 'success' }

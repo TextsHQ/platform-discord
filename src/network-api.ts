@@ -15,7 +15,7 @@ import { generateSnowflake } from './common-util'
 import { ENABLE_GUILDS, ENABLE_DM_GUILD_MEMBERS, ENABLE_DISCORD_ANALYTICS } from './preferences'
 import { IGNORED_CHANNEL_TYPES, ScienceEventType, USER_AGENT } from './constants'
 import { SUPER_PROPERTIES } from './discord-constants'
-import type { DiscordEmoji, DiscordMessage, DiscordReactionDetails, DiscordScienceEvent } from './types'
+import type { DiscordEmoji, DiscordMessage, DiscordReactionDetails, DiscordScienceEvent } from './types/discord-types'
 
 import _emojis from './resources/emojis.json'
 import _emojiShortcuts from './resources/shortcuts.json'
@@ -151,6 +151,7 @@ export default class DiscordNetworkAPI {
     const res = await this.fetch({ method: 'GET', url: 'users/@me/channels', checkError: true })
 
     const threads: Thread[] = (res!.json as APIChannel[])
+      // @ts-expect-error We're not checking categories
       .sort((a, b) => +a.last_message_id! - +b.last_message_id!)
       .reverse()
       .map(t => mapThread(t, this.readStateMap.get(t.id), this.mutedChannels.has(t.id), this.currentUser))
@@ -170,7 +171,7 @@ export default class DiscordNetworkAPI {
       method: 'POST',
       url: 'users/@me/channels',
       json: userIDs.length === 1 ? { recipient_id: userIDs[0] } : { recipients: userIDs },
-      checkError: true
+      checkError: true,
     })
     const json = res!.json
 
@@ -192,43 +193,53 @@ export default class DiscordNetworkAPI {
   // }
 
   reportThread = async (threadID: string, _messageID?: string) => {
+    /*
+      This WILL fail if it's not really `first_dm`:
+      { message: "Report Type 'first_dm' is currently unsupported", code: 0 } (400)
+
+      TODO: Find other types
+    */
+
     // TODO: Review - this getMessages call is untested
     const messageID = _messageID || await this.getMessages(threadID, { direction: 'after', cursor: '0' }).then(m => m?.[0]?.id)
-    const Referer = `https://discord.com/channels/@me/${threadID}`
-    const res1 = await this.fetch({
-      url: 'reporting/menu/first_dm',
-      headers: {
-        Referer,
-      },
-      method: 'GET',
-    })
-    const breadcrumb = Object.values<any>(res1?.json.nodes).find(n => n.report_type === 'sub_spam')?.id
+
+    const referer = 'https://discord.com/message-requests'
+
+    // I don't think it's really needed, and it's slowing down the flow :/
+    // const res1 = await this.fetch({
+    //   url: "reporting/menu/first_dm",
+    //   method: "GET",
+    //   headers: {
+    //     referer
+    //   }
+    // })
+    // const { root_node_id } = res1.json
+
+    const json2 = {
+      version: '1.0', // don't know
+      variant: '1', // don't know
+      language: 'en', // client (message?) lang?
+      breadcrumbs: [ // UX flow breadcrumbs?
+        32, // root_node_id   // possibly? maybe? not sure
+      ],
+      elements: {}, // don't know
+      name: 'first_dm', // report type?
+      channel_id: threadID,
+      message_id: messageID,
+    }
     const res2 = await this.fetch({
-      method: 'POST',
       url: 'reporting/first_dm',
-      json: {
-        id: String(generateSnowflake()),
-        version: '1.0',
-        variant: '1',
-        language: 'en',
-        breadcrumbs: [breadcrumb],
-        elements: {},
-        name: 'first_dm',
-        channel_id: threadID,
-        message_id: messageID,
-      },
+      method: 'POST',
       headers: {
-        Referer,
+        referer,
       },
+      json: json2,
     })
-    const success = !!res2?.json?.report_id
-    // 400 {
-    //   message: 'Validation error: 1 validation error for MessageReportSubmission\n' +
-    //     'message_id\n' +
-    //     '  none is not an allowed value (type=type_error.none.not_allowed)',
-    //     code: 0
-    // }
-    texts.log(`${LOG_PREFIX} reported thread`, res1?.statusCode, res1?.json, res2?.statusCode, res2?.json)
+
+    // texts.log(`${LOG_PREFIX} reported thread`, res1?.statusCode, res1?.json, res2?.statusCode, res2?.json)
+    texts.log(`${LOG_PREFIX} reported thread`, res2?.statusCode, res2?.json)
+    const success = !!res2.json.report_id
+
     if (success) {
       // this.blockUser(userID).then(result => texts.log('block user', userID, result))
       this.closeThread(threadID)
@@ -520,6 +531,7 @@ export default class DiscordNetworkAPI {
     const emojiRegex = /:([a-zA-Z0-9-_]*)(~\d*)?:/gi
 
     // TODO: Check if user has swapping emojis enabled
+    // TODO: Fix mappings for users without discriminators
     return text
       ?.replace(mentionRegex, (match, username) => { // mentions
         if (!mapMentions) return match
@@ -619,6 +631,7 @@ export default class DiscordNetworkAPI {
           this.mutedChannels = new Set(mutedChannels)
 
           const allChannels = d.guilds.map((g: APIGuild) => {
+            // @ts-expect-error
             const channels = [...g.channels ?? [], ...g.threads ?? []]
               .filter(c => !IGNORED_CHANNEL_TYPES.has(c.type))
               .map(c => mapThread(c, this.readStateMap.get(c.id), this.mutedChannels.has(c.id), this.currentUser))
@@ -1126,6 +1139,7 @@ export default class DiscordNetworkAPI {
         headers: {
           'User-Agent': USER_AGENT,
           Authorization: this.token!,
+          // TODO: x-super-proporties?
           ...headers,
         },
       }

@@ -26,10 +26,10 @@ export const SUPPORTED_EMBED_TYPES: Set<EmbedType> = new Set([
 ])
 
 export const IGNORED_MESSAGE_TYPES: Set<MessageType> = new Set([
-  MessageType.UserPremiumGuildSubscription,
-  MessageType.UserPremiumGuildSubscriptionTier1,
-  MessageType.UserPremiumGuildSubscriptionTier2,
-  MessageType.UserPremiumGuildSubscriptionTier3,
+  // MessageType.UserPremiumGuildSubscription,
+  // MessageType.UserPremiumGuildSubscriptionTier1,
+  // MessageType.UserPremiumGuildSubscriptionTier2,
+  // MessageType.UserPremiumGuildSubscriptionTier3,
   MessageType.ChannelFollowAdd,
   MessageType.GuildDiscoveryDisqualified,
   MessageType.GuildDiscoveryRequalified,
