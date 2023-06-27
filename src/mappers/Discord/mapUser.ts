@@ -1,4 +1,4 @@
-import { User as TextsUser } from '@textshq/platform-sdk'
+import { User as TextsUser } from '@/types/Texts'
 import { User as DiscordUser } from '@/types/Discord'
 import { getUserAvatarURL } from '@/util/Discord'
 

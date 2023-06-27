@@ -1,7 +1,7 @@
 import { GuildMember } from '../GuildMember'
 
 enum OP {
-  Sync = 'SYNC',
+  SYNC = 'SYNC',
 }
 
 export type GuildMemberListUpdate = {

@@ -1,15 +1,15 @@
-/* eslint-disable no-useless-return */
-import { Message as TextsMessage } from '@textshq/platform-sdk'
-import { Message as DiscordMessage, MessageType as DiscordMessageType } from '@/types/Discord'
-import { LOG_PREFIX } from '@'
+import { DEBUG, LOG_PREFIX } from '@'
+import * as TextsTypes from '@/types/Texts'
+import * as DiscordTypes from '@/types/Discord'
+import { mapReaction } from './mapReaction'
 
-export function mapSpecialMessage(message: DiscordMessage): Partial<TextsMessage> | undefined {
+export function mapSpecialMessage(message: DiscordTypes.Message): Partial<TextsTypes.Message> | undefined {
   switch (message.type) {
-    case DiscordMessageType.Default: {
+    case DiscordTypes.MessageType.DEFAULT: {
       return
     }
 
-    case DiscordMessageType.RecipientAdd: {
+    case DiscordTypes.MessageType.RECIPIENT_ADD: {
       const mentionsJoined = message.mentions?.map(m => `{{${m.id}}}`).join(', ')
       return {
         parseTemplate: true,
@@ -18,7 +18,7 @@ export function mapSpecialMessage(message: DiscordMessage): Partial<TextsMessage
       }
     }
 
-    case DiscordMessageType.RecipientRemove: {
+    case DiscordTypes.MessageType.RECIPIENT_REMOVE: {
       const mentionsJoined = message.mentions?.map(m => `{{${m.id}}}`).join(', ')
       return {
         parseTemplate: true,
@@ -27,7 +27,7 @@ export function mapSpecialMessage(message: DiscordMessage): Partial<TextsMessage
       }
     }
 
-    case DiscordMessageType.Call: {
+    case DiscordTypes.MessageType.CALL: {
       return {
         parseTemplate: true,
         isAction: true,
@@ -35,7 +35,7 @@ export function mapSpecialMessage(message: DiscordMessage): Partial<TextsMessage
       }
     }
 
-    case DiscordMessageType.ChannelNameChange: {
+    case DiscordTypes.MessageType.CHANNEL_NAME_CHANGE: {
       return {
         parseTemplate: true,
         isAction: true,
@@ -43,7 +43,7 @@ export function mapSpecialMessage(message: DiscordMessage): Partial<TextsMessage
       }
     }
 
-    case DiscordMessageType.ChannelIconChange: {
+    case DiscordTypes.MessageType.CHANNEL_ICON_CHANGE: {
       return {
         parseTemplate: true,
         isAction: true,
@@ -51,7 +51,7 @@ export function mapSpecialMessage(message: DiscordMessage): Partial<TextsMessage
       }
     }
 
-    case DiscordMessageType.ChannelPinnedMessage: {
+    case DiscordTypes.MessageType.CHANNEL_PINNED_MESSAGE: {
       return {
         parseTemplate: true,
         isAction: true,
@@ -60,7 +60,7 @@ export function mapSpecialMessage(message: DiscordMessage): Partial<TextsMessage
       }
     }
 
-    case DiscordMessageType.GuildMemberJoin: {
+    case DiscordTypes.MessageType.USER_JOIN: {
       return {
         parseTemplate: true,
         isAction: true,
@@ -68,7 +68,7 @@ export function mapSpecialMessage(message: DiscordMessage): Partial<TextsMessage
       }
     }
 
-    case DiscordMessageType.UserPremiumGuildSubscription: {
+    case DiscordTypes.MessageType.GUILD_BOOST: {
       // TODO
       return {
         parseTemplate: true,
@@ -76,7 +76,7 @@ export function mapSpecialMessage(message: DiscordMessage): Partial<TextsMessage
       }
     }
 
-    case DiscordMessageType.UserPremiumGuildSubscriptionTier1: {
+    case DiscordTypes.MessageType.GUILD_BOOST_TIER_1: {
       // TODO
       return {
         parseTemplate: true,
@@ -84,7 +84,7 @@ export function mapSpecialMessage(message: DiscordMessage): Partial<TextsMessage
       }
     }
 
-    case DiscordMessageType.UserPremiumGuildSubscriptionTier2: {
+    case DiscordTypes.MessageType.GUILD_BOOST_TIER_2: {
       // TODO
       return {
         parseTemplate: true,
@@ -92,7 +92,7 @@ export function mapSpecialMessage(message: DiscordMessage): Partial<TextsMessage
       }
     }
 
-    case DiscordMessageType.UserPremiumGuildSubscriptionTier3: {
+    case DiscordTypes.MessageType.GUILD_BOOST_TIER_3: {
       // TODO
       return {
         parseTemplate: true,
@@ -100,7 +100,7 @@ export function mapSpecialMessage(message: DiscordMessage): Partial<TextsMessage
       }
     }
 
-    case DiscordMessageType.ChannelFollowAdd: {
+    case DiscordTypes.MessageType.CHANNEL_FOLLOW_ADD: {
       // TODO
       return {
         parseTemplate: true,
@@ -108,7 +108,7 @@ export function mapSpecialMessage(message: DiscordMessage): Partial<TextsMessage
       }
     }
 
-    case DiscordMessageType.GuildDiscoveryDisqualified: {
+    case DiscordTypes.MessageType.GUILD_DISCOVERY_DISQUALIFIED: {
       // TODO
       return {
         parseTemplate: true,
@@ -116,7 +116,7 @@ export function mapSpecialMessage(message: DiscordMessage): Partial<TextsMessage
       }
     }
 
-    case DiscordMessageType.GuildDiscoveryRequalified: {
+    case DiscordTypes.MessageType.GUILD_DISCOVERY_REQUALIFIED: {
       // TODO
       return {
         parseTemplate: true,
@@ -124,7 +124,7 @@ export function mapSpecialMessage(message: DiscordMessage): Partial<TextsMessage
       }
     }
 
-    case DiscordMessageType.GuildDiscoveryGracePeriodInitialWarning: {
+    case DiscordTypes.MessageType.GUILD_DISCOVERY_GRACE_PERIOD_INITIAL_WARNING: {
       // TODO
       return {
         parseTemplate: true,
@@ -132,7 +132,7 @@ export function mapSpecialMessage(message: DiscordMessage): Partial<TextsMessage
       }
     }
 
-    case DiscordMessageType.GuildDiscoveryGracePeriodFinalWarning: {
+    case DiscordTypes.MessageType.GUILD_DISCOVERY_GRACE_PERIOD_FINAL_WARNING: {
       // TODO
       return {
         parseTemplate: true,
@@ -140,11 +140,11 @@ export function mapSpecialMessage(message: DiscordMessage): Partial<TextsMessage
       }
     }
 
-    case DiscordMessageType.Reply: {
+    case DiscordTypes.MessageType.REPLY: {
       return
     }
 
-    case DiscordMessageType.ChatInputCommand: {
+    case DiscordTypes.MessageType.CHAT_INPUT_COMMAND: {
       // TODO
       return {
         parseTemplate: true,
@@ -152,7 +152,7 @@ export function mapSpecialMessage(message: DiscordMessage): Partial<TextsMessage
       }
     }
 
-    case DiscordMessageType.GuildInviteReminder: {
+    case DiscordTypes.MessageType.GUILD_INVITE_REMINDER: {
       // TODO
       return {
         parseTemplate: true,
@@ -160,7 +160,71 @@ export function mapSpecialMessage(message: DiscordMessage): Partial<TextsMessage
       }
     }
 
-    case DiscordMessageType.ContextMenuCommand: {
+    case DiscordTypes.MessageType.CONTEXT_MENU_COMMAND: {
+      // TODO
+      return {
+        parseTemplate: true,
+        isAction: true,
+      }
+    }
+
+    case DiscordTypes.MessageType.AUTO_MODERATION_ACTION: {
+      // TODO
+      return {
+        parseTemplate: true,
+        isAction: true,
+      }
+    }
+
+    case DiscordTypes.MessageType.ROLE_SUBSCRIPTION_PURCHASE: {
+      // TODO
+      return {
+        parseTemplate: true,
+        isAction: true,
+      }
+    }
+
+    case DiscordTypes.MessageType.INTERACTION_PREMIUM_UPSELL: {
+      // TODO
+      return {
+        parseTemplate: true,
+        isAction: true,
+      }
+    }
+
+    case DiscordTypes.MessageType.STAGE_START: {
+      // TODO
+      return {
+        parseTemplate: true,
+        isAction: true,
+      }
+    }
+
+    case DiscordTypes.MessageType.STAGE_END: {
+      // TODO
+      return {
+        parseTemplate: true,
+        isAction: true,
+      }
+    }
+
+    case DiscordTypes.MessageType.STAGE_SPEAKER: {
+      // TODO
+      return {
+        parseTemplate: true,
+        isAction: true,
+      }
+    }
+
+    case DiscordTypes.MessageType.STAGE_TOPIC: {
+      // TODO
+      return {
+        parseTemplate: true,
+        isAction: true,
+      }
+    }
+
+    case DiscordTypes.MessageType.GUILD_APPLICATION_PREMIUM_SUBSCRIPTION: {
       // TODO
       return {
         parseTemplate: true,
@@ -169,8 +233,7 @@ export function mapSpecialMessage(message: DiscordMessage): Partial<TextsMessage
     }
 
     default: {
-      console.warn(LOG_PREFIX, 'Unhandled MessageType', message)
-      return
+      if (DEBUG) console.warn(LOG_PREFIX, 'Unhandled MessageType', message)
     }
   }
 }

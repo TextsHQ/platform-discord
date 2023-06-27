@@ -1,3 +1,3 @@
-import { UserChannel } from '@/types/Discord/UserChannel'
+import { Channel } from '@/types/Discord'
 
-export type Response = UserChannel[]
+export type Response = Channel[]

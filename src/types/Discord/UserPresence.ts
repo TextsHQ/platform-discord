@@ -1,9 +1,9 @@
 export enum UserPresenceStatus {
-  Online = 'online',
+  ONLINE = 'online',
   DND = 'dnd',
-  Idle = 'idle',
-  Invisible = 'invisible',
-  Offline = 'offline',
+  IDLE = 'idle',
+  INVISIBLE = 'invisible',
+  OFFLINE = 'offline',
 }
 
 export interface UserPresenceActivity {

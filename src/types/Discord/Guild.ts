@@ -1,31 +1,5 @@
 import { CustomEmoji } from './CustomEmoji'
-
-export enum GuildChannelType {
-  Default = 0,
-
-  Category = 4,
-}
-
-export interface GuildChannel {
-  // version: number
-  type: GuildChannelType
-  topic?: string
-  // rate_limit_per_user: number
-  // position: number
-  permission_overwrites: {
-    type: number
-    id: string
-    deny: string
-    allow: string
-  }[]
-  // parent_id?: string
-  name: string
-  last_message_id?: string
-  id: string
-  icon_emoji: any[]
-  // flags: number
-  guild_id?: string
-}
+import { GuildChannel } from './GuildChannel'
 
 export interface GuildRole {
   // version: number

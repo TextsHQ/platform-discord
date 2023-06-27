@@ -67,17 +67,17 @@ export class GatewayClient {
     const urlParts = {
       v: this.options.version.toString(),
       encoding: this.options.encoding.toString(),
-      // compress: this.options.compress?.toString() ?? ''
+      // compress: this.options.compress?.toString() ?? '',
     }
     const urlParams = new URLSearchParams(urlParts)
     const gatewayURL = `${this.url}?${urlParams.toString()}`
-    console.log(LOG_PREFIX, 'Opening WebSocket, URL:', gatewayURL)
+    texts.log(LOG_PREFIX, 'Opening WebSocket, URL:', gatewayURL)
     this.ws = new WebSocket(gatewayURL)
     this.setupHandlers()
   }
 
-  public disconnect = (code: number = CloseCode.ManualDisconnect) => {
-    console.log(LOG_PREFIX, `Disconnect called with code ${code}`)
+  public disconnect = (code: number = CloseCode.MANUAL_DISCONNECT) => {
+    texts.log(LOG_PREFIX, `Disconnect called with code ${code}`)
     clearInterval(this.heartbeatTimer!)
     clearTimeout(this.heartbeatTimeout!)
     this.ws?.close(code)
@@ -108,18 +108,18 @@ export class GatewayClient {
   }
 
   private wsOpen = () => {
-    console.log(LOG_PREFIX, 'WebSocket open!')
+    texts.log(LOG_PREFIX, 'WebSocket open!')
     this._ready = true
   }
 
   private wsClose = (code: CloseCode, reason: string) => {
-    console.log(LOG_PREFIX, `WebSocket closed, code: ${code}, reason: ${reason}.`)
+    texts.log(LOG_PREFIX, `WebSocket closed, code: ${code}, reason: ${reason}.`)
     this._ready = false
     clearInterval(this.heartbeatTimer!)
 
-    if (code === CloseCode.ReconnectRequested) {
+    if (code === CloseCode.RECONNECT_REQUESTED) {
       this.shouldResume = true
-      this.disconnect(CloseCode.ReconnectRequested)
+      this.disconnect(code)
       this.connect()
       return
     }
@@ -149,48 +149,35 @@ export class GatewayClient {
     }
 
     switch (message.op) {
-      case OPCode.Dispatch:
+      case OPCode.DISPATCH:
         this.handleDispatch(message)
         break
-      case OPCode.Heartbeat:
+      case OPCode.HEARTBEAT:
         this.sendHeartbeat()
         break
-      case OPCode.Reconnect:
-      case OPCode.InvalidSession:
-        console.log(LOG_PREFIX, `OP: ${message.op}, reconnecting...`)
+      case OPCode.RECONNECT:
+      case OPCode.INVALID_SESSION:
+        texts.log(LOG_PREFIX, `OP: ${message.op}, reconnecting...`)
         this._ready = false
         this.shouldResume = true
-        this.disconnect(CloseCode.ManualDisconnect)
+        this.disconnect(CloseCode.MANUAL_DISCONNECT)
         this.connect()
         break
-      case OPCode.Hello:
+      case OPCode.HELLO:
         this.setupHeartbeat(message.d.heartbeat_interval)
         this.sendIdentifyOrResume()
         this.shouldResume = false
         break
-      case OPCode.HearbeatAck: {
+      case OPCode.HEARTBEAT_ACK: {
         if (DEBUG) console.log(LOG_PREFIX, 'Got HEARTBEAT_ACK!')
         this.receivedHeartbeatAck = true
         break
       }
 
-      // * Send-only
-      /*
-      case OPCode.Identify:
-      case OPCode.PresenceUpdate:
-      case OPCode.VoiceStateUpdate:
-      case OPCode.Resume:
-      case OPCode.RequestGuildMembers: {
-        // Shouldn't ever happen
-        console.log(LOG_PREFIX, `Received send-only OPCode (${message.op})!`, message)
-        break
-      }
-      */
-
       // * Default
 
       default: {
-        console.log(LOG_PREFIX, `Unhandled OPCode (${message.op})!`, message)
+        if (DEBUG) console.log(LOG_PREFIX, `Unhandled OPCode (${message.op})!`, message)
         break
       }
     }
@@ -220,7 +207,7 @@ export class GatewayClient {
     let payload: Message<any>
     if (this.shouldResume) {
       payload = {
-        op: OPCode.Resume,
+        op: OPCode.RESUME,
         d: {
           token: this.token,
           session_id: this.sessionID,
@@ -229,13 +216,13 @@ export class GatewayClient {
       }
     } else {
       payload = {
-        op: OPCode.Identify,
+        op: OPCode.IDENTIFY,
         d: {
           token: this.token,
           capabilities: 8189, // sniffed
           properties: SUPER_PROPERTIES,
           presence: {
-            status: UserPresenceStatus.Online,
+            status: UserPresenceStatus.ONLINE,
             since: 0,
             activities: [],
             afk: false,
@@ -262,15 +249,15 @@ export class GatewayClient {
 
     if (!this.receivedHeartbeatAck) {
       // TODO: Check this - connection zombified, https://discord.com/developers/docs/topics/gateway#heartbeating
-      console.log(LOG_PREFIX, 'Connection zombified')
+      texts.log(LOG_PREFIX, 'Connection zombified')
       this.shouldResume = true
-      this.disconnect(CloseCode.ReconnectRequested)
+      this.disconnect(CloseCode.RECONNECT_REQUESTED)
       this.connect()
       return
     }
 
     const payload: Message<number> = {
-      op: OPCode.Heartbeat,
+      op: OPCode.HEARTBEAT,
       d: this.lastSequenceNumber,
     }
     this.send(payload)
@@ -279,23 +266,23 @@ export class GatewayClient {
 
   private handleDispatch = (message: Message<any>) => {
     switch (message.t) {
-      case MessageType.Ready: {
+      case MessageType.READY: {
         if (DEBUG) console.log(LOG_PREFIX, 'Got dispatch <READY>!')
         this.sessionID = message.d?.session_id
         break
       }
 
-      case MessageType._SessionsReplace: {
+      case MessageType._SESSIONS_REPLACE: {
         const session = message.d?.[0]
         if (session.session_id) this.sessionID = session.session_id
         break
       }
 
-      case MessageType.Resumed: {
+      case MessageType.RESUMED: {
         const presencePayload = {
-          op: OPCode.PresenceUpdate,
+          op: OPCode.PRESENCE_UPDATE,
           d: {
-            status: UserPresenceStatus.Online,
+            status: UserPresenceStatus.ONLINE,
             since: null,
             activities: [],
             afk: false,

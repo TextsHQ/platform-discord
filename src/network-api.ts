@@ -12,6 +12,7 @@ import * as DiscordAPI from './types/Discord/api'
 import * as DiscordGatewayMessage from '@/types/Discord/gateway'
 import * as TextsTypes from '@/types/Texts'
 import * as DiscordMappers from '@/mappers/Discord'
+import * as TextsMappers from '@/mappers/Texts'
 import * as DiscordConstants from '@/discord-constants'
 
 const WS_OPTIONS: Gateway.ConnectionOptions = {
@@ -87,7 +88,7 @@ class DiscordNetworkAPI {
 
     const _thread = Texts.texts.getOriginalObject(PLATFORM_NAME, this.accountID!, ['thread', threadID])
     if (_thread) {
-      const thread = JSON.parse(_thread) as DiscordTypes.UserChannel | DiscordTypes.GuildChannel
+      const thread = JSON.parse(_thread) as DiscordTypes.Channel
       if ('guild_id' in thread && thread.guild_id) {
         await this.requestGuildMembers(thread.guild_id, threadID)
       }
@@ -134,6 +135,7 @@ class DiscordNetworkAPI {
 
     const threads: TextsTypes.Thread[] = res.json
       .map(DiscordMappers.mapChannel)
+      .filter(c => !!c?.id) as TextsTypes.Thread[]
 
     // const customThreads: TextsThread[] = (this.config.customChannels ?? [])
     //   .map(({ id, name }) => ({
@@ -156,6 +158,27 @@ class DiscordNetworkAPI {
       .sort((a, b) => (a.timestamp?.getTime() ?? 0) - (b.timestamp?.getTime() ?? 0))
 
     return { items, hasMore: false }
+  }
+
+  updateThread = async (threadID: Texts.ThreadID, updates: Partial<TextsTypes.Thread>) => {
+    const json: DiscordAPI.Channels.Thread.Request | undefined = TextsMappers.mapPartialThread(updates)
+
+    const res = await this.fetch<DiscordAPI.Channels.Thread.Response>(`channels/${threadID}`, { method: 'PATCH', checkError: true, json })
+    if (!res?.json) {
+      throw new Error(`Failed to get threads: ${res?.statusCode}`)
+    }
+
+    const newChannel = DiscordMappers.mapChannel(res.json)
+    if (newChannel) {
+      const newChannelUpdateEvent: Texts.UpdateStateSyncEvent = {
+        type: Texts.ServerEventType.STATE_SYNC,
+        mutationType: 'update',
+        objectName: 'thread',
+        objectIDs: {},
+        entries: [newChannel],
+      }
+      this.eventCallback([newChannelUpdateEvent])
+    }
   }
 
   // Get messages in specified thread.
@@ -182,6 +205,7 @@ class DiscordNetworkAPI {
         return {
           ...mapped,
           isSender: m.author.id === this.currentUser?.id,
+          accountID: this.accountID,
         }
       })
       .sort((a, b) => +a.id - +b.id)
@@ -236,11 +260,20 @@ class DiscordNetworkAPI {
 
   // Send read receipt for specified message in specified thread.
   sendReadReceipt = async (threadID: Texts.ThreadID, messageID?: Texts.MessageID, messageCursor?: string) => {
+    let _messageID = messageID
+    if (!_messageID) {
+      const _thread = Texts.texts.getOriginalObject(PLATFORM_NAME, this.accountID!, ['thread', threadID])
+      if (_thread) {
+        const thread = JSON.parse(_thread) as DiscordTypes.Channel
+        _messageID = thread.last_message_id
+      }
+    }
+
     const json: DiscordAPI.Channels.Thread.Messages.Ack.Request = {
       token: this.lastAck.token,
       last_viewed: this.lastAck.lastViewed,
     }
-    const res = await this.fetch<DiscordAPI.Channels.Thread.Messages.Ack.Response>(`channels/${threadID}/messages/${messageID}/ack`, {
+    const res = await this.fetch<DiscordAPI.Channels.Thread.Messages.Ack.Response>(`channels/${threadID}/messages/${_messageID}/ack`, {
       method: 'POST',
       checkError: true,
       json,
@@ -261,7 +294,7 @@ class DiscordNetworkAPI {
     const fromIndex = 0
     const toIndex = 99
     const gatewayMessage: Gateway.Message<GatewayPayload.RequestGuildDetails> = {
-      op: Gateway.OPCode._LazyRequest,
+      op: Gateway.OPCode._LAZY_REQUEST,
       d: {
         guild_id: guildID,
         activities: true,
@@ -318,20 +351,20 @@ class DiscordNetworkAPI {
       this.eventCallback([toastEvent])
 
       switch (code) {
-        case Gateway.CloseCode.AddressNotFound: {
+        case Gateway.CloseCode.ADDRESS_NOT_FOUND: {
           Texts.texts.log(LOG_PREFIX, 'Gateway connection closed due to network connection loss.')
           // this.startPolling?.()
           break
         }
 
-        case Gateway.CloseCode.AuthenticationFailed: {
+        case Gateway.CloseCode.AUTHENTICATION_FAILED: {
           Texts.texts.log(LOG_PREFIX, 'Gateway connection closed due to authentication failure.')
           this.gatewayClient?.disconnect()
           this.gatewayClient = undefined
           throw new Texts.ReAuthError('Access token invalid')
         }
 
-        case Gateway.CloseCode.SessionTimedOut: {
+        case Gateway.CloseCode.SESSION_TIMED_OUT: {
           Texts.texts.log(`${LOG_PREFIX} Gateway session timed out`)
           break
         }
@@ -359,11 +392,11 @@ class DiscordNetworkAPI {
         // Doesn't interest us
         break
       }
-      case Gateway.MessageType.Hello: {
+      case Gateway.MessageType.HELLO: {
         // Handled by GatewayClient
         break
       }
-      case Gateway.MessageType.Ready: {
+      case Gateway.MessageType.READY: {
         const _d = d as DiscordGatewayMessage.Ready
 
         const allServerEvents: Texts.ServerEvent[] = []
@@ -438,7 +471,7 @@ class DiscordNetworkAPI {
 
         break
       }
-      case Gateway.MessageType._ReadySupplemental: {
+      case Gateway.MessageType._READY_SUPPLEMENTAL: {
         const _d = d as DiscordGatewayMessage.ReadySupplemental
 
         const allServerEvents: Texts.ServerEvent[] = []
@@ -456,31 +489,31 @@ class DiscordNetworkAPI {
 
         break
       }
-      case Gateway.MessageType.Resumed: {
+      case Gateway.MessageType.RESUMED: {
         console.log(t, d)
         break
       }
-      case Gateway.MessageType.Reconnect: {
+      case Gateway.MessageType.RECONNECT: {
         console.log(t, d)
         break
       }
-      case Gateway.MessageType.InvalidSession: {
+      case Gateway.MessageType.INVALID_SESSION: {
         console.log(t, d)
         break
       }
-      case Gateway.MessageType.ApplicationCommandCreate: {
+      case Gateway.MessageType.APPLICATION_COMMAND_CREATE: {
         console.log(t, d)
         break
       }
-      case Gateway.MessageType.ApplicationCommandUpdate: {
+      case Gateway.MessageType.APPLICATION_COMMAND_UPDATE: {
         console.log(t, d)
         break
       }
-      case Gateway.MessageType.ApplicationCommandDelete: {
+      case Gateway.MessageType.APPLICATION_COMMAND_DELETE: {
         console.log(t, d)
         break
       }
-      case Gateway.MessageType.ChannelCreate: {
+      case Gateway.MessageType.CHANNEL_CREATE: {
         const _d = d as DiscordGatewayMessage.ChannelCreate
         if (!this.config.enableGuilds && _d.guild_id) return
 
@@ -500,7 +533,7 @@ class DiscordNetworkAPI {
 
         break
       }
-      case Gateway.MessageType.ChannelUpdate: {
+      case Gateway.MessageType.CHANNEL_UPDATE: {
         const _d = d as DiscordGatewayMessage.ChannelUpdate
         if (!this.config.enableGuilds && _d.guild_id) return
 
@@ -524,7 +557,7 @@ class DiscordNetworkAPI {
 
         break
       }
-      case Gateway.MessageType.ChannelDelete: {
+      case Gateway.MessageType.CHANNEL_DELETE: {
         const _d = d as DiscordGatewayMessage.ChannelDelete
         if (!this.config.enableGuilds && _d.guild_id) return
 
@@ -541,91 +574,91 @@ class DiscordNetworkAPI {
 
         break
       }
-      case Gateway.MessageType.ChannelPinsUpdate: {
+      case Gateway.MessageType.CHANNEL_PINS_UPDATE: {
         console.log(t, d)
         break
       }
-      case Gateway.MessageType.ThreadCreate: {
+      case Gateway.MessageType.THREAD_CREATE: {
         console.log(t, d)
         break
       }
-      case Gateway.MessageType.ThreadUpdate: {
+      case Gateway.MessageType.THREAD_UPDATE: {
         console.log(t, d)
         break
       }
-      case Gateway.MessageType.ThreadDelete: {
+      case Gateway.MessageType.THREAD_DELETE: {
         console.log(t, d)
         break
       }
-      case Gateway.MessageType.ThreadListSync: {
+      case Gateway.MessageType.THREAD_LIST_SYNC: {
         console.log(t, d)
         break
       }
-      case Gateway.MessageType.ThreadMemberUpdate: {
+      case Gateway.MessageType.THREAD_MEMBER_UPDATE: {
         console.log(t, d)
         break
       }
-      case Gateway.MessageType.ThreadMembersUpdate: {
+      case Gateway.MessageType.THREAD_MEMBERS_UPDATE: {
         console.log(t, d)
         break
       }
-      case Gateway.MessageType.GuildCreate: {
+      case Gateway.MessageType.GUILD_CREATE: {
         console.log(t, d)
         break
       }
-      case Gateway.MessageType.GuildUpdate: {
+      case Gateway.MessageType.GUILD_UPDATE: {
         console.log(t, d)
         break
       }
-      case Gateway.MessageType.GuildDelete: {
+      case Gateway.MessageType.GUILD_DELETE: {
         console.log(t, d)
         break
       }
-      case Gateway.MessageType.GuildBanAdd: {
+      case Gateway.MessageType.GUILD_BAN_ADD: {
         console.log(t, d)
         break
       }
-      case Gateway.MessageType.GuildBanRemove: {
+      case Gateway.MessageType.GUILD_BAN_REMOVE: {
         console.log(t, d)
         break
       }
-      case Gateway.MessageType.GuildEmojisUpdate: {
+      case Gateway.MessageType.GUILD_EMOJIS_UPDATE: {
         console.log(t, d)
         break
       }
-      case Gateway.MessageType.GuildIntegrationsUpdate: {
+      case Gateway.MessageType.GUILD_INTEGRATIONS_UPDATE: {
         console.log(t, d)
         break
       }
-      case Gateway.MessageType.GuildMemberAdd: {
+      case Gateway.MessageType.GUILD_MEMBER_ADD: {
         console.log(t, d)
         break
       }
-      case Gateway.MessageType.GuildMemberRemove: {
+      case Gateway.MessageType.GUILD_MEMBER_REMOVE: {
         console.log(t, d)
         break
       }
-      case Gateway.MessageType.GuildMemberUpdate: {
+      case Gateway.MessageType.GUILD_MEMBER_UPDATE: {
         console.log(t, d)
         break
       }
-      case Gateway.MessageType.GuildMembersChunk: {
+      case Gateway.MessageType.GUILD_MEMBERS_CHUNK: {
         console.log(t, d)
         break
       }
-      case Gateway.MessageType.GuildRoleCreate: {
+      case Gateway.MessageType.GUILD_ROLE_CREATE: {
         console.log(t, d)
         break
       }
-      case Gateway.MessageType.GuildRoleUpdate: {
+      case Gateway.MessageType.GUILD_ROLE_UPDATE: {
         console.log(t, d)
         break
       }
-      case Gateway.MessageType.GuildRoleDelete: {
+      case Gateway.MessageType.GUILD_ROLE_DELETE: {
         console.log(t, d)
         break
       }
-      case Gateway.MessageType.GuildMemberListUpdate: {
+      case Gateway.MessageType.GUILD_MEMBER_LIST_UPDATE: {
         console.log(t, d)
 
         // const _d = d as GatewayMessagePayload.GuildMemberListUpdate
@@ -637,34 +670,38 @@ class DiscordNetworkAPI {
 
         break
       }
-      case Gateway.MessageType.IntegrationCreate: {
+      case Gateway.MessageType.INTEGRATION_CREATE: {
         console.log(t, d)
         break
       }
-      case Gateway.MessageType.IntegrationUpdate: {
+      case Gateway.MessageType.INTEGRATION_UPDATE: {
         console.log(t, d)
         break
       }
-      case Gateway.MessageType.IntegrationDelete: {
+      case Gateway.MessageType.INTEGRATION_DELETE: {
         console.log(t, d)
         break
       }
-      case Gateway.MessageType.InteractionCreate: {
+      case Gateway.MessageType.INTERACTION_CREATE: {
         console.log(t, d)
         break
       }
-      case Gateway.MessageType.InviteCreate: {
+      case Gateway.MessageType.INVITE_CREATE: {
         console.log(t, d)
         break
       }
-      case Gateway.MessageType.InviteDelete: {
+      case Gateway.MessageType.INVITE_DELETE: {
         console.log(t, d)
         break
       }
-      case Gateway.MessageType.MessageCreate: {
+      case Gateway.MessageType.MESSAGE_CREATE: {
         const _d = d as DiscordGatewayMessage.MessageCreate
 
-        const mapped = DiscordMappers.mapMessage(_d)
+        const mapped: Texts.Message = {
+          ...DiscordMappers.mapMessage(_d),
+          isSender: _d.author.id === this.currentUser?.id,
+          accountID: this.accountID,
+        }
 
         const messageEvent: Texts.UpsertStateSyncEvent = {
           type: Texts.ServerEventType.STATE_SYNC,
@@ -686,10 +723,14 @@ class DiscordNetworkAPI {
 
         break
       }
-      case Gateway.MessageType.MessageUpdate: {
+      case Gateway.MessageType.MESSAGE_UPDATE: {
         const _d = d as DiscordGatewayMessage.MessageUpdate
 
-        const mapped = DiscordMappers.mapMessage(_d)
+        const mapped: Texts.Message = {
+          ...DiscordMappers.mapMessage(_d),
+          isSender: _d.author.id === this.currentUser?.id,
+          accountID: this.accountID,
+        }
 
         const messageEvent: Texts.UpdateStateSyncEvent = {
           type: Texts.ServerEventType.STATE_SYNC,
@@ -702,7 +743,7 @@ class DiscordNetworkAPI {
 
         break
       }
-      case Gateway.MessageType.MessageDelete: {
+      case Gateway.MessageType.MESSAGE_DELETE: {
         const _d = d as DiscordGatewayMessage.MessageDelete
 
         const messageEvent: Texts.DeleteStateSyncEvent = {
@@ -716,27 +757,27 @@ class DiscordNetworkAPI {
 
         break
       }
-      case Gateway.MessageType.MessageDeleteBulk: {
+      case Gateway.MessageType.MESSAGE_DELETE_BULK: {
         console.log(t, d)
         break
       }
-      case Gateway.MessageType.MessageReactionAdd: {
+      case Gateway.MessageType.MESSAGE_REACTION_ADD: {
         console.log(t, d)
         break
       }
-      case Gateway.MessageType.MessageReactionRemove: {
+      case Gateway.MessageType.MESSAGE_REACTION_REMOVE: {
         console.log(t, d)
         break
       }
-      case Gateway.MessageType.MessageReactionRemoveAll: {
+      case Gateway.MessageType.MESSAGE_REACTION_REMOVE_ALL: {
         console.log(t, d)
         break
       }
-      case Gateway.MessageType.MessageReactionRemoveEmoji: {
+      case Gateway.MessageType.MESSAGE_REACTION_REMOVE_EMOJI: {
         console.log(t, d)
         break
       }
-      case Gateway.MessageType.PresenceUpdate: {
+      case Gateway.MessageType.PRESENCE_UPDATE: {
         const _d = d as DiscordTypes.UserPresence
 
         const presence = DiscordMappers.mapUserPresence(_d)
@@ -750,7 +791,7 @@ class DiscordNetworkAPI {
 
         break
       }
-      case Gateway.MessageType.TypingStart: {
+      case Gateway.MessageType.TYPING_START: {
         const _d = d as DiscordGatewayMessage.TypingStart
 
         const typingEvent: Texts.UserActivityEvent = {
@@ -764,58 +805,58 @@ class DiscordNetworkAPI {
 
         break
       }
-      case Gateway.MessageType.UserUpdate: {
+      case Gateway.MessageType.USER_UPDATE: {
         console.log(t, d)
         break
       }
-      case Gateway.MessageType.VoiceStateUpdate: {
+      case Gateway.MessageType.VOICE_STATE_UPDATE: {
         console.log(t, d)
         break
       }
-      case Gateway.MessageType.VoiceServerUpdate: {
+      case Gateway.MessageType.VOICE_SERVER_UPDATE: {
         console.log(t, d)
         break
       }
-      case Gateway.MessageType.WebhooksUpdate: {
+      case Gateway.MessageType.WEBHOOKS_UPDATE: {
         console.log(t, d)
         break
       }
-      case Gateway.MessageType.ChannelRecipientAdd: {
+      case Gateway.MessageType.CHANNEL_RECIPIENT_ADD: {
         console.log(t, d)
         break
       }
-      case Gateway.MessageType.ChannelRecipientRemove: {
+      case Gateway.MessageType.CHANNEL_RECIPIENT_REMOVE: {
         console.log(t, d)
         break
       }
-      case Gateway.MessageType._ChannelPinsAck: {
+      case Gateway.MessageType._CHANNEL_PINS_ACK: {
         console.log(t, d)
         break
       }
-      case Gateway.MessageType._ChannelUnreadUpdate: {
+      case Gateway.MessageType._CHANNEL_UNREAD_UPDATE: {
         console.log(t, d)
         break
       }
-      case Gateway.MessageType._GuildApplicationCommandCountsUpdate: {
+      case Gateway.MessageType._GUILD_APPLICATION_COMMAND_COUNTS_UPDATE: {
         console.log(t, d)
         break
       }
-      case Gateway.MessageType._MessageAck: {
+      case Gateway.MessageType._MESSAGE_ACK: {
         const _d = d as DiscordGatewayMessage.MessageAck
 
         this.lastAck.lastViewed = _d.last_viewed
 
         break
       }
-      case Gateway.MessageType._RelationshipAdd: {
+      case Gateway.MessageType._RELATIONSHIP_ADD: {
         console.log(t, d)
         break
       }
-      case Gateway.MessageType._RelationshipRemove: {
+      case Gateway.MessageType._RELATIONSHIP_REMOVE: {
         console.log(t, d)
         break
       }
-      case Gateway.MessageType._SessionsReplace: {
+      case Gateway.MessageType._SESSIONS_REPLACE: {
         console.log(t, d)
         break
       }

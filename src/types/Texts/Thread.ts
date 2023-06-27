@@ -1,6 +1,6 @@
 import { Thread as TextsThread } from '@textshq/platform-sdk'
 
-export type Thread = TextsThread & {
+export type _Thread = TextsThread & {
   extra?: {
     guildID?: string
   }

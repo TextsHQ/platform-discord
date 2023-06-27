@@ -1,26 +1,26 @@
-import { ThreadType as TextsThreadType } from '@textshq/platform-sdk'
-import {
-  Thread as TextsThread,
-} from '@/types/Texts'
-import {
-  UserChannel as DiscordChannel,
-  UserChannelType as DiscordUserChannelType,
-  Guild as DiscordGuild,
-  GuildChannel as DiscordGuildChannel,
-  GuildChannelType as DiscordGuildChannelType,
-} from '@/types/Discord'
+import * as TextsTypes from '@/types/Texts'
+import * as DiscordTypes from '@/types/Discord'
 import { dateFromSnowflake, getChannelIconURL } from '@/util/Discord'
 import { mapUser } from '@/mappers/Discord'
 
-const ChannelTypeMap: { [key: string]: TextsThreadType } = {
-  [DiscordUserChannelType.DM]: 'single',
-  [DiscordUserChannelType.DMGroup]: 'group',
-  // [DiscordUserChannelType.]: 'channel',
-  // [DiscordUserChannelType.]: 'broadcast',
+const ChannelTypeMap: { [key: string]: TextsTypes.ThreadType | undefined } = {
+  [DiscordTypes.ChannelType.GUILD_TEXT]: 'channel',
+  [DiscordTypes.ChannelType.DM]: 'single',
+  [DiscordTypes.ChannelType.GROUP_DM]: 'group',
+  [DiscordTypes.ChannelType.GUILD_CATEGORY]: undefined,
+  [DiscordTypes.ChannelType.GUILD_ANNOUNCEMENT]: 'broadcast',
+  [DiscordTypes.ChannelType.ANNOUNCEMENT_THREAD]: 'broadcast',
+  [DiscordTypes.ChannelType.PUBLIC_THREAD]: 'channel',
+  [DiscordTypes.ChannelType.PRIVATE_THREAD]: 'channel',
+  [DiscordTypes.ChannelType.GUILD_STAGE_VOICE]: undefined,
+  [DiscordTypes.ChannelType.GUILD_DIRECTORY]: undefined,
+  [DiscordTypes.ChannelType.GUILD_FORUM]: undefined,
 }
 
-export function mapChannel(channel: DiscordChannel): TextsThread {
+export function mapChannel(channel: DiscordTypes.Channel): TextsTypes._Thread | undefined {
   const type = ChannelTypeMap[channel.type]
+  if (!type) return
+
   const participants = channel.recipients.map(mapUser)
   const createdAt = dateFromSnowflake(channel.id)
 
@@ -46,22 +46,15 @@ export function mapChannel(channel: DiscordChannel): TextsThread {
   }
 }
 
-const GuildChannelTypeMap: { [key: string]: TextsThreadType | undefined } = {
-  [DiscordGuildChannelType.Default]: 'channel',
-  // [DiscordGuildChannelType.]: 'group',
-  // [DiscordGuildChannelType.]: 'channel',
-  [DiscordGuildChannelType.Category]: undefined,
-}
-
-export function mapGuildChannel(channel: DiscordGuildChannel, guild?: DiscordGuild): TextsThread | undefined {
+export function mapGuildChannel(channel: DiscordTypes.Channel, guild?: DiscordTypes.Guild): TextsTypes._Thread | undefined {
   // TODO: Participants
 
-  const _channel: DiscordGuildChannel = {
+  const _channel: DiscordTypes.Channel = {
     ...channel,
     guild_id: channel.guild_id ?? guild?.id,
   }
 
-  const type = GuildChannelTypeMap[_channel.type]
+  const type = ChannelTypeMap[_channel.type]
   if (!type) return
 
   const createdAt = dateFromSnowflake(_channel.id)
@@ -92,10 +85,9 @@ export function mapGuildChannel(channel: DiscordGuildChannel, guild?: DiscordGui
   }
 }
 
-export function mapGuildChannels(guild: DiscordGuild): TextsThread[] {
-  // console.log(guild)
+export function mapGuildChannels(guild: DiscordTypes.Guild): TextsTypes._Thread[] {
   const channels = guild.channels
     .map(channel => mapGuildChannel(channel, guild))
-    .filter(c => c?.id) as TextsThread[]
+    .filter(c => !!c?.id) as TextsTypes.Thread[]
   return channels
 }

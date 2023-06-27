@@ -2,7 +2,7 @@ import { Guild, User } from '@/types/Discord'
 import { Partial } from '@/types/Discord/util'
 
 enum SessionType {
-  Normal = 'normal',
+  NORMAL = 'normal',
 }
 
 type ReadState = {

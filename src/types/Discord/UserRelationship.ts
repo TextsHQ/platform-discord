@@ -9,5 +9,5 @@ export interface UserRelationship {
 }
 
 export enum UserRelationshipType {
-  Friends = 1,
+  FRIENDS = 1,
 }
