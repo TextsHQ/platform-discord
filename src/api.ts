@@ -1,204 +1,253 @@
-import { PlatformAPI, OnServerEventCallback, LoginResult, Paginated, Message, MessageContent, PaginationArg, ActivityType, MessageSendOptions, texts, LoginCreds, Thread, ServerEventType, NotificationsInfo, SerializedSession, ClientContext } from '@textshq/platform-sdk'
-import { mapUser } from './mappers/mappers'
+/* eslint-disable class-methods-use-this */
+import { readFile } from 'fs/promises'
+import { homedir } from 'os'
+import { resolve } from 'path'
+import {
+  texts,
+  PlatformAPI,
+  SerializedSession,
+  ClientContext,
+  CurrentUser,
+  LoginResult,
+  LoginCreds,
+  OnServerEventCallback,
+  Paginated,
+  PaginationArg,
+  Thread,
+  ThreadID,
+  ThreadFolderName,
+  Message,
+  MessageID,
+  ActivityType,
+  OnConnStateChangeCallback,
+  OnLoginEventCallback,
+  MessageContent,
+  MessageSendOptions,
+} from '@textshq/platform-sdk'
+
+import { LOG_PREFIX } from '.'
 import DiscordNetworkAPI from './network-api'
-import { getDataURI } from './util'
+import { PLATFORM_NAME, Preferences } from './info'
 
-const POLLING_INTERVAL = 10_000
-const LOG_PREFIX = '[discord]'
+interface TextsDiscordSettings {
+  custom_channels?: { id: string, name?: string }[]
+}
 
-export default class Discord implements PlatformAPI {
+class DiscordPlatformAPI implements PlatformAPI {
+  // Current account ID
   private accountID?: string
 
-  private api = new DiscordNetworkAPI()
+  // Discord API helper
+  private discordAPI = new DiscordNetworkAPI()
 
-  private pollingInterval?: NodeJS.Timeout
+  // private onServerEventCallback?: OnServerEventCallback
 
-  // private connCallback: OnConnStateChangeCallback = () => {}
+  private onLoginEventCallback?: OnLoginEventCallback
 
-  // private connState: ConnectionState = { status: ConnectionStatus.UNKNOWN }
+  private onConnStateChangeCallback?: OnConnStateChangeCallback
 
-  private async afterAuth() {
-    const res = await this.api.getMe()
-    const currentUser = mapUser(res!.json)
-    this.api.currentUser = currentUser
-    this.api.usernameIDMap.set(currentUser.username!, currentUser.id)
-    this.api.startPolling = this.startPolling
-    await this.api.getUserFriends()
+  init = async (session: SerializedSession, context: ClientContext, prefs?: Preferences): Promise<void> => {
+    const accountID = context?.accountID
+
+    texts.log(LOG_PREFIX, accountID, 'Hello, world!')
+
+    this.accountID = accountID
+    this.discordAPI.accountID = accountID
+
+    this.discordAPI.config.enableGuilds = prefs?.enable_guilds === true
+
+    await this.readTextsConfig()
+
+    if (session) {
+      await this._login(session)
+    } else {
+      texts.log(LOG_PREFIX, 'No `session`!')
+    }
   }
 
-  init = async (session: SerializedSession, context: ClientContext, prefs?: Record<string, boolean | string>) => {
-    this.accountID = context?.accountID
-    this.api.accountID = this.accountID
+  /** `dispose` disconnects all network connections and cleans up. Called when user disables account and when app exits. */
+  dispose = async () => {
+    texts.log(LOG_PREFIX, this.accountID, 'Disposing')
 
-    texts.log(LOG_PREFIX, 'Hello, world!')
-    if (!session) return
-
-    await this.api.login(session)
-    await this.afterAuth()
+    // if (this.pollingInterval) this.stopPolling(false)
+    // this.api.disconnect()
   }
 
-  dispose = () => {
-    texts.log(LOG_PREFIX, 'Disposing')
-    if (this.pollingInterval) this.stopPolling(false)
-    this.api.disconnect()
+  /*
+  TODO: Return emotes, nitro status etc.
+  getPlatformInfo = async (): Promise<Partial<OverridablePlatformInfo>> => {
+  }
+  */
+
+  subscribeToEvents = (onEvent: OnServerEventCallback) => {
+    this.discordAPI.eventCallback = onEvent
+
+    const eventCallbacks = this.discordAPI.pendingEventsQueue
+    if (eventCallbacks.length > 0) onEvent(eventCallbacks)
+
+    this.discordAPI.pendingEventsQueue.length = 0
   }
 
-  getCurrentUser = () => this.api.currentUser!
+  onLoginEvent = (onEvent: OnLoginEventCallback) => {
+    this.onLoginEventCallback = onEvent
+  }
+
+  onConnectionStateChange = (onEvent: OnConnStateChangeCallback) => {
+    this.onConnStateChangeCallback = onEvent
+  }
+
+  getCurrentUser = async (): Promise<CurrentUser> => {
+    const user = await this.discordAPI.getCurrentUser()
+    if (!user) throw new Error('Failed to get current user!')
+    return user
+  }
 
   login = async (creds?: LoginCreds): Promise<LoginResult> => {
     if (!creds || !('jsCodeResult' in creds) || !creds.jsCodeResult) return { type: 'error', errorMessage: 'Token was empty' }
-    await this.api.login(creds.jsCodeResult)
-    await this.afterAuth()
-    return { type: 'success' }
+    return this._login(creds.jsCodeResult)
   }
 
-  logout = () =>
-    (this.pushToken
-      ? this.api.logout('gcm', this.pushToken)
-      : this.api.logout())
+  /** `logout` logs out the user from the platform's servers, session should no longer be valid. Called when user clicks logout. */
+  // logout?: () => Awaitable<void>
 
-  serializeSession = () => this.api.token
+  serializeSession = async (): Promise<SerializedSession> => this.discordAPI.token
 
-  subscribeToEvents = (onEvent: OnServerEventCallback) => {
-    this.api.eventCallback = onEvent
-    if (this.api.pendingEventsQueue.length > 0) onEvent(this.api.pendingEventsQueue)
-    this.api.pendingEventsQueue.length = 0
-  }
+  // searchUsers?: (typed: string) => Awaitable<User[]>
 
-  searchUsers = (typed: string) => {
-    const typedLower = typed.toLowerCase()
-    return typedLower
-      ? this.api.userFriends.filter(u => u.fullName?.toLowerCase().includes(typedLower) || u.username?.toLowerCase().includes(typedLower))
-      : this.api.userFriends
-  }
+  // searchThreads?: (typed: string) => Awaitable<Thread[]>
 
-  /* searchMessages = (typed: string, pagination?: PaginationArg, threadID?: string) => {
-    if (!threadID) return { items: [], hasMore: false }
-    const typedLower = typed.toLowerCase()
-    return this.api.searchMessages(typedLower, threadID, pagination)
-  } */
+  // searchMessages?: (typed: string, pagination?: PaginationArg, options?: SearchMessageOptions) => Awaitable<Paginated<Message>>
 
-  getPresence = () => this.api.getUsersPresence()
+  getPresence = () => this.discordAPI.usersPresence
 
-  getThreads = (folderName: string, pagination?: PaginationArg) => this.api.getThreads(folderName, pagination)
+  // getCustomEmojis?: () => Awaitable<CustomEmojiMap>
 
-  getMessages = async (threadID: string, pagination?: PaginationArg): Promise<Paginated<Message>> => {
-    const items = await this.api.getMessages(threadID, pagination)
-    return { items, hasMore: items.length > 0 }
-  }
+  getThreads = async (folderName: ThreadFolderName, pagination?: PaginationArg): Promise<Paginated<Thread>> =>
+    this.discordAPI.getThreads(folderName, pagination)
 
-  createThread = (userIDs: string[], title?: string) => this.api.createThread(userIDs, title)
+  /** Messages should be sorted by timestamp asc → desc */
+  getMessages = async (threadID: ThreadID, pagination?: PaginationArg): Promise<Paginated<Message>> =>
+    this.discordAPI.getMessages(threadID, pagination)
 
-  updateThread = (threadID: string, updates: Partial<Thread>) => {
-    if ('title' in updates) return this.api.patchChannel(threadID, { name: updates.title })
-    if ('mutedUntil' in updates) return this.api.muteThread(threadID, updates.mutedUntil)
-  }
+  // getThreadParticipants?: (threadID: ThreadID, pagination?: PaginationArg) => Awaitable<Paginated<Participant>>
 
-  changeThreadImage = async (threadID: string, imageBuffer: Buffer, mimeType: string) => {
-    await this.api.patchChannel(threadID, { icon: getDataURI(imageBuffer, mimeType) })
-  }
+  // getStickerPacks?: (pagination?: PaginationArg) => Awaitable<Paginated<StickerPack>>
 
-  deleteThread = (threadID: string) => this.api.closeThread(threadID)
+  // getStickers?: (stickerPackID: StickerPackID, pagination?: PaginationArg) => Awaitable<Paginated<Attachment>>
 
-  reportThread = (type: 'spam', threadID: string, firstMessageID?: string) =>
-    this.api.reportThread(threadID, firstMessageID)
+  // getThread?: (threadID: ThreadID) => Awaitable<Thread | undefined>
 
-  sendMessage = (threadID: string, content: MessageContent, options?: MessageSendOptions) =>
-    this.api.sendMessage(threadID, content, options)
+  // getMessage?: (threadID: ThreadID, messageID: MessageID) => Awaitable<Message | undefined>
 
-  editMessage = (threadID: string, messageID: string, content: MessageContent, options?: MessageSendOptions) =>
-    this.api.editMessage(threadID, messageID, content, options)
+  // getUser?: (ids: { userID: UserID } | { username: string } | { phoneNumber: PhoneNumber } | { email: string }) => Awaitable<User | undefined>
 
-  deleteMessage = (threadID: string, messageID: string, forEveryone?: boolean) =>
-    this.api.deleteMessage(threadID, messageID, forEveryone)
+  // createThread?: (userIDs: UserID[], title?: string, messageText?: string) => Awaitable<boolean | Thread>
 
-  addReaction = (threadID: string, messageID: string, reactionKey: string) =>
-    this.api.addReaction(threadID, messageID, reactionKey)
+  // updateThread?: (threadID: ThreadID, updates: Partial<Thread>) => Awaitable<void>
 
-  removeReaction = (threadID: string, messageID: string, reactionKey: string) =>
-    this.api.removeReaction(threadID, messageID, reactionKey)
+  // deleteThread?: (threadID: ThreadID) => Awaitable<void>
 
-  sendActivityIndicator = (type: ActivityType, threadID?: string) =>
-    this.api.setTyping(type, threadID)
+  // reportThread?: (type: 'spam', threadID: ThreadID, firstMessageID?: MessageID) => Awaitable<boolean>
 
-  sendReadReceipt = (threadID: string, messageID?: string) => {
-    if (!messageID) {
-      const ogThreadJSON = texts.getOriginalObject?.('discord', this.accountID!, ['thread', threadID])
-      if (!ogThreadJSON) return
-      const ogThread = JSON.parse(ogThreadJSON)
-      messageID = ogThread.last_message_id
+  sendMessage = async (threadID: ThreadID, content: MessageContent, options?: MessageSendOptions) => this.discordAPI.sendMessage(threadID, content, options)
+
+  // editMessage?: (threadID: ThreadID, messageID: MessageID, content: MessageContent, options?: MessageSendOptions) => Promise<boolean | Message[]>
+
+  // forwardMessage?: (threadID: ThreadID, messageID: MessageID, threadIDs?: ThreadID[], userIDs?: UserID[], opts?: { noAttribution?: boolean }) => Promise<void>
+
+  sendActivityIndicator = async (type: ActivityType, threadID?: ThreadID) => {
+    switch (type) {
+      case ActivityType.TYPING:
+        if (threadID) await this.discordAPI.sendTypingIndicator(threadID)
+        break
+      default:
+        break
     }
-    if (!messageID) {
-      texts.log(`Unable to find last_message_id for threadID: ${threadID}`)
-      return
-    }
-    return this.api.sendReadReceipt(threadID, messageID)
   }
 
-  onThreadSelected = (threadID?: string) => this.api.onThreadSelected(threadID)
+  deleteMessage = async (threadID: ThreadID, messageID: MessageID, forEveryone?: boolean) => this.discordAPI.deleteMessage(threadID, messageID)
 
-  // onConnectionStateChange = (onEvent: OnConnStateChangeCallback) => {
-  //   this.connCallback = onEvent
-  // }
+  sendReadReceipt = async (threadID: ThreadID, messageID?: MessageID, messageCursor?: string) => this.discordAPI.sendReadReceipt(threadID, messageID, messageCursor)
 
-  reconnectRealtime = async () => {
-    texts.log(`${LOG_PREFIX} reconnectRealtime`)
-    await this.api.connect(true, true)
-    if (this.api.lastFocusedThread) this.api.eventCallback?.([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: this.api.lastFocusedThread }])
-  }
+  // addReaction?: (threadID: ThreadID, messageID: MessageID, reactionKey: string) => Awaitable<void>
 
-  startPolling = async () => {
-    texts.log(`${LOG_PREFIX} Starting polling, interval: ${POLLING_INTERVAL}`)
-    this.api.setGatewayShouldResume(true)
+  // removeReaction?: (threadID: ThreadID, messageID: MessageID, reactionKey: string) => Awaitable<void>
 
-    const action = async (): Promise<boolean> => {
-      texts.log(`${LOG_PREFIX} Polling...`)
-      try {
-        const user = await this.api.getMe()
-        if (user) {
-          texts.log(`${LOG_PREFIX} Poll successful!`)
-          await this.stopPolling(true)
-          return true
-        }
-      } catch (error) {
-        texts.log(`${LOG_PREFIX} Poll failed!`, error)
+  // getLinkPreview?: (link: string) => Awaitable<MessageLink | undefined>
+
+  // addParticipant?: (threadID: ThreadID, participantID: UserID) => Awaitable<void>
+
+  // removeParticipant?: (threadID: ThreadID, participantID: UserID) => Awaitable<void>
+
+  // changeParticipantRole?: (threadID: ThreadID, participantID: UserID, role: 'admin' | 'regular') => Awaitable<void>
+
+  // changeThreadImage?: (threadID: ThreadID, imageBuffer: Buffer, mimeType: string) => Awaitable<void>
+
+  // markAsUnread?: (threadID: ThreadID, messageID?: MessageID) => Awaitable<void>
+
+  // archiveThread?: (threadID: ThreadID, archived: boolean) => Awaitable<void>
+
+  // pinThread?: (threadID: ThreadID, pinned: boolean) => Awaitable<void>
+
+  // notifyAnyway?: (threadID: ThreadID) => Awaitable<void>
+
+  /** called by the client when an attachment (video/audio/image) is marked as played by user */
+  // markAttachmentPlayed?: (attachmentID: AttachmentID, messageID?: MessageID) => Awaitable<void>
+
+  onThreadSelected = async (threadID: ThreadID) => this.discordAPI.onThreadSelected(threadID)
+
+  // loadDynamicMessage?: (message: Message) => Awaitable<Partial<Message>>
+
+  // registerForPushNotifications?: (type: keyof NotificationsInfo, token: string) => Awaitable<void>
+
+  // unregisterForPushNotifications?: (type: keyof NotificationsInfo, token: string) => Awaitable<void>
+
+  // getAsset?: (fetchOptions?: GetAssetOptions, ...args: string[]) => Awaitable<FetchURL | FetchInfo | Buffer | Readable | Asset>
+
+  /** `getAssetInfo` must be implemented if getAsset supports fetchOptions.range */
+  // getAssetInfo?: (fetchOptions?: GetAssetOptions, ...args: string[]) => Awaitable<AssetInfo>
+
+  /** `getOriginalObject` returns the JSON representation of the original thread or message */
+  // getOriginalObject?: (objName: 'thread' | 'message', objectID: ThreadID | MessageID) => Awaitable<string>
+
+  // handleDeepLink?: (link: string) => void
+
+  /** reconnect any websocket, mqtt or network connections since client thinks it's likely to have broken */
+  // reconnectRealtime?: () => void
+
+  private _login = async (token: string): Promise<LoginResult> => {
+    try {
+      texts.log(LOG_PREFIX, this.accountID, 'Logging in with token...')
+      await this.discordAPI.login(token)
+
+      const currentUser = await this.discordAPI.getCurrentUser()
+      if (!currentUser) throw new Error('Failed to get current user!')
+
+      return { type: 'success' }
+    } catch (err) {
+      texts.log(LOG_PREFIX, this.accountID, 'Failed login!', err)
+      return {
+        type: 'error',
+        errorMessage: `${err}`,
       }
-      return false
-    }
-    const success = await action()
-    if (!success) {
-      clearInterval(this.pollingInterval!)
-      this.pollingInterval = setInterval(action, POLLING_INTERVAL)
     }
   }
 
-  stopPolling = async (success: boolean) => {
-    texts.log(`${LOG_PREFIX} Stopping polling`)
+  private readTextsConfig = async () => {
+    try {
+      const configPath = resolve(homedir(), '.texts-conf.json')
+      const configContent = await readFile(configPath)
+      const config = JSON.parse(configContent.toString())
+      if (config[PLATFORM_NAME]) {
+        const settings = config[PLATFORM_NAME] as TextsDiscordSettings
+        console.log(LOG_PREFIX, 'Custom settings:', settings)
 
-    if (this.pollingInterval != null) clearInterval(this.pollingInterval)
-    this.pollingInterval = undefined
-
-    if (success) {
-      await this.api.connect(true, true)
-      if (this.api.lastFocusedThread) this.api.eventCallback?.([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: this.api.lastFocusedThread }])
+        this.discordAPI.config.customChannels = settings.custom_channels
+      }
+    } catch (err) {
+      console.log(LOG_PREFIX, 'Failed to read custom settings:', err)
     }
   }
-
-  private pushToken: string | undefined
-
-  registerForPushNotifications = async (type: keyof NotificationsInfo, token: string) => {
-    if (type !== 'android') throw Error('invalid type')
-    // TODO: persist to session
-    this.pushToken = token
-    await this.api.createDevice(token)
-  }
-
-  unregisterForPushNotifications = async (type: keyof NotificationsInfo, token: string) => {
-    // TODO: persist to session
-    this.pushToken = token
-  }
-
-  addParticipant = (threadID: string, participantID: string) => this.api.modifyParticipant(threadID, participantID)
-
-  removeParticipant = (threadID: string, participantID: string) => this.api.modifyParticipant(threadID, participantID, true)
 }
+
+export default DiscordPlatformAPI

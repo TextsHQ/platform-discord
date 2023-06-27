@@ -1,9 +1,16 @@
 import { PlatformInfo, MessageDeletionMode, Attribute } from '@textshq/platform-sdk'
-import { generateSnowflake } from './common-util'
+import { generateSnowflake } from './util/Discord'
+
+export const PLATFORM_NAME = 'discord'
+
+export interface Preferences {
+  enable_guilds?: boolean
+  custom_channel_ids?: string
+}
 
 const info: PlatformInfo = {
-  name: 'discord',
-  version: '2021.08.01',
+  name: PLATFORM_NAME,
+  version: '2023.07.19',
   displayName: 'Discord',
   icon: `
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -18,7 +25,7 @@ const info: PlatformInfo = {
     windowHeight: 650,
     runJSOnClose: 'token',
     runJSOnLaunch: `
-      let token = ""
+      let token
       const iframe = document.createElement('iframe')
       document.head.append(iframe)
       const i = setInterval(() => {
@@ -40,27 +47,33 @@ const info: PlatformInfo = {
   attributes: new Set([
     Attribute.CAN_MESSAGE_USERNAME,
     Attribute.CANNOT_MESSAGE_SELF,
+    Attribute.SEARCH_ALL_USERS_FOR_GROUP_MENTIONS,
+    // Attribute.SORT_MESSAGES_ON_PUSH,
+    Attribute.SUBSCRIBE_TO_CONN_STATE_CHANGE,
+    Attribute.SUBSCRIBE_TO_THREAD_SELECTION,
+    Attribute.SUBSCRIBE_TO_ONLINE_OFFLINE_ACTIVITY,
+    Attribute.SUPPORTS_ARCHIVE,
+    Attribute.SUPPORTS_CUSTOM_EMOJIS,
+    Attribute.SUPPORTS_DELETE_THREAD,
+    Attribute.SUPPORTS_REPORT_THREAD,
+    Attribute.SUPPORTS_EDIT_MESSAGE,
+    // Attribute.SUPPORTS_GROUP_IMAGE_CHANGE,
+    // Attribute.SUPPORTS_GROUP_PARTICIPANT_ROLE_CHANGE,
     Attribute.SUPPORTS_PRESENCE,
     Attribute.SUPPORTS_QUOTED_MESSAGES,
-    Attribute.SUPPORTS_GROUP_IMAGE_CHANGE,
-    Attribute.SUPPORTS_EDIT_MESSAGE,
-    Attribute.SUPPORTS_CUSTOM_EMOJIS,
-    Attribute.SUPPORTS_REPORT_THREAD,
-    Attribute.SUPPORTS_DELETE_THREAD,
+    // Attribute.SUPPORTS_REQUESTS_INBOX,
     Attribute.SUPPORTS_STOP_TYPING_INDICATOR,
-    // Attribute.SUPPORTS_SEARCH,
-    Attribute.SUPPORTS_PUSH_NOTIFICATIONS,
-    Attribute.SUBSCRIBE_TO_THREAD_SELECTION,
-    Attribute.SUBSCRIBE_TO_CONN_STATE_CHANGE,
-    Attribute.SUBSCRIBE_TO_ONLINE_OFFLINE_ACTIVITY,
+    // Attribute.SUPPORTS_PUSH_NOTIFICATIONS,
+    // Attribute.GET_MESSAGES_SUPPORTS_AFTER_DIRECTION,
+    // Attribute.CAN_FETCH_LINK_PREVIEW,
+    // Attribute.CAN_REMOVE_LINK_PREVIEW,
   ]),
   attachments: {
     recordedAudioMimeType: 'audio/ogg',
     gifMimeType: 'image/gif',
     supportsCaption: true,
     maxSize: {
-      // todo: conditionally change for nitro and non-nitro users with platform info override
-      // Discord Nitro: "Upload what you want with increased 100MB upload size."
+      // TODO: conditionally change for nitro and non-nitro users with platform info override
       image: 100 * 1024 * 1024,
       video: 100 * 1024 * 1024,
       audio: 100 * 1024 * 1024,
@@ -74,13 +87,19 @@ const info: PlatformInfo = {
   },
   maxGroupTitleLength: 100,
   generateUniqueMessageID: () => generateSnowflake().toString(),
-  // prefs: {
-  //   enable_guilds: {
-  //     label: 'Enable guilds',
-  //     type: 'checkbox',
-  //     default: false,
-  //   },
-  // },
+  prefs: {
+    enable_guilds: {
+      label: 'Enable guilds',
+      description: 'Risky - we do not take responsibility for banned accounts.',
+      type: 'checkbox',
+      default: false,
+    },
+    // custom_channel_ids: {
+    //   label: 'Custom channel IDs',
+    //   type: 'select',
+    //   default: '',
+    // },
+  },
 }
 
 export default info

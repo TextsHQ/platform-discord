@@ -1,0 +1,16 @@
+{
+  "extends": "@textshq",
+  "rules": {
+    "global-require": "off",
+    "arrow-body-style": "off",
+    "vars-on-top": "off",
+    "prefer-destructuring": "off",
+    "no-nested-ternary": "off",
+    "no-else-return": "off",
+    "no-param-reassign": "off",
+    "import/extensions": "off"
+  },
+  "parserOptions": {
+    "project": "./tsconfig.json"
+  }
+}
