@@ -238,8 +238,36 @@ export function mapSpecialMessage(message: DiscordTypes.Message): Partial<TextsT
   }
 }
 
-export function mapMessage(message: DiscordMessage): TextsMessage {
-  const mappedSpecialMessage = message.type !== DiscordMessageType.Default ? mapSpecialMessage(message) : undefined
+export function mapMessageEmbeds(messageEmbeds: DiscordTypes.MessageEmbed[]): Partial<TextsTypes.Message> | undefined {
+  if (messageEmbeds.length === 0) return
+
+  // TODO: Map other things
+
+  const links: TextsTypes.Message['links'] = messageEmbeds
+    .map(e => {
+      const media = e.image ?? e.thumbnail
+      const imgSize = media?.width && media.height ? { width: media.width, height: media.height } : undefined
+
+      return {
+        url: e.url,
+        img: media?.proxy_url ?? media?.url,
+        imgSize,
+        title: e.title,
+        summary: e.description,
+      }
+    })
+
+  return {
+    // attachments?: Attachment[];
+    // tweets?: Tweet[];
+    links,
+    // buttons?: MessageButton[];
+  }
+}
+
+export function mapMessage(message: DiscordTypes.Message): TextsTypes.Message {
+  const mappedSpecialMessage = mapSpecialMessage(message)
+  const mappedEmbeds = message.embeds ? mapMessageEmbeds(message.embeds) : undefined
 
   return {
     _original: JSON.stringify(message),
@@ -253,9 +281,8 @@ export function mapMessage(message: DiscordMessage): TextsMessage {
     // textFooter?: string;
     // attachments?: Attachment[];
     // tweets?: Tweet[];
-    // links?: MessageLink[];
     // iframeURL?: string;
-    // reactions?: MessageReaction[];
+    reactions: message.reactions ? message.reactions.map(mapReaction) : undefined,
     linkedMessageThreadID: message.message_reference?.channel_id ?? message.referenced_message?.channel_id,
     linkedMessageID: message.message_reference?.message_id ?? message.referenced_message?.id,
     linkedMessage: message.referenced_message ? {
@@ -272,6 +299,7 @@ export function mapMessage(message: DiscordMessage): TextsMessage {
     threadID: message.channel_id,
     // sortKey?: string | number;
 
+    ...mappedEmbeds,
     ...mappedSpecialMessage,
   }
 }

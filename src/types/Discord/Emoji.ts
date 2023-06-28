@@ -1,10 +1,10 @@
-export interface CustomEmoji {
+export interface Emoji {
   // version: number
   // roles: any[]
-  require_colons: boolean
+  require_colons?: boolean
   name: string
   // managed: boolean
-  id: string
-  available: boolean
+  id?: string
+  available?: boolean
   animated: boolean
 }

@@ -1,4 +1,4 @@
-import { CustomEmoji } from './CustomEmoji'
+import { CustomEmoji } from './Emoji'
 import { GuildChannel } from './GuildChannel'
 
 export interface GuildRole {

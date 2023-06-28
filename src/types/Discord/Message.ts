@@ -1,4 +1,32 @@
+import { MessageReaction } from './MessageReaction'
 import { User } from './User'
+
+export enum MessageEmbedType {
+  RICH = 'rich',
+  ARTICLE = 'article',
+  IMAGE = 'image',
+  VIDEO = 'video',
+}
+
+export type MessageEmbedMedia = {
+  url: string
+  proxy_url?: string
+  width?: number
+  height?: number
+}
+
+export type MessageEmbed = {
+  type: MessageEmbedType
+  url: string
+  title: string
+  description?: string
+  provider?: {
+    name?: string
+  }
+  image?: MessageEmbedMedia
+  thumbnail?: MessageEmbedMedia
+  video?: MessageEmbedMedia
+}
 
 export enum MessageType {
   DEFAULT = 0,
@@ -41,7 +69,7 @@ export interface Message {
   channel_id: string
   author: User
   // attachments: []
-  // embeds: [],
+  embeds?: MessageEmbed[]
   mentions?: User[]
   // mention_roles: [],
   pinned: boolean
@@ -51,6 +79,7 @@ export interface Message {
   edited_timestamp?: string
   // flags: 0,
   // components: []
+  reactions?: MessageReaction[]
   message_reference?: {
     channel_id: string
     message_id: string
