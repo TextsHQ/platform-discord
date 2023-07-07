@@ -1,6 +1,6 @@
 import * as TextsTypes from '@/types/Texts'
 import * as DiscordTypes from '@/types/Discord'
-import { dateFromSnowflake, getChannelIconURL } from '@/util/Discord'
+import { URLs, dateFromSnowflake } from '@/util/Discord'
 import { mapUser } from '@/mappers/Discord'
 
 const ChannelTypeMap: { [key: string]: TextsTypes.ThreadType | undefined } = {
@@ -32,7 +32,7 @@ export function mapChannel(channel: DiscordTypes.Channel): TextsTypes._Thread | 
     isReadOnly: false,
     type,
     timestamp: channel.last_message_id ? dateFromSnowflake(channel.last_message_id) : createdAt,
-    imgURL: channel.icon ? getChannelIconURL(channel.id, channel.icon) : undefined,
+    imgURL: channel.icon ? URLs.getChannelIconURL(channel.id, channel.icon) : undefined,
     createdAt,
     partialLastMessage: {
       id: channel.last_message_id,

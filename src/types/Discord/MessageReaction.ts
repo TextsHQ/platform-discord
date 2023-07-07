@@ -1,4 +1,4 @@
-import { Emoji } from './Emoji'
+import { Emoji } from '@/types/Discord'
 
 export enum MessageReactionType {
   DEFAULT = 0,

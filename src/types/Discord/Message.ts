@@ -1,5 +1,15 @@
-import { MessageReaction } from './MessageReaction'
-import { User } from './User'
+import { MessageReaction, Sticker, User } from '@/types/Discord'
+
+export type MessageAttachment = {
+  id: string
+  filename: string
+  size: number
+  url: string
+  proxy_url?: string
+  width: number
+  height: number
+  content_type: string
+}
 
 export enum MessageEmbedType {
   RICH = 'rich',
@@ -20,12 +30,18 @@ export type MessageEmbed = {
   url: string
   title: string
   description?: string
+  timestamp?: string
   provider?: {
     name?: string
   }
   image?: MessageEmbedMedia
   thumbnail?: MessageEmbedMedia
   video?: MessageEmbedMedia
+  fields?: {
+    name: string
+    value: string
+    inline: boolean
+  }[]
 }
 
 export enum MessageType {
@@ -62,13 +78,13 @@ export enum MessageType {
   GUILD_APPLICATION_PREMIUM_SUBSCRIPTION = 32,
 }
 
-export interface Message {
+export type Message = {
   id: string
   type: MessageType
   content: string
   channel_id: string
   author: User
-  // attachments: []
+  attachments: MessageAttachment[]
   embeds?: MessageEmbed[]
   mentions?: User[]
   // mention_roles: [],
@@ -80,9 +96,11 @@ export interface Message {
   // flags: 0,
   // components: []
   reactions?: MessageReaction[]
+  sticker_items?: Sticker[]
   message_reference?: {
     channel_id: string
     message_id: string
   }
   referenced_message?: Message
+  nonce?: string
 }

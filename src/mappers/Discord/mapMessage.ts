@@ -2,6 +2,14 @@ import { DEBUG, LOG_PREFIX } from '@'
 import * as TextsTypes from '@/types/Texts'
 import * as DiscordTypes from '@/types/Discord'
 import { mapReaction } from './mapReaction'
+import { URLs } from '@/util'
+
+const AttachmentTypeMap: { [key: string]: TextsTypes.AttachmentType | undefined } = {
+  'image/png': TextsTypes.AttachmentType.IMG,
+  'image/jpeg': TextsTypes.AttachmentType.IMG,
+  'image/gif': TextsTypes.AttachmentType.IMG,
+  'video/quicktime': TextsTypes.AttachmentType.VIDEO,
+}
 
 export function mapSpecialMessage(message: DiscordTypes.Message): Partial<TextsTypes.Message> | undefined {
   switch (message.type) {
@@ -238,27 +246,59 @@ export function mapSpecialMessage(message: DiscordTypes.Message): Partial<TextsT
   }
 }
 
-export function mapMessageEmbeds(messageEmbeds: DiscordTypes.MessageEmbed[]): Partial<TextsTypes.Message> | undefined {
-  if (messageEmbeds.length === 0) return
-
+export function mapMessageEmbeds(message: DiscordTypes.Message): Partial<TextsTypes.Message> | undefined {
   // TODO: Map other things
 
-  const links: TextsTypes.Message['links'] = messageEmbeds
-    .map(e => {
-      const media = e.image ?? e.thumbnail
-      const imgSize = media?.width && media.height ? { width: media.width, height: media.height } : undefined
+  const stickers: TextsTypes.Message['attachments'] = message.sticker_items?.map(item => {
+    const isGif = item.format_type === DiscordTypes.StickerType.APNG
+      || item.format_type === DiscordTypes.StickerType.LOTTIE
+      || item.format_type === DiscordTypes.StickerType.GIF
 
-      return {
-        url: e.url,
-        img: media?.proxy_url ?? media?.url,
-        imgSize,
-        title: e.title,
-        summary: e.description,
-      }
-    })
+    return {
+      id: item.id,
+      type: TextsTypes.AttachmentType.IMG,
+      isGif,
+      isSticker: true,
+      srcURL: URLs.getStickerURL(item.id),
+    }
+  })
+
+  const attachments: TextsTypes.Message['attachments'] = message.attachments?.map(item => {
+    const size = item.width && item.height ? { width: item.width, height: item.height } : undefined
+    const type: TextsTypes.AttachmentType = AttachmentTypeMap[item.content_type] ?? TextsTypes.AttachmentType.UNKNOWN
+
+    return {
+      id: item.id,
+      type,
+      size,
+      posterImg: item.proxy_url,
+      mimeType: item.content_type,
+      fileName: item.filename,
+      fileSize: item.size,
+      isGif: item.content_type === 'image/gif',
+      // isVoiceNote?: boolean;
+      srcURL: item.url,
+    }
+  })
+
+  const links: TextsTypes.Message['links'] = message.embeds?.map(item => {
+    const media = item.image ?? item.thumbnail
+    const imgSize = media?.width && media?.height ? { width: media.width, height: media.height } : undefined
+
+    return {
+      url: item.url,
+      img: media?.proxy_url ?? media?.url,
+      imgSize,
+      title: item.title,
+      summary: item.description,
+    }
+  })
 
   return {
-    // attachments?: Attachment[];
+    attachments: [
+      ...attachments ?? [],
+      ...stickers ?? [],
+    ],
     // tweets?: Tweet[];
     links,
     // buttons?: MessageButton[];
@@ -267,7 +307,7 @@ export function mapMessageEmbeds(messageEmbeds: DiscordTypes.MessageEmbed[]): Pa
 
 export function mapMessage(message: DiscordTypes.Message): TextsTypes.Message {
   const mappedSpecialMessage = mapSpecialMessage(message)
-  const mappedEmbeds = message.embeds ? mapMessageEmbeds(message.embeds) : undefined
+  const mappedEmbeds = message.embeds ? mapMessageEmbeds(message) : undefined
 
   return {
     _original: JSON.stringify(message),
