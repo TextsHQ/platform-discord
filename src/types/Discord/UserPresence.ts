@@ -6,7 +6,7 @@ export enum UserPresenceStatus {
   OFFLINE = 'offline',
 }
 
-export interface UserPresenceActivity {
+export type UserPresenceActivity = {
   // type: 4,
   // timestamps: [Object],
   state: string
@@ -16,7 +16,7 @@ export interface UserPresenceActivity {
   created_at: number
 }
 
-export interface UserPresence {
+export type UserPresence = {
   // activities: []
   // broadcast?: any
   // client_status: {}

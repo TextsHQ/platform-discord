@@ -1,13 +1,13 @@
-import { User } from './User'
+import { User } from '@/types/Discord'
 
-export interface UserRelationship {
+export enum UserRelationshipType {
+  FRIENDS = 1,
+}
+
+export type UserRelationship = {
   id: string
   type: UserRelationshipType
   nickname?: string
   user: User
   // since: string
-}
-
-export enum UserRelationshipType {
-  FRIENDS = 1,
 }

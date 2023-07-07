@@ -1,4 +1,4 @@
-export interface Emoji {
+export type Emoji = {
   // version: number
   // roles: any[]
   require_colons?: boolean

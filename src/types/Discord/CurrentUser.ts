@@ -1,4 +1,4 @@
-export interface CurrentUser {
+export type CurrentUser = {
   id: string
   username: string
   global_name: string

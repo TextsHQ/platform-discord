@@ -1,4 +1,4 @@
-import { User } from './User'
+import { User } from '@/types/Discord'
 
 export enum ChannelType {
   GUILD_TEXT = 0, // a text channel within a server
@@ -15,7 +15,7 @@ export enum ChannelType {
   GUILD_FORUM = 15, // Channel that can only contain threads
 }
 
-export interface Channel {
+export type Channel = {
   id: string
   type: ChannelType
   last_message_id?: string

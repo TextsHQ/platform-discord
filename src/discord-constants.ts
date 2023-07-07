@@ -20,3 +20,7 @@ export const SUPER_PROPERTIES = {
   client_build_number: 206632,
   client_event_source: null,
 }
+
+export const REGEX_USERID = /<(?:@(!?))(\d+)>/gi
+export const REGEX_USERNAME = /@([a-z0-9._]{2,32})/g
+export const REGEX_EMOTE = /^(a?):([A-Za-z0-9_]+):(\d+)$/gi

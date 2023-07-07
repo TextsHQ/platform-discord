@@ -28,7 +28,7 @@ interface DiscordNetworkAPIConfig {
 
 class DiscordNetworkAPI {
   // HTTP client
-  private httpClient = Texts.texts.createHttpClient!()
+  private readonly httpClient = Texts.texts.createHttpClient!()
 
   // Discord Gateway client
   private gatewayClient?: Gateway.GatewayClient
@@ -38,6 +38,8 @@ class DiscordNetworkAPI {
   private mutedThreads: Map<TextsTypes.Thread['id'], TextsTypes.Thread['mutedUntil']> = new Map()
 
   private guildThreads: Map<TextsTypes.Thread['id'], TextsTypes.Thread> = new Map()
+
+  private readonly sentMessagesNonces: Set<string> = new Set()
 
   private analytics: { token?: string, deviceFingerprint?: string } = {}
 
@@ -152,12 +154,14 @@ class DiscordNetworkAPI {
     const items: TextsTypes.Thread[] = [...threads, ...this.guildThreads.values()]
       .map(c => ({
         ...c,
-        isUnread: this.unreadThreads.has(c.id),
-        mutedUntil: this.mutedThreads.get(c.id),
+        isUnread: this.unreadThreads?.has(c.id) ?? false,
+        mutedUntil: this.mutedThreads?.get(c.id),
       }))
       .sort((a, b) => (a.timestamp?.getTime() ?? 0) - (b.timestamp?.getTime() ?? 0))
 
     return { items, hasMore: false }
+
+    // return { items: [...this.threads?.values() ?? []], hasMore: !this.threads }
   }
 
   updateThread = async (threadID: Texts.ThreadID, updates: Partial<TextsTypes.Thread>) => {
@@ -194,7 +198,7 @@ class DiscordNetworkAPI {
     const paginationQuery = options.before ? `before=${options.before}` : options.after ? `after=${options.after}` : ''
     const url = `channels/${threadID}/messages?limit=${messagesCountLimit}&${paginationQuery}`
 
-    const res = await this.fetch<DiscordAPI.Channels.Thread.Messages.Response>(url, { method: 'GET', checkError: true })
+    const res = await this.fetch<DiscordAPI.Channels.Thread.Messages.Response.GET>(url, { method: 'GET', checkError: true })
     if (!res?.json) {
       throw new Error(`Failed to get messages: ${res?.statusCode}`)
     }
@@ -240,10 +244,139 @@ class DiscordNetworkAPI {
     */
   }
 
-  // eslint-disable-next-line class-methods-use-this
   sendMessage = async (threadID: Texts.ThreadID, content: Texts.MessageContent, options?: Texts.MessageSendOptions): Promise<boolean | TextsTypes.Message[]> => {
-    console.log('sendMessage', threadID, content, options)
-    return false
+    // TODO: Parsing mentions & emotes
+
+    const nonce = options?.pendingMessageID?.includes('-') ? Util.generateSnowflake().toString() : options?.pendingMessageID as string
+    this.sentMessagesNonces.add(nonce)
+
+    // const text = content.text ? this.mapMentionsAndEmojis(content.text) : undefined
+    const text = content.text
+
+    // fetch('https://discord-attachments-uploads-prd.storage.googleapis.com/333aa876-a817-4662-97b2-727390927197/dasdas_r.png?upload_id=ADPycdtx8eJYBka_bZuLL6xYtYz1xZZdVIPYL0-JAS10UkQozavBLsYYSeZF4o6c970TPmNwnXfzMqiR21tPyzROlXYp5PD0FKzP', {
+    //   cache: 'default',
+    //   credentials: 'omit',
+    //   headers: {
+    //     Accept: '*/*',
+    //     'Accept-Language': 'pl-PL,pl;q=0.9',
+    //     'Content-Type': 'image/png',
+    //     Priority: 'u=3, i',
+    //     'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15',
+    //   },
+    //   method: 'PUT',
+    //   mode: 'cors',
+    //   redirect: 'follow',
+    //   referrer: 'https://discord.com/',
+    //   referrerPolicy: 'strict-origin-when-cross-origin',
+    // })
+
+    const json = {
+      content: text ?? '',
+      nonce,
+      message_reference: options?.quotedMessageID ? { message_id: options?.quotedMessageID } : undefined,
+      // channel_id: threadID,
+      // type: 0,
+      // sticker_ids: [],
+      // tts: false,
+      // flags: 0,
+      // attachments: [
+      //   {
+      //     id: '0',
+      //     filename: 'dasdas_r.png',
+      //     uploaded_filename: 'b4ae4c4e-395d-40c0-a91a-d3e4ab13fb0f/dasdas_r.png',
+      //   },
+      //   {
+      //     id: '1',
+      //     filename: 'dasdas_r.png',
+      //     uploaded_filename: 'b4ae4c4e-395d-40c0-a91a-d3e4ab13fb0f/dasdas_r.png',
+      //   },
+      // ],
+    }
+
+    try {
+      const res = await this.fetch<DiscordAPI.Channels.Thread.Messages.Response.POST>(`channels/${threadID}/messages`, {
+        method: 'POST',
+        // headers,
+        json,
+        // body,
+        checkError: true,
+      })
+
+      if (!res?.json) {
+        this.sentMessagesNonces.delete(nonce)
+        throw new Error(`Failed to send message: ${res?.statusCode}`)
+      }
+
+      const mapped = DiscordMappers.mapMessage(res.json)
+      return [{
+        ...mapped,
+        isSender: res.json.author.id === this.currentUser?.id,
+        accountID: this.accountID,
+      }]
+    } catch (error) {
+      this.sentMessagesNonces.delete(nonce)
+      throw error
+    }
+
+    /*
+    let headers: { [key: string]: string } = {}
+    let json: { [key: string]: any } | undefined
+    let body: any | undefined
+
+    if (content.fileBuffer || content.filePath) {
+      const form = new FormData()
+      if (content.fileBuffer) {
+        form.append('file', content.fileBuffer, {
+          filename: content.fileName,
+          knownLength: content.fileBuffer?.length,
+        })
+      } else if (content.filePath) {
+        form.append('file', await fs.readFile(content.filePath), { filename: content.fileName || path.basename(content.filePath) })
+      }
+
+      const payload_json = {
+        content: text || '',
+        message_reference,
+        nonce,
+      }
+      form.append('payload_json', JSON.stringify(payload_json))
+
+      headers = form.getHeaders()
+      body = form
+    } else {
+      headers = { 'Content-Type': 'application/json' }
+      json = {
+        content: text,
+        nonce,
+        message_reference,
+      }
+    }
+
+    try {
+      const res = await this.fetch<DiscordAPI.Channels.Thread.Messages.Response.POST>(`channels/${threadID}/messages`, {
+        method: 'POST',
+        headers,
+        json,
+        body,
+        checkError: true,
+      })
+
+      if (!res?.json) {
+        this.sentMessagesNonces.delete(nonce)
+        throw new Error(`Failed to send message: ${res?.statusCode}`)
+      }
+
+      const mapped = DiscordMappers.mapMessage(res.json)
+      return [{
+        ...mapped,
+        isSender: res.json.author.id === this.currentUser?.id,
+        accountID: this.accountID,
+      }]
+    } catch (error) {
+      this.sentMessagesNonces.delete(nonce)
+      throw error
+    }
+    */
   }
 
   // Delete message with specified id in specified thread.
@@ -405,14 +538,15 @@ class DiscordNetworkAPI {
           this.gatewayClient.url = _d.resume_gateway_url
         }
 
+        // const allThreads = _d.private_channels.map(DiscordMappers.mapPrivateChannel)
         if (this.config.enableGuilds) {
           const guildThreads = _d.guilds
             .flatMap(guild => {
               const channels = DiscordMappers.mapGuildChannels(guild)
                 .map(channel => ({
                   ...channel,
-                  isUnread: this.unreadThreads.has(channel.id),
-                  mutedUntil: this.mutedThreads.get(channel.id),
+                  isUnread: this.unreadThreads?.has(channel.id),
+                  mutedUntil: this.mutedThreads?.get(channel.id),
                 }))
               return channels
             })
@@ -438,34 +572,56 @@ class DiscordNetworkAPI {
             return guildMutedChannels
           })
         this.mutedThreads = new Map(mutedChannels.map(c => [c.id, c.mutedUntil]))
-        const mutedChannelsEvents: Texts.UpdateStateSyncEvent[] = mutedChannels.map(entry => ({
+        // const mutedChannelsEvents: Texts.UpdateStateSyncEvent[] = mutedChannels.map(entry => ({
+        //   type: Texts.ServerEventType.STATE_SYNC,
+        //   mutationType: 'update',
+        //   objectName: 'thread',
+        //   objectIDs: {},
+        //   entries: [
+        //     { id: entry.id, mutedUntil: entry.mutedUntil },
+        //   ],
+        // }))
+        // allServerEvents.push(...mutedChannelsEvents)
+        const mutedChannelsEvent: Texts.UpdateStateSyncEvent = {
           type: Texts.ServerEventType.STATE_SYNC,
           mutationType: 'update',
           objectName: 'thread',
           objectIDs: {},
-          entries: [
-            { id: entry.id, mutedUntil: entry.mutedUntil },
-          ],
-        }))
-        allServerEvents.push(...mutedChannelsEvents)
+          entries: mutedChannels,
+        }
+        allServerEvents.push(mutedChannelsEvent)
 
         const unreadThreads = _d.read_state.entries
           .filter(entry => entry.mention_count > 0)
         this.unreadThreads = new Set(unreadThreads.map(entry => entry.id))
-        const readStatesEvents: Texts.UpdateStateSyncEvent[] = unreadThreads.map(entry => ({
+        // const readStatesEvents: Texts.UpdateStateSyncEvent[] = unreadThreads.map(entry => ({
+        //   type: Texts.ServerEventType.STATE_SYNC,
+        //   mutationType: 'update',
+        //   objectName: 'thread',
+        //   objectIDs: {},
+        //   entries: [
+        //     {
+        //       id: entry.id,
+        //       isUnread: entry.mention_count > 0,
+        //       partialLastMessage: { id: entry.last_message_id },
+        //     },
+        //   ],
+        // }))
+        // allServerEvents.push(...readStatesEvents)
+        const readStatesEvent: Texts.UpdateStateSyncEvent = {
           type: Texts.ServerEventType.STATE_SYNC,
           mutationType: 'update',
           objectName: 'thread',
           objectIDs: {},
-          entries: [
-            {
-              id: entry.id,
-              isUnread: entry.mention_count > 0,
-              partialLastMessage: { id: entry.last_message_id },
-            },
-          ],
-        }))
-        allServerEvents.push(...readStatesEvents)
+          entries: unreadThreads.map(entry => ({
+            id: entry.id,
+            isUnread: entry.mention_count > 0,
+            partialLastMessage: { id: entry.last_message_id },
+          })),
+        }
+        allServerEvents.push(readStatesEvent)
+
+        // TODO: Get nicknames from _d.relationships[].nickname
 
         this.eventCallback(allServerEvents)
 
@@ -697,18 +853,28 @@ class DiscordNetworkAPI {
       case Gateway.MessageType.MESSAGE_CREATE: {
         const _d = d as DiscordGatewayMessage.MessageCreate
 
-        const mapped: Texts.Message = {
-          ...DiscordMappers.mapMessage(_d),
-          isSender: _d.author.id === this.currentUser?.id,
-          accountID: this.accountID,
-        }
+        const allEvents: Texts.ServerEvent[] = []
 
-        const messageEvent: Texts.UpsertStateSyncEvent = {
-          type: Texts.ServerEventType.STATE_SYNC,
-          mutationType: 'upsert',
-          objectName: 'message',
-          objectIDs: { threadID: mapped.threadID },
-          entries: [mapped],
+        if (_d.nonce && this.sentMessagesNonces.has(_d.nonce)) {
+          this.sentMessagesNonces.delete(_d.nonce)
+        } else {
+          // only send upsert message if message was sent from another client/device
+          // this is to prevent 2 messages from showing for a split second in somecases
+          // (prevents sending ServerEvent before sendMessage() resolves)
+          const mapped: Texts.Message = {
+            ...DiscordMappers.mapMessage(_d),
+            isSender: _d.author.id === this.currentUser?.id,
+            accountID: this.accountID,
+          }
+
+          const messageEvent: Texts.UpsertStateSyncEvent = {
+            type: Texts.ServerEventType.STATE_SYNC,
+            mutationType: 'upsert',
+            objectName: 'message',
+            objectIDs: { threadID: mapped.threadID },
+            entries: [mapped],
+          }
+          allEvents.push(messageEvent)
         }
 
         const messageTypingEvent: Texts.UserActivityEvent = {
@@ -717,8 +883,8 @@ class DiscordNetworkAPI {
           threadID: _d.channel_id,
           participantID: _d.channel_id,
         }
+        allEvents.push(messageTypingEvent)
 
-        const allEvents: Texts.ServerEvent[] = [messageEvent, messageTypingEvent]
         this.eventCallback(allEvents)
 
         break
@@ -857,7 +1023,7 @@ class DiscordNetworkAPI {
         break
       }
       case Gateway.MessageType._SESSIONS_REPLACE: {
-        console.log(t, d)
+        // Doesn't interest us
         break
       }
     }

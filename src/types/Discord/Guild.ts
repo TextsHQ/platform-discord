@@ -1,5 +1,4 @@
-import { CustomEmoji } from './Emoji'
-import { GuildChannel } from './GuildChannel'
+import { Channel, Emoji } from '@/types/Discord'
 
 export interface GuildRole {
   // version: number
@@ -17,7 +16,7 @@ export interface GuildRole {
   // color: number
 }
 
-export interface Guild {
+export type Guild = {
   // guild_hashes: {
   //   version: 1,
   //   roles: [Object],
@@ -48,7 +47,7 @@ export interface Guild {
   // safety_alerts_channel_id?: string
   // nsfw: boolean
   // stage_instances: any[]
-  emojis: CustomEmoji[]
+  emojis: Emoji[]
   // home_header?: any
   // default_message_notifications: number
   // afk_channel_id?: string
@@ -61,7 +60,7 @@ export interface Guild {
   // splash?: any
   // region: string
   stickers: any[]
-  channels: GuildChannel[]
+  channels: Channel[]
   // incidents_data?: any
   // hub_type?: any
   // afk_timeout: number

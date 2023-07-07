@@ -1,6 +1,6 @@
 import { User, UserPresence } from '@/types/Discord'
 
-export interface GuildMember {
+export type GuildMember = {
   user: User
   roles: string[]
   presence: UserPresence

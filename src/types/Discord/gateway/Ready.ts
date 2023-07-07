@@ -1,4 +1,4 @@
-import { Guild, User } from '@/types/Discord'
+import { Guild, PrivateChannel, User, UserRelationship } from '@/types/Discord'
 import { Partial } from '@/types/Discord/util'
 
 enum SessionType {
@@ -38,7 +38,8 @@ export type Ready = {
   resume_gateway_url: string
   // relationships: any[]
   read_state: Partial<ReadState[]>
-  // private_channels: any[]
+  relationships: UserRelationship[]
+  private_channels: PrivateChannel[]
   merged_members: any[]
   session_id: string
   session_type: SessionType
