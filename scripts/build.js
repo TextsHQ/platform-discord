@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 const { build } = require('estrella')
-const watch = process.argv.includes("--watch")
+const watch = process.argv.includes('--watch')
 
 build({
   entry: './src/index.ts',

@@ -34,10 +34,8 @@ interface TextsDiscordSettings {
 }
 
 class DiscordPlatformAPI implements PlatformAPI {
-  // Current account ID
   private accountID?: string
 
-  // Discord API helper
   private discordAPI = new DiscordNetworkAPI()
 
   // private onServerEventCallback?: OnServerEventCallback

@@ -245,6 +245,7 @@ class DiscordNetworkAPI {
   }
 
   sendMessage = async (threadID: Texts.ThreadID, content: Texts.MessageContent, options?: Texts.MessageSendOptions): Promise<boolean | TextsTypes.Message[]> => {
+    // TODO: https://discord.com/developers/docs/reference#uploading-files
     // TODO: Parsing mentions & emotes
 
     const nonce = options?.pendingMessageID?.includes('-') ? Util.generateSnowflake().toString() : options?.pendingMessageID as string
