@@ -2,7 +2,7 @@ import zlib from 'zlib'
 import { texts } from '@textshq/platform-sdk'
 import type { Data as WSData } from 'ws'
 import type Erlpack from 'erlpack'
-import { DEBUG } from './preferences'
+import { DEBUG } from '.'
 
 let erlpack: typeof Erlpack | undefined
 try {

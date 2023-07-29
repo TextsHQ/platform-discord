@@ -3,7 +3,11 @@
   "compilerOptions": {
     "outDir": "./dist",
     "rootDir": "./src",
-    "strict": false, // remove
+    "paths": {
+      "@": ["./src"],
+      "@/*": ["./src/*"]
+    },
+    "esModuleInterop": true
   },
   "include": ["src"]
 }
