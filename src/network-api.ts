@@ -1,5 +1,8 @@
 import * as Texts from '@textshq/platform-sdk'
 import { ExpectedJSONGotHTMLError } from '@textshq/platform-sdk/dist/json'
+import FormData from 'form-data'
+import { readFile as fsReadFile } from 'fs/promises'
+import { basename as pathBasename } from 'path'
 
 import { DISCORD_API_ENDPOINT, DISCORD_API_VERSION, DISCORD_DEFAULT_GATEWAY, DISCORD_ENABLE_ANALYTICS, LOG_PREFIX } from '@'
 import { PLATFORM_NAME } from './info'
@@ -245,7 +248,6 @@ class DiscordNetworkAPI {
   }
 
   sendMessage = async (threadID: Texts.ThreadID, content: Texts.MessageContent, options?: Texts.MessageSendOptions): Promise<boolean | TextsTypes.Message[]> => {
-    // TODO: https://discord.com/developers/docs/reference#uploading-files
     // TODO: Parsing mentions & emotes
 
     const nonce = options?.pendingMessageID?.includes('-') ? Util.generateSnowflake().toString() : options?.pendingMessageID as string
@@ -254,117 +256,52 @@ class DiscordNetworkAPI {
     // const text = content.text ? this.mapMentionsAndEmojis(content.text) : undefined
     const text = content.text
 
-    // fetch('https://discord-attachments-uploads-prd.storage.googleapis.com/333aa876-a817-4662-97b2-727390927197/dasdas_r.png?upload_id=ADPycdtx8eJYBka_bZuLL6xYtYz1xZZdVIPYL0-JAS10UkQozavBLsYYSeZF4o6c970TPmNwnXfzMqiR21tPyzROlXYp5PD0FKzP', {
-    //   cache: 'default',
-    //   credentials: 'omit',
-    //   headers: {
-    //     Accept: '*/*',
-    //     'Accept-Language': 'pl-PL,pl;q=0.9',
-    //     'Content-Type': 'image/png',
-    //     Priority: 'u=3, i',
-    //     'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15',
-    //   },
-    //   method: 'PUT',
-    //   mode: 'cors',
-    //   redirect: 'follow',
-    //   referrer: 'https://discord.com/',
-    //   referrerPolicy: 'strict-origin-when-cross-origin',
-    // })
-
     const json = {
       content: text ?? '',
       nonce,
       message_reference: options?.quotedMessageID ? { message_id: options?.quotedMessageID } : undefined,
-      // channel_id: threadID,
-      // type: 0,
-      // sticker_ids: [],
-      // tts: false,
-      // flags: 0,
-      // attachments: [
-      //   {
-      //     id: '0',
-      //     filename: 'dasdas_r.png',
-      //     uploaded_filename: 'b4ae4c4e-395d-40c0-a91a-d3e4ab13fb0f/dasdas_r.png',
-      //   },
-      //   {
-      //     id: '1',
-      //     filename: 'dasdas_r.png',
-      //     uploaded_filename: 'b4ae4c4e-395d-40c0-a91a-d3e4ab13fb0f/dasdas_r.png',
-      //   },
-      // ],
     }
 
-    try {
-      const res = await this.fetch<DiscordAPI.Channels.Thread.Messages.Response.POST>(`channels/${threadID}/messages`, {
-        method: 'POST',
-        // headers,
-        json,
-        // body,
-        checkError: true,
-      })
-
-      if (!res?.json) {
-        this.sentMessagesNonces.delete(nonce)
-        throw new Error(`Failed to send message: ${res?.statusCode}`)
-      }
-
-      const mapped = DiscordMappers.mapMessage(res.json)
-      return [{
-        ...mapped,
-        isSender: res.json.author.id === this.currentUser?.id,
-        accountID: this.accountID,
-      }]
-    } catch (error) {
-      this.sentMessagesNonces.delete(nonce)
-      throw error
-    }
-
-    /*
-    let headers: { [key: string]: string } = {}
-    let json: { [key: string]: any } | undefined
-    let body: any | undefined
+    const payload: { headers?: { [key: string]: string }, json?: any, body?: Buffer } = {}
 
     if (content.fileBuffer || content.filePath) {
       const form = new FormData()
       if (content.fileBuffer) {
         form.append('file', content.fileBuffer, {
           filename: content.fileName,
+          contentType: content.mimeType,
           knownLength: content.fileBuffer?.length,
         })
       } else if (content.filePath) {
-        form.append('file', await fs.readFile(content.filePath), { filename: content.fileName || path.basename(content.filePath) })
+        const fileBuffer = await fsReadFile(content.filePath)
+        form.append('file', fileBuffer, {
+          filename: content.fileName || pathBasename(content.filePath),
+          contentType: content.mimeType,
+          knownLength: fileBuffer.length,
+        })
       }
 
-      const payload_json = {
-        content: text || '',
-        message_reference,
-        nonce,
-      }
-      form.append('payload_json', JSON.stringify(payload_json))
+      form.append('payload_json', JSON.stringify(json), { contentType: 'application/json' })
 
-      headers = form.getHeaders()
-      body = form
+      payload.headers = form.getHeaders()
+      payload.body = form.getBuffer()
     } else {
-      headers = { 'Content-Type': 'application/json' }
-      json = {
-        content: text,
-        nonce,
-        message_reference,
-      }
+      payload.headers = { 'Content-Type': 'application/json' }
+      payload.json = json
     }
 
     try {
       const res = await this.fetch<DiscordAPI.Channels.Thread.Messages.Response.POST>(`channels/${threadID}/messages`, {
         method: 'POST',
-        headers,
-        json,
-        body,
+        headers: payload.headers,
+        json: payload.json,
+        body: payload.body,
         checkError: true,
       })
 
-      if (!res?.json) {
+      if (!res?.json?.id) {
         this.sentMessagesNonces.delete(nonce)
-        throw new Error(`Failed to send message: ${res?.statusCode}`)
+        throw new Error(`Failed to send message: ${res?.statusCode} (${(res?.json as any)?.code})`)
       }
 
       const mapped = DiscordMappers.mapMessage(res.json)
@@ -377,7 +314,6 @@ class DiscordNetworkAPI {
       this.sentMessagesNonces.delete(nonce)
       throw error
     }
-    */
   }
 
   // Delete message with specified id in specified thread.
@@ -1031,7 +967,7 @@ class DiscordNetworkAPI {
   }
 
   // Discord HTTP request helper
-  private fetch = async <D>(path: string, { headers = {}, json, checkError, ...rest }: Texts.FetchOptions & { json?: any, checkError?: boolean }): Promise<{ statusCode: number, json?: D } | undefined> => {
+  private fetch = async <D>(requestPath: string, { headers = {}, json, checkError, ...rest }: Texts.FetchOptions & { json?: any, checkError?: boolean }): Promise<{ statusCode: number, json?: D } | undefined> => {
     try {
       const opts: Texts.FetchOptions = {
         // TODO: timeout: 10000,
@@ -1044,18 +980,23 @@ class DiscordNetworkAPI {
           ...headers,
         },
       }
-      if (json) opts.headers!['Content-Type'] = 'application/json'
+      if (json) opts.headers!['Content-Type'] = opts.headers?.['Content-Type'] || 'application/json'
 
-      const res = await this.httpClient.requestAsString(`${DISCORD_API_ENDPOINT}/${path}`, opts)
+      const res = await this.httpClient.requestAsString(`${DISCORD_API_ENDPOINT}/${requestPath}`, opts)
       const { statusCode, body } = res
       if (statusCode === 401) throw new Texts.ReAuthError('Unauthorized')
       const hasBody = body?.length
       if (hasBody && body[0] === '<') {
-        Texts.texts.log(LOG_PREFIX, path, statusCode, body)
+        Texts.texts.log(LOG_PREFIX, requestPath, statusCode, body)
         throw new ExpectedJSONGotHTMLError(statusCode, body)
       }
       const responseJSON = hasBody ? JSON.parse(body) : undefined
-      if (checkError && (statusCode < 200 || statusCode > 204 || (statusCode !== 204 && !responseJSON))) throw new Error(Util.getErrorMessage(res))
+      if (checkError) {
+        if (!(statusCode >= 200 && statusCode < 300)) {
+          throw new Error(Util.getErrorMessage({ statusCode, json: responseJSON }))
+        }
+      }
+      // if (checkError && (statusCode < 200 || statusCode > 204 || (statusCode !== 204 && !responseJSON))) throw new Error(Util.getErrorMessage(res))
       return {
         statusCode,
         json: responseJSON as D,
