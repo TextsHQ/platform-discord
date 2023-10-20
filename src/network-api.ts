@@ -130,7 +130,13 @@ export default class DiscordNetworkAPI {
     texts.log(LOG_PREFIX, 'Connecting...')
 
     if (!this.client) {
-      const gatewayRes = await this.httpClient.requestAsString(`${API_ENDPOINT}/gateway`, { headers: { 'User-Agent': USER_AGENT } })
+      const url = `${API_ENDPOINT}/gateway`
+      const gatewayRes = await this.httpClient.requestAsString(url, { headers: { 'User-Agent': USER_AGENT } })
+      const { statusCode, body } = gatewayRes
+      if (body[0] === '<') {
+        texts.log(statusCode, url, body)
+        throw new ExpectedJSONGotHTMLError(statusCode, body)
+      }
       const gatewayHost = JSON.parse(gatewayRes?.body)?.url as string ?? DEFAULT_GATEWAY
       this.client = new WSClient(gatewayHost, this.token!, defaultPacker!, WS_OPTIONS)
     }
