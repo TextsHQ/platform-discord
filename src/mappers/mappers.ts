@@ -1,5 +1,5 @@
 import { Message, MessageActionType, Attachment, AttachmentType, MessageLink, MessageReaction, Thread, ThreadType, User, PartialWithID, UserPresence, texts } from '@textshq/platform-sdk'
-import { APIChannel, EmbedType, MessageActivityType, APIAttachment, MessageType, GatewayPresenceUpdateData } from 'discord-api-types/v9'
+import { APIChannel, EmbedType, MessageActivityType, APIAttachment, MessageType, GatewayPresenceUpdateData, APIUser } from 'discord-api-types/v9'
 import { uniqBy } from 'lodash'
 
 import { IGNORED_MESSAGE_TYPES, StickerFormat, THREAD_TYPES } from '../constants'
@@ -7,7 +7,6 @@ import { getEmojiURL, getLottieStickerURL, getPNGStickerURL, getThreadIcon, getT
 import { mapTextAttributes } from '../text-attributes'
 import { handleArticleEmbed, handleGifvEmbed, handleImageEmbed, handleLinkEmbed, handleRichEmbed, handleVideoEmbed } from './rich-embeds'
 import type { DiscordMessage, DiscordReactionDetails } from '../types/discord-types'
-import { _APIUser } from '../types/APIUser'
 
 export const mapReaction = (reaction: DiscordReactionDetails, participantID: string): MessageReaction => {
   // reaction.emoji = { id: '352592187265122304', name: 'pat' }
@@ -31,7 +30,7 @@ export const mapPresence = (userID: string, presence: GatewayPresenceUpdateData)
   }
 }
 
-export function mapUser(user: _APIUser): User {
+export function mapUser(user: APIUser): User {
   const username = user.discriminator.length === 4 ? `${user.username}#${user.discriminator}` : user.username
   return {
     id: user.id,
