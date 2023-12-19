@@ -50,7 +50,8 @@ class WSClient {
   /// Should connection be resumed after connecting?
   shouldResume = false
 
-  public onMessage?: (message: GatewayMessage) => void
+  /// A callback to expose incoming gateway messages downstream.
+  public gatewayMessageHandler?: (message: GatewayMessage) => void
 
   public onChangedReadyState?: (ready: boolean) => void
 
@@ -200,7 +201,7 @@ class WSClient {
       }
     }
 
-    this.onMessage?.(message)
+    this.gatewayMessageHandler?.(message)
   }
 
   private setupHeartbeat = (interval: number) => {

@@ -20,6 +20,7 @@ import type { DiscordEmoji, DiscordMessage, DiscordReactionDetails, DiscordScien
 import _emojis from './resources/emojis.json'
 import _emojiShortcuts from './resources/shortcuts.json'
 import type { GatewayConnectionOptions, GatewayMessage } from './websocket/types'
+import { serverEventPump } from './event-handling'
 
 const API_VERSION = 9
 const API_ENDPOINT = `https://discord.com/api/v${API_VERSION}`
@@ -49,25 +50,25 @@ export default class DiscordNetworkAPI {
     shortcuts: new Map<string, string>(_emojiShortcuts as Iterable<[string, string]>),
   }
 
+  analyticsToken: string | null
+
   // username-to-id mappings
   usernameIDMap = new Map<string, string>()
 
-  private readStateMap = new Map<string, string>()
+  readStateMap = new Map<string, string>()
 
-  private channelsMap? = ENABLE_GUILDS ? new Map<string, Thread[]>() : undefined
+  channelsMap? = ENABLE_GUILDS ? new Map<string, Thread[]>() : undefined
 
   // key is guild id
-  private guildCustomEmojiMap?: Map<string, DiscordEmoji[]>
+  guildCustomEmojiMap?: Map<string, DiscordEmoji[]>
 
   private allCustomEmojis?: DiscordEmoji[]
 
   private usersPresence: PresenceMap = {}
 
-  private mutedChannels = new Set<string>()
+  mutedChannels = new Set<string>()
 
   private lastAckToken?: string = undefined
-
-  private analyticsToken?: string = undefined
 
   private deviceFingerprint?: string = undefined
 
@@ -518,7 +519,7 @@ export default class DiscordNetworkAPI {
     if (this.client) this.client.shouldResume = shouldResume
   }
 
-  private onGuildCustomEmojiMapUpdate = () => {
+  onGuildCustomEmojiMapUpdate = () => {
     if (this.guildCustomEmojiMap) this.allCustomEmojis = Array.from(this.guildCustomEmojiMap.values()).flat()
     // TODO: State sync
   }
@@ -590,64 +591,18 @@ export default class DiscordNetworkAPI {
       texts.Sentry.captureException(error)
     }
 
-    this.client.onMessage = this.handleGatewayMessage
+    this.client.gatewayMessageHandler = this.handleGatewayMessage
   }
 
-  private handleGatewayMessage = ({ op, d, t }: GatewayMessage) => {
+  private handleGatewayMessage = (message: GatewayMessage) => {
     // texts.log(LOG_PREFIX, op, d, t)
+    const { d, t } = message
 
     switch (t) {
       // * Documented
 
       case GatewayMessageType.HELLO: {
         // handled by WSClient
-        break
-      }
-
-      case GatewayMessageType.READY: {
-        // const notes = d.notes
-        // const user_settings = d.user_settings
-
-        if (ENABLE_DISCORD_ANALYTICS) this.analyticsToken = d.analytics_token
-
-        this.usernameIDMap = new Map((d.users as APIUser[])?.map(r => [(r.username + '#' + r.discriminator), r.id]))
-        this.readStateMap = new Map(d.read_state?.entries.map((s: { id: Snowflake, last_message_id: Snowflake }) => [s.id, s.last_message_id]))
-
-        if (d.user.premium_type && d.user.premium_type !== 0) {
-          // User has nitro, so store emojis
-          const allEmojis = d.guilds.map((g: APIGuild) => {
-            const emojis = g.emojis.map(e => ({
-              displayName: e.name,
-              reactionKey: `<:${e.name}:${e.id}>`,
-              url: getEmojiURL(e.id!, e.animated),
-            }))
-
-            return [g.id, emojis]
-          })
-          this.guildCustomEmojiMap = new Map<string, DiscordEmoji[]>(allEmojis)
-
-          this.onGuildCustomEmojiMapUpdate()
-        }
-
-        if (ENABLE_GUILDS) {
-          const mutedChannels = d.user_guild_settings.entries
-            ?.flatMap((g: { channel_overrides: any[] }) => g.channel_overrides)
-            .filter((g: { muted: Boolean }) => g.muted)
-            .map((g: { channel_id: string }) => g.channel_id)
-          this.mutedChannels = new Set(mutedChannels)
-
-          const allChannels = d.guilds.map((g: APIGuild) => {
-            // @ts-expect-error
-            const channels = [...g.channels ?? [], ...g.threads ?? []]
-              .filter(c => !IGNORED_CHANNEL_TYPES.has(c.type))
-              .map(c => mapThread(c, this.readStateMap.get(c.id), this.mutedChannels.has(c.id), this.currentUser))
-
-            return [g.id, channels]
-          })
-          this.channelsMap = new Map(allChannels)
-        }
-
-        this.ready = true
         break
       }
 
@@ -1126,7 +1081,7 @@ export default class DiscordNetworkAPI {
       }
 
       default: {
-        texts.log(`${LOG_PREFIX} Unhandled`, op, t, d)
+        serverEventPump(this, message)
         break
       }
     }
