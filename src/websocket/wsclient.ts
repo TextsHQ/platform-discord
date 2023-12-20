@@ -35,7 +35,7 @@ class WSClient {
 
   private lastSequenceNumber?: number
 
-  private heartbeatTimer?: NodeJS.Timer
+  private heartbeatTimer?: NodeJS.Timeout
 
   private heartbeatTimeout?: NodeJS.Timeout
 
