@@ -1,7 +1,0 @@
-export { default as attachReadyHandlers } from './ready'
-export { default as attachChannelHandlers } from './channels'
-export { default as attachGuildHandlers } from './guilds'
-export { default as attachReactionHandlers } from './reactions'
-export { default as attachMessageHandlers } from './messages'
-export { default as attachRelationshipHandlers } from './relationships'
-export { default as attachRecipientHandlers } from './recipients'

@@ -21,7 +21,7 @@ import type { DiscordEmoji, DiscordMessage, DiscordReactionDetails, DiscordScien
 import _emojis from './resources/emojis.json'
 import _emojiShortcuts from './resources/shortcuts.json'
 import type { GatewayConnectionOptions, GatewayMessage } from './websocket/types'
-import { attachReadyHandlers, attachChannelHandlers, attachGuildHandlers, attachReactionHandlers, attachMessageHandlers, attachRelationshipHandlers, attachRecipientHandlers } from './websocket/events/handlers'
+import { attachReadyHandlers, attachChannelHandlers, attachGuildHandlers, attachReactionHandlers, attachMessageHandlers, attachRelationshipHandlers, attachRecipientHandlers } from './websocket/event-handlers'
 
 const API_VERSION = 9
 const API_ENDPOINT = `https://discord.com/api/v${API_VERSION}`
