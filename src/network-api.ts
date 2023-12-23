@@ -97,7 +97,8 @@ export default class DiscordNetworkAPI {
 
   constructor() {
     this.gatewayEvents.on('error', error => {
-      texts.log(LOG_PREFIX, 'Error occurred in gateway event handler', error)
+      texts.error(LOG_PREFIX, 'Error occurred in gateway event handler', error)
+      texts.Sentry.captureException(error)
     })
 
     attachReadyHandlers(this)
