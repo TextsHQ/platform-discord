@@ -5,6 +5,7 @@ import { uniqBy } from 'lodash'
 import { texts, MessageContent, PaginationArg, Thread, Message, ServerEventType, OnServerEventCallback, ActivityType, User, MessageSendOptions, ReAuthError, PresenceMap, Paginated, FetchOptions, ServerEvent, CustomEmojiMap, UserPresence } from '@textshq/platform-sdk'
 import { ExpectedJSONGotHTMLError } from '@textshq/platform-sdk/dist/json'
 import { APIChannel, APIEmoji, APIGuild, APIReaction, APIUser, ChannelType, GatewayPresenceUpdateData, Snowflake } from 'discord-api-types/v9'
+import EventEmitter from 'events'
 
 import { mapMessage, mapPresence, mapReaction, mapThread, mapUser } from './mappers/mappers'
 import WSClient from './websocket/wsclient'
@@ -20,6 +21,7 @@ import type { DiscordEmoji, DiscordMessage, DiscordReactionDetails, DiscordScien
 import _emojis from './resources/emojis.json'
 import _emojiShortcuts from './resources/shortcuts.json'
 import type { GatewayConnectionOptions, GatewayMessage } from './websocket/types'
+import { attachReadyHandlers, attachChannelHandlers, attachGuildHandlers, attachReactionHandlers, attachMessageHandlers, attachRelationshipHandlers, attachRecipientHandlers } from './websocket/event-handlers'
 
 const API_VERSION = 9
 const API_ENDPOINT = `https://discord.com/api/v${API_VERSION}`
@@ -42,34 +44,36 @@ export default class DiscordNetworkAPI {
 
   private httpClient = texts.createHttpClient!()
 
-  private readonly sendMessageNonces = new Set<string>()
+  readonly sendMessageNonces = new Set<string>()
 
   private emojiShortcuts = {
     emojis: new Map<string, string>(_emojis as Iterable<[string, string]>),
     shortcuts: new Map<string, string>(_emojiShortcuts as Iterable<[string, string]>),
   }
 
+  analyticsToken: string | null
+
   // username-to-id mappings
   usernameIDMap = new Map<string, string>()
 
-  private readStateMap = new Map<string, string>()
+  readStateMap = new Map<string, string>()
 
-  private channelsMap? = ENABLE_GUILDS ? new Map<string, Thread[]>() : undefined
+  channelsMap? = ENABLE_GUILDS ? new Map<string, Thread[]>() : undefined
 
   // key is guild id
-  private guildCustomEmojiMap?: Map<string, DiscordEmoji[]>
+  guildCustomEmojiMap?: Map<string, DiscordEmoji[]>
 
   private allCustomEmojis?: DiscordEmoji[]
 
-  private usersPresence: PresenceMap = {}
+  usersPresence: PresenceMap = {}
 
-  private mutedChannels = new Set<string>()
+  mutedChannels = new Set<string>()
 
   private lastAckToken?: string = undefined
 
-  private analyticsToken?: string = undefined
-
   private deviceFingerprint?: string = undefined
+
+  gatewayEvents = new EventEmitter({ captureRejections: true })
 
   token?: string
 
@@ -90,6 +94,21 @@ export default class DiscordNetworkAPI {
   userFriends: User[] = []
 
   lastFocusedThread?: string
+
+  constructor() {
+    this.gatewayEvents.on('error', error => {
+      texts.error(LOG_PREFIX, 'Error occurred in gateway event handler', error)
+      texts.Sentry.captureException(error)
+    })
+
+    attachReadyHandlers(this)
+    attachMessageHandlers(this)
+    attachChannelHandlers(this)
+    attachGuildHandlers(this)
+    attachReactionHandlers(this)
+    attachRelationshipHandlers(this)
+    attachRecipientHandlers(this)
+  }
 
   login = async (token: string) => {
     texts.log(LOG_PREFIX, 'Logging in with token...')
@@ -435,7 +454,8 @@ export default class DiscordNetworkAPI {
       muted: true,
       mute_config: {
         selected_time_window: -1,
-        end_time: null },
+        end_time: null,
+      },
     } : { muted: false }
     return this.patchSettings(threadID, settings)
   }
@@ -518,7 +538,7 @@ export default class DiscordNetworkAPI {
     if (this.client) this.client.shouldResume = shouldResume
   }
 
-  private onGuildCustomEmojiMapUpdate = () => {
+  onGuildCustomEmojiMapUpdate = () => {
     if (this.guildCustomEmojiMap) this.allCustomEmojis = Array.from(this.guildCustomEmojiMap.values()).flat()
     // TODO: State sync
   }
@@ -590,545 +610,14 @@ export default class DiscordNetworkAPI {
       texts.Sentry.captureException(error)
     }
 
-    this.client.onMessage = this.handleGatewayMessage
+    this.client.gatewayMessageHandler = this.handleGatewayMessage
   }
 
-  private handleGatewayMessage = ({ op, d, t }: GatewayMessage) => {
+  private handleGatewayMessage = (message: GatewayMessage) => {
     // texts.log(LOG_PREFIX, op, d, t)
-
-    switch (t) {
-      // * Documented
-
-      case GatewayMessageType.HELLO: {
-        // handled by WSClient
-        break
-      }
-
-      case GatewayMessageType.READY: {
-        // const notes = d.notes
-        // const user_settings = d.user_settings
-
-        if (ENABLE_DISCORD_ANALYTICS) this.analyticsToken = d.analytics_token
-
-        this.usernameIDMap = new Map((d.users as APIUser[])?.map(r => [(r.username + '#' + r.discriminator), r.id]))
-        this.readStateMap = new Map(d.read_state?.entries.map((s: { id: Snowflake, last_message_id: Snowflake }) => [s.id, s.last_message_id]))
-
-        if (d.user.premium_type && d.user.premium_type !== 0) {
-          // User has nitro, so store emojis
-          const allEmojis = d.guilds.map((g: APIGuild) => {
-            const emojis = g.emojis.map(e => ({
-              displayName: e.name,
-              reactionKey: `<:${e.name}:${e.id}>`,
-              url: getEmojiURL(e.id!, e.animated),
-            }))
-
-            return [g.id, emojis]
-          })
-          this.guildCustomEmojiMap = new Map<string, DiscordEmoji[]>(allEmojis)
-
-          this.onGuildCustomEmojiMapUpdate()
-        }
-
-        if (ENABLE_GUILDS) {
-          const mutedChannels = d.user_guild_settings.entries
-            ?.flatMap((g: { channel_overrides: any[] }) => g.channel_overrides)
-            .filter((g: { muted: Boolean }) => g.muted)
-            .map((g: { channel_id: string }) => g.channel_id)
-          this.mutedChannels = new Set(mutedChannels)
-
-          const allChannels = d.guilds.map((g: APIGuild) => {
-            // @ts-expect-error
-            const channels = [...g.channels ?? [], ...g.threads ?? []]
-              .filter(c => !IGNORED_CHANNEL_TYPES.has(c.type))
-              .map(c => mapThread(c, this.readStateMap.get(c.id), this.mutedChannels.has(c.id), this.currentUser))
-
-            return [g.id, channels]
-          })
-          this.channelsMap = new Map(allChannels)
-        }
-
-        this.ready = true
-        break
-      }
-
-      case GatewayMessageType.READY_SUPPLEMENTAL: {
-        this.usersPresence = Object.fromEntries(d.merged_presences.friends?.map(((p: GatewayPresenceUpdateData & { user_id: Snowflake }) => [p.user_id, mapPresence(p.user_id, p)])))
-        break
-      }
-
-      case GatewayMessageType.RESUMED: {
-        // TODO: RESUMED
-        // texts.log(t, d)
-        break
-      }
-
-      case GatewayMessageType.RECONNECT: {
-        // TODO: RECONNECT
-        // texts.log(t, d)
-        break
-      }
-
-      case GatewayMessageType.INVALID_SESSION: {
-        // TODO: INVALID_SESSION
-        // texts.log(t, d)
-        break
-      }
-
-      case GatewayMessageType.CHANNEL_CREATE: {
-        if (!ENABLE_GUILDS && d.guild_id) return
-
-        switch (d.type) {
-          case ChannelType.GuildText:
-          case ChannelType.GuildNews:
-          case ChannelType.GuildNewsThread:
-          case ChannelType.GuildPublicThread:
-          case ChannelType.GuildPrivateThread: {
-            // const channels = [...this.channelsMap?.get(d.guild_id) ?? [], channel]
-            // this.channelsMap?.set(d.guild_id, channels)
-            break
-          }
-          case ChannelType.DM:
-          case ChannelType.GroupDM: {
-            const channel = mapThread(d, this.readStateMap.get(d.id), this.mutedChannels.has(d.id), this.currentUser)
-
-            this.eventCallback([{
-              type: ServerEventType.STATE_SYNC,
-              mutationType: 'upsert',
-              objectName: 'thread',
-              objectIDs: {},
-              entries: [channel],
-            }])
-            break
-          }
-        }
-
-        break
-      }
-
-      case GatewayMessageType.CHANNEL_UPDATE: {
-        if (!ENABLE_GUILDS && d.guild_id) return
-
-        const channels = this.channelsMap?.get(d.guild_id)
-        if (!channels) return
-
-        const index = channels.findIndex(c => c.id === d.id)
-        if (index < 0) return
-
-        const channel = channels[index]
-        const newChannel = mapThread(d, this.readStateMap.get(d.id), this.mutedChannels.has(d.id), this.currentUser)
-        Object.assign(channel, newChannel)
-        channels[index] = channel
-        this.channelsMap?.set(d.guild_id, channels)
-
-        this.eventCallback([{
-          type: ServerEventType.STATE_SYNC,
-          mutationType: 'update',
-          objectName: 'thread',
-          objectIDs: {},
-          entries: [channel],
-        }])
-        break
-      }
-
-      case GatewayMessageType.CHANNEL_DELETE: {
-        if (!ENABLE_GUILDS && d.guild_id) return
-
-        this.eventCallback([{
-          type: ServerEventType.STATE_SYNC,
-          mutationType: 'delete',
-          objectName: 'thread',
-          objectIDs: {},
-          entries: [d.id],
-        }])
-        break
-      }
-
-      case GatewayMessageType.CHANNEL_PINS_UPDATE: {
-        // TODO: CHANNEL_PINS_UPDATE
-        // texts.log(t, d)
-        break
-      }
-
-      case GatewayMessageType.THREAD_CREATE: {
-        // TODO: THREAD_CREATE
-        // texts.log(t, d)
-        break
-      }
-
-      case GatewayMessageType.THREAD_UPDATE: {
-        // TODO: THREAD_UPDATE
-        // texts.log(t, d)
-        break
-      }
-
-      case GatewayMessageType.THREAD_DELETE: {
-        // TODO: THREAD_DELETE
-        // texts.log(t, d)
-        break
-      }
-
-      case GatewayMessageType.THREAD_LIST_SYNC: {
-        // TODO: THREAD_LIST_SYNC
-        // texts.log(t, d)
-        break
-      }
-
-      case GatewayMessageType.THREAD_MEMBER_UPDATE: {
-        // TODO: THREAD_MEMBER_UPDATE
-        // texts.log(t, d)
-        break
-      }
-
-      case GatewayMessageType.THREAD_MEMBERS_UPDATE: {
-        // TODO: THREAD_MEMBERS_UPDATE
-        // texts.log(t, d)
-        break
-      }
-
-      case GatewayMessageType.GUILD_CREATE: {
-        if (this.guildCustomEmojiMap) {
-          const guild = d as APIGuild
-          const emojis: DiscordEmoji[] = guild.emojis.map(e => ({
-            displayName: e.name ?? e.id!,
-            reactionKey: `<:${e.name}:${e.id}>`,
-            url: getEmojiURL(e.id!, e.animated),
-          }))
-          this.guildCustomEmojiMap.set(guild.id, emojis)
-          this.onGuildCustomEmojiMapUpdate()
-
-          const emojiEvent: ServerEvent = {
-            type: ServerEventType.STATE_SYNC,
-            objectIDs: {},
-            mutationType: 'upsert',
-            objectName: 'custom_emoji',
-            entries: guild.emojis.map(e => ({
-              id: e.id!,
-              url: getEmojiURL(e.id!, e.animated),
-            })),
-          }
-
-          this.eventCallback([emojiEvent])
-        }
-
-        if (!ENABLE_GUILDS) return
-
-        const channels = (d.channels as APIChannel[])
-          .filter(c => !IGNORED_CHANNEL_TYPES.has(c.type))
-          .map(c => mapThread(c, this.readStateMap.get(c.id), this.mutedChannels.has(c.id), this.currentUser))
-
-        this.channelsMap?.set(d.id, channels)
-
-        const channelEvents: ServerEvent[] = channels.map(c => ({
-          type: ServerEventType.STATE_SYNC,
-          mutationType: 'upsert',
-          objectName: 'thread',
-          objectIDs: {},
-          entries: [c],
-        }))
-
-        this.eventCallback(channelEvents)
-        break
-      }
-
-      case GatewayMessageType.GUILD_DELETE: {
-        this.guildCustomEmojiMap?.delete(d.id)
-        this.onGuildCustomEmojiMapUpdate()
-        // TODO: State sync
-
-        if (!ENABLE_GUILDS) return
-
-        const channelIDs = this.channelsMap?.get(d.id)?.map(c => c.id)
-        if (!channelIDs) return
-
-        const events: ServerEvent[] = channelIDs.map(id => ({
-          type: ServerEventType.STATE_SYNC,
-          mutationType: 'delete',
-          objectName: 'thread',
-          objectIDs: {},
-          entries: [id],
-        }))
-        this.eventCallback(events)
-
-        this.channelsMap?.delete(d.id)
-        break
-      }
-
-      case GatewayMessageType.GUILD_EMOJIS_UPDATE: {
-        if (!this.guildCustomEmojiMap) return
-
-        const emojis = d.emojis.map((e: APIEmoji) => ({
-          displayName: e.name,
-          reactionKey: `<:${e.name}:${e.id}>`,
-          url: getEmojiURL(e.id!, e.animated),
-        }))
-        this.guildCustomEmojiMap.set(d.guild_id, emojis)
-        this.onGuildCustomEmojiMapUpdate()
-
-        break
-      }
-
-      case GatewayMessageType.MESSAGE_CREATE: {
-        if (!ENABLE_GUILDS && d.guild_id) return
-
-        d.mentions.forEach((m: APIUser) => this.usernameIDMap.set((m.username + '#' + m.discriminator), m.id))
-
-        if (ENABLE_GUILDS && d.author) {
-          const sender = mapUser(d.author)
-          this.eventCallback([{
-            type: ServerEventType.STATE_SYNC,
-            mutationType: 'upsert',
-            objectName: 'participant',
-            objectIDs: {
-              threadID: d.channel_id,
-            },
-            entries: [sender],
-          }])
-        }
-
-        if (this.sendMessageNonces.has(d.nonce)) {
-          this.sendMessageNonces.delete(d.nonce)
-        } else {
-          // only send upsert message if message was sent from another client/device
-          // this is to prevent 2 messages from showing for a split second in somecases
-          // (prevents sending ServerEvent before sendMessage() resolves)
-          this.eventCallback([{
-            type: ServerEventType.STATE_SYNC,
-            mutationType: 'upsert',
-            objectName: 'message',
-            objectIDs: { threadID: d.channel_id },
-            entries: [mapMessage(d, this.currentUser?.id) as Message],
-          }])
-        }
-        break
-      }
-
-      case GatewayMessageType.MESSAGE_UPDATE: {
-        if (!ENABLE_GUILDS && d.guild_id) return
-
-        let mapped = d
-
-        const og = texts.getOriginalObject?.('discord', this.accountID!, ['message', d.id])
-        if (og) {
-          const ogParsed = JSON.parse(og)
-          Object.assign(ogParsed, d)
-          mapped = ogParsed
-        }
-
-        const message = mapMessage(mapped, this.currentUser?.id)
-        if (!message) return
-
-        this.eventCallback([{
-          type: ServerEventType.STATE_SYNC,
-          mutationType: 'update',
-          objectName: 'message',
-          objectIDs: { threadID: mapped.channel_id },
-          entries: [message],
-        }])
-        break
-      }
-
-      case GatewayMessageType.MESSAGE_DELETE: {
-        if (!ENABLE_GUILDS && d.guild_id) return
-
-        this.eventCallback([{
-          type: ServerEventType.STATE_SYNC,
-          mutationType: 'delete',
-          objectName: 'message',
-          objectIDs: { threadID: d.channel_id },
-          entries: [d.id],
-        }])
-        break
-      }
-
-      case GatewayMessageType.MESSAGE_DELETE_BULK: {
-        if (!ENABLE_GUILDS && d.guild_id) return
-
-        this.eventCallback([{
-          type: ServerEventType.STATE_SYNC,
-          mutationType: 'delete',
-          objectName: 'message',
-          objectIDs: { threadID: d.channel_id },
-          entries: d.ids,
-        }])
-        break
-      }
-
-      case GatewayMessageType.MESSAGE_REACTION_ADD: {
-        if (!ENABLE_GUILDS && d.guild_id) return
-
-        this.eventCallback([{
-          type: ServerEventType.STATE_SYNC,
-          mutationType: 'upsert',
-          objectName: 'message_reaction',
-          objectIDs: {
-            threadID: d.channel_id,
-            messageID: d.message_id,
-          },
-          entries: [mapReaction(d, d.user_id)],
-        }])
-        break
-      }
-
-      case GatewayMessageType.MESSAGE_REACTION_REMOVE:
-      case GatewayMessageType.MESSAGE_REACTION_REMOVE_EMOJI: {
-        if (!ENABLE_GUILDS && d.guild_id) return
-
-        this.eventCallback([{
-          type: ServerEventType.STATE_SYNC,
-          mutationType: 'delete',
-          objectName: 'message_reaction',
-          objectIDs: {
-            threadID: d.channel_id,
-            messageID: d.message_id,
-          },
-          entries: [`${d.user_id}${d.emoji.name || d.emoji.id}`],
-        }])
-        break
-      }
-
-      case GatewayMessageType.MESSAGE_REACTION_REMOVE_ALL: {
-        if (!ENABLE_GUILDS && d.guild_id) return
-
-        this.eventCallback([{
-          type: ServerEventType.STATE_SYNC,
-          mutationType: 'update',
-          objectName: 'message',
-          objectIDs: { threadID: d.channel_id },
-          entries: [{
-            id: d.message_id,
-            reactions: [],
-          }],
-        }])
-        break
-      }
-
-      case GatewayMessageType.PRESENCE_UPDATE: {
-        if (!ENABLE_GUILDS && d.guild_id) return
-
-        const presence: UserPresence = mapPresence(d.user.id, d)
-        this.usersPresence[d.user.id] = presence
-
-        this.eventCallback([{
-          type: ServerEventType.USER_PRESENCE_UPDATED,
-          presence,
-        }])
-
-        break
-      }
-
-      case GatewayMessageType.TYPING_START: {
-        if (!ENABLE_GUILDS && d.guild_id) return
-
-        this.eventCallback([{
-          type: ServerEventType.USER_ACTIVITY,
-          activityType: ActivityType.TYPING,
-          durationMs: 10_000,
-          participantID: d.user_id,
-          threadID: d.channel_id,
-        }])
-        break
-      }
-
-      case GatewayMessageType.USER_UPDATE: {
-        // TODO: USER_UPDATE
-        // texts.log(t, d)
-        break
-      }
-
-      // * Undocumented
-
-      case GatewayMessageType.CHANNEL_UNREAD_UPDATE: {
-        // TODO: CHANNEL_UNREAD_UPDATE
-        // texts.log(t, d)
-        break
-      }
-
-      case GatewayMessageType.MESSAGE_ACK: {
-        if (!ENABLE_GUILDS && d.guild_id) return
-        const threadID = d.channel_id
-        this.readStateMap.set(threadID, d.message_id)
-        this.eventCallback([{
-          type: ServerEventType.STATE_SYNC,
-          mutationType: 'update',
-          objectName: 'thread',
-          objectIDs: {},
-          entries: [{ id: threadID, isUnread: d.ack_type === 0, lastReadMessageID: d.message_id }],
-        }])
-        break
-      }
-
-      case GatewayMessageType.RELATIONSHIP_ADD: {
-        if (!this.userFriends.find(f => f.id === d.id)) {
-          const user = mapUser(d.user)
-          this.userFriends.push(user)
-        }
-        break
-      }
-
-      case GatewayMessageType.RELATIONSHIP_REMOVE: {
-        const index = this.userFriends.findIndex(f => f.id === d.id)
-        if (index >= 0) this.userFriends.splice(index, 1)
-        break
-      }
-
-      case GatewayMessageType.CHANNEL_RECIPIENT_ADD: {
-        this.eventCallback([{
-          type: ServerEventType.STATE_SYNC,
-          mutationType: 'upsert',
-          objectName: 'participant',
-          objectIDs: {
-            threadID: d.channel_id,
-          },
-          entries: [mapUser(d.user)],
-        }])
-        break
-      }
-
-      case GatewayMessageType.CHANNEL_RECIPIENT_REMOVE:
-      {
-        this.eventCallback([{
-          type: ServerEventType.THREAD_MESSAGES_REFRESH,
-          threadID: d.channel_id,
-        }])
-        break
-      }
-
-      // * Defaults
-
-      case GatewayMessageType.APPLICATION_COMMAND_CREATE:
-      case GatewayMessageType.APPLICATION_COMMAND_UPDATE:
-      case GatewayMessageType.APPLICATION_COMMAND_DELETE:
-      case GatewayMessageType.GUILD_UPDATE:
-      case GatewayMessageType.GUILD_BAN_ADD:
-      case GatewayMessageType.GUILD_BAN_REMOVE:
-      case GatewayMessageType.GUILD_APPLICATION_COMMAND_COUNTS_UPDATE:
-      case GatewayMessageType.GUILD_INTEGRATIONS_UPDATE:
-      case GatewayMessageType.GUILD_MEMBER_ADD:
-      case GatewayMessageType.GUILD_MEMBER_REMOVE:
-      case GatewayMessageType.GUILD_MEMBER_UPDATE:
-      case GatewayMessageType.GUILD_MEMBERS_CHUNK:
-      case GatewayMessageType.GUILD_ROLE_CREATE:
-      case GatewayMessageType.GUILD_ROLE_UPDATE:
-      case GatewayMessageType.GUILD_ROLE_DELETE:
-      case GatewayMessageType.INTEGRATION_CREATE:
-      case GatewayMessageType.INTEGRATION_UPDATE:
-      case GatewayMessageType.INTEGRATION_DELETE:
-      case GatewayMessageType.INTERACTION_CREATE:
-      case GatewayMessageType.INVITE_CREATE:
-      case GatewayMessageType.INVITE_DELETE:
-      case GatewayMessageType.VOICE_STATE_UPDATE:
-      case GatewayMessageType.VOICE_SERVER_UPDATE:
-      case GatewayMessageType.WEBHOOKS_UPDATE:
-      case GatewayMessageType.CHANNEL_PINS_ACK:
-      case GatewayMessageType.SESSIONS_REPLACE:
-      case null: {
-        break
-      }
-
-      default: {
-        texts.log(`${LOG_PREFIX} Unhandled`, op, t, d)
-        break
-      }
+    this.gatewayEvents.emit('message', message)
+    if (message.t) {
+      this.gatewayEvents.emit(message.t, message)
     }
   }
 
