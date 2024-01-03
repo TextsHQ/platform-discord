@@ -64,6 +64,15 @@ class WSClient {
     this.token = token
     this.packer = packer
     this.options = options
+    const urlParts = {
+      v: this.options.version.toString(),
+      encoding: this.options.encoding.toString(),
+      // compress: this.options.compress?.toString() ?? ''
+    }
+    const urlParams = new URLSearchParams(urlParts)
+    const gatewayURL = `${this.gateway}?${urlParams.toString()}`
+    texts.log(LOG_PREFIX, `creating new websocket (eventually connecting to: ${gatewayURL})`)
+    this.ws = new PersistentWS(() => ({ endpoint: gatewayURL }), this.wsMessage, this.wsOpen, this.wsClose)
   }
 
   public connect = () => {
@@ -72,15 +81,7 @@ class WSClient {
       return
     }
 
-    const urlParts = {
-      v: this.options.version.toString(),
-      encoding: this.options.encoding.toString(),
-      // compress: this.options.compress?.toString() ?? ''
-    }
-    const urlParams = new URLSearchParams(urlParts)
-    const gatewayURL = `${this.gateway}?${urlParams.toString()}`
-    texts.log(LOG_PREFIX, 'Opening WebSocket, URL:', gatewayURL)
-    this.ws = new PersistentWS(() => { endpoint: gatewayURL }, this.wsMessage, this.wsOpen, this.wsClose)
+    texts.log(LOG_PREFIX, 'connecting now')
     this.ws.connect()
   }
 
