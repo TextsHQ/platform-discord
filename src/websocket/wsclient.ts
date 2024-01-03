@@ -80,7 +80,7 @@ class WSClient {
     const urlParams = new URLSearchParams(urlParts)
     const gatewayURL = `${this.gateway}?${urlParams.toString()}`
     texts.log(LOG_PREFIX, 'Opening WebSocket, URL:', gatewayURL)
-    this.ws = new PersistentWS(() => Promise.resolve({ endpoint: gatewayURL }), this.wsMessage, this.wsOpen, this.wsClose)
+    this.ws = new PersistentWS(() => { endpoint: gatewayURL }, this.wsMessage, this.wsOpen, this.wsClose)
     this.ws.connect()
   }
 
