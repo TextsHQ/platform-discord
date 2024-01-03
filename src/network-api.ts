@@ -186,9 +186,7 @@ export default class DiscordNetworkAPI {
     // TODO: App doesn't display empty channels
     const items = ENABLE_GUILDS ? threads.concat([...this.channelsMap?.values() ?? []].flat()) : threads
 
-    // TODO: Verify that the order is correct, so we give Texts the right
-    // cursor.
-    return { items, hasMore: false, oldestCursor: threads.at(-1)?.id }
+    return { items, hasMore: false, oldestCursor: null }
   }
 
   createThread = async (userIDs: string[], title?: string): Promise<boolean | Thread> => {
