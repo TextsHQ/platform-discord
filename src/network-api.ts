@@ -585,7 +585,7 @@ export default class DiscordNetworkAPI {
       this.ready = ready
     }
 
-    this.client.onConnectionClosed = (code, reason) => {
+    this.client.onConnectionClosed = (code) => {
       this.ready = false
 
       // TODO: Show toast

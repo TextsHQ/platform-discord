@@ -1,5 +1,5 @@
 import { texts } from '@textshq/platform-sdk'
-import type { ClientRequest, IncomingMessage } from 'http'
+import PersistentWS from '@textshq/platform-sdk/dist/PersistentWS'
 import WebSocket from 'ws'
 import { SUPER_PROPERTIES } from '../discord-constants'
 import type { Packer } from '../packers'
@@ -29,7 +29,7 @@ class WSClient {
 
   private readonly options: GatewayConnectionOptions
 
-  private ws?: WebSocket
+  private ws?: PersistentWS
 
   private sessionID?: string
 
@@ -44,7 +44,7 @@ class WSClient {
   private _ready = false
 
   public get ready(): boolean {
-    return this._ready && this.ws?.readyState === WebSocket.OPEN
+    return this._ready && this.ws?.connected
   }
 
   /// Should connection be resumed after connecting?
@@ -57,7 +57,7 @@ class WSClient {
 
   public onError?: (error: Error) => void
 
-  public onConnectionClosed?: (code: number, reason?: string) => void
+  public onConnectionClosed?: (code: number) => void
 
   constructor(gateway: string, token: string, packer: Packer, options: GatewayConnectionOptions) {
     this.gateway = gateway
@@ -67,8 +67,8 @@ class WSClient {
   }
 
   public connect = () => {
-    if (this.ready || (this.ws?.readyState === WebSocket.CONNECTING) || this.ws?.readyState === WebSocket.OPEN) {
-      texts.log(LOG_PREFIX, `Attempted to connect, but is already ready/connecting, ready: ${this.ready}, state: ${this.ws?.readyState}`)
+    if (this.ready || this.ws?.connected) {
+      texts.log(LOG_PREFIX, `Attempted to connect, but is already ready/connecting, ready?: ${this.ready}`)
       return
     }
 
@@ -80,39 +80,26 @@ class WSClient {
     const urlParams = new URLSearchParams(urlParts)
     const gatewayURL = `${this.gateway}?${urlParams.toString()}`
     texts.log(LOG_PREFIX, 'Opening WebSocket, URL:', gatewayURL)
-    this.ws = new WebSocket(gatewayURL)
-    this.setupHandlers()
+    this.ws = new PersistentWS(() => Promise.resolve({ endpoint: gatewayURL }), this.wsMessage, this.wsOpen, this.wsClose)
+    this.ws.connect()
   }
 
   public disconnect = (code: number = GatewayCloseCode.MANUAL_DISCONNECT) => {
     texts.log(LOG_PREFIX, `Disconnect called with code ${code}`)
     clearInterval(this.heartbeatTimer!)
     clearTimeout(this.heartbeatTimeout!)
-    this.ws?.close(code)
+    this.ws?.dispose(code)
   }
 
   public send = async (message: GatewayMessage) => {
     if (DEBUG) texts.log('<', message)
 
-    if (this.ws?.readyState !== WebSocket.OPEN) {
-      texts.error(LOG_PREFIX, `Attempted to send, but ws isn't ready: readyState: ${this.ws?.readyState}.`)
+    if (!this._ready) {
+      texts.error(LOG_PREFIX, 'attempted to send something, but the websocket hasn\'t opened yet')
       throw WSError.wsNotReady
     }
     const packed = this.packer.pack(message)
     this.ws.send(packed)
-  }
-
-  private setupHandlers = () => {
-    if (!this.ws) {
-      texts.error(LOG_PREFIX, 'Called setupHandlers(), but there\'s no ws!')
-      throw WSError.wsNotReady
-    }
-
-    this.ws.on('open', this.wsOpen)
-    this.ws.on('close', this.wsClose)
-    this.ws.on('message', this.wsMessage)
-    this.ws.on('error', WSClient.wsError)
-    this.ws.on('unexpected-response', WSClient.wsUnexpectedResponse)
   }
 
   private wsOpen = () => {
@@ -120,7 +107,7 @@ class WSClient {
     this._ready = true
   }
 
-  private wsClose = (code: number, reason: string) => {
+  private wsClose = (code: number) => {
     texts.log(LOG_PREFIX, 'WebSocket closed, code:', code)
     this._ready = false
     clearInterval(this.heartbeatTimer!)
@@ -132,7 +119,7 @@ class WSClient {
       return
     }
 
-    this.onConnectionClosed?.(code, reason)
+    this.onConnectionClosed?.(code)
   }
 
   private wsMessage = (data: WebSocket.Data) => {
@@ -311,14 +298,6 @@ class WSClient {
       default:
         break
     }
-  }
-
-  private static wsError = (err: Error) => {
-    if (DEBUG) texts.log(LOG_PREFIX, `WebSocket error: ${err}`)
-  }
-
-  private static wsUnexpectedResponse = (request: ClientRequest, response: IncomingMessage) => {
-    if (DEBUG) texts.log(LOG_PREFIX, 'WebSocket unexpected response!', request, response)
   }
 }
 
