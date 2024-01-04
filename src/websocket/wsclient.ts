@@ -77,7 +77,9 @@ class WSClient {
 
   public connect = () => {
     if (this.ready || this.ws?.connected) {
-      texts.log(LOG_PREFIX, `Attempted to connect, but is already ready/connecting, ready?: ${this.ready}`)
+      const msg = `attempted to connect, but we're already ready/connected, (ready state: ${this.ready})`
+      texts.log(LOG_PREFIX, msg)
+      texts.Sentry.captureMessage(msg)
       return
     }
 
