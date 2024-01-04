@@ -96,11 +96,6 @@ class WSClient {
 
   public send = async (message: GatewayMessage) => {
     if (DEBUG) texts.log('<', message)
-
-    if (!this._ready) {
-      texts.error(LOG_PREFIX, 'attempted to send something, but the websocket hasn\'t opened yet')
-      throw WSError.wsNotReady
-    }
     const packed = this.packer.pack(message)
     this.ws.send(packed)
   }
