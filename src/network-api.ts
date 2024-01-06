@@ -136,7 +136,7 @@ export default class DiscordNetworkAPI {
   }
 
   connect = async (force = false, resume = false) => {
-    if (this.client && this.client.ready) {
+    if (this.client?.ready) {
       if (force) {
         texts.log(LOG_PREFIX, 'Force connect!')
         this.client.disconnect()
