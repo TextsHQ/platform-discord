@@ -41,10 +41,8 @@ class WSClient {
 
   private receivedHeartbeatAck?: boolean
 
-  private _ready = false
-
   public get ready(): boolean {
-    return this._ready && this.ws?.connected
+    return this.ws?.connected
   }
 
   /// Should connection be resumed after connecting?
@@ -72,7 +70,9 @@ class WSClient {
     const urlParams = new URLSearchParams(urlParts)
     const gatewayURL = `${this.gateway}?${urlParams.toString()}`
     texts.log(LOG_PREFIX, `creating new websocket (eventually connecting to: ${gatewayURL})`)
-    this.ws = new PersistentWS(() => ({ endpoint: gatewayURL }), this.wsMessage, this.wsOpen, this.wsClose)
+    this.ws = new PersistentWS(() => ({ endpoint: gatewayURL }), this.wsMessage, () => {
+      texts.log(LOG_PREFIX, 'websocket open!')
+    }, this.wsClose)
   }
 
   public connect = () => {
@@ -100,14 +100,8 @@ class WSClient {
     this.ws.send(packed)
   }
 
-  private wsOpen = () => {
-    texts.log(LOG_PREFIX, 'WebSocket open!')
-    this._ready = true
-  }
-
   private wsClose = (code: number) => {
     texts.log(LOG_PREFIX, 'WebSocket closed, code:', code)
-    this._ready = false
     clearInterval(this.heartbeatTimer!)
 
     if (code === GatewayCloseCode.RECONNECT_REQUESTED) {
@@ -151,7 +145,6 @@ class WSClient {
       case OPCode.RECONNECT:
       case OPCode.INVALID_SESSION:
         texts.log(LOG_PREFIX, `OP: ${message.op}, reconnecting...`)
-        this._ready = false
         this.shouldResume = false
         this.disconnect(GatewayCloseCode.MANUAL_DISCONNECT)
         this.connect()
