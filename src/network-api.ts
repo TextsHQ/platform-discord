@@ -2,7 +2,7 @@ import path from 'path'
 import FormData from 'form-data'
 import { promises as fs } from 'fs'
 import { uniqBy } from 'lodash'
-import { texts, MessageContent, PaginationArg, Thread, Message, ServerEventType, OnServerEventCallback, ActivityType, User, MessageSendOptions, ReAuthError, PresenceMap, Paginated, FetchOptions, ServerEvent, CustomEmojiMap, UserPresence } from '@textshq/platform-sdk'
+import { texts, MessageContent, PaginationArg, Thread, Message, ServerEventType, OnServerEventCallback, ActivityType, User, MessageSendOptions, ReAuthError, PresenceMap, Paginated, FetchOptions, ServerEvent, CustomEmojiMap, UserPresence, PaginatedWithCursors } from '@textshq/platform-sdk'
 import { ExpectedJSONGotHTMLError } from '@textshq/platform-sdk/dist/json'
 import { APIChannel, APIEmoji, APIGuild, APIReaction, APIUser, ChannelType, GatewayPresenceUpdateData, Snowflake } from 'discord-api-types/v9'
 import EventEmitter from 'events'
@@ -136,7 +136,7 @@ export default class DiscordNetworkAPI {
   }
 
   connect = async (force = false, resume = false) => {
-    if (this.client && this.client.ready) {
+    if (this.client?.ready) {
       if (force) {
         texts.log(LOG_PREFIX, 'Force connect!')
         this.client.disconnect()
@@ -170,7 +170,7 @@ export default class DiscordNetworkAPI {
     return res
   }
 
-  getThreads = async (folderName: string, pagination?: PaginationArg): Promise<Paginated<Thread>> => {
+  getThreads = async (folderName: string, pagination?: PaginationArg): Promise<PaginatedWithCursors<Thread>> => {
     await this.waitUntilReady()
 
     const res = await this.fetch({ method: 'GET', url: 'users/@me/channels', checkError: true })
@@ -185,7 +185,8 @@ export default class DiscordNetworkAPI {
 
     // TODO: App doesn't display empty channels
     const items = ENABLE_GUILDS ? threads.concat([...this.channelsMap?.values() ?? []].flat()) : threads
-    return { items, hasMore: false }
+
+    return { items, hasMore: false, oldestCursor: null }
   }
 
   createThread = async (userIDs: string[], title?: string): Promise<boolean | Thread> => {
@@ -582,7 +583,7 @@ export default class DiscordNetworkAPI {
       this.ready = ready
     }
 
-    this.client.onConnectionClosed = (code, reason) => {
+    this.client.onConnectionClosed = (code) => {
       this.ready = false
 
       // TODO: Show toast
