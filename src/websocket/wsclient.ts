@@ -6,7 +6,7 @@ import type { Packer } from '../packers'
 import { DEBUG } from '../preferences'
 import { DiscordPresenceStatus, GatewayCloseCode, GatewayMessageType, OPCode } from './constants'
 import { WSError } from './errors'
-import type { GatewayConnectionOptions, GatewayMessage } from './types'
+import type { GatewayConnectionOptions, GatewayMessage, OutboundGatewayMessage } from './types'
 
 const LOG_PREFIX = '[discord ws]'
 
@@ -94,7 +94,7 @@ class WSClient {
     this.ws?.dispose(code)
   }
 
-  public send = async (message: GatewayMessage) => {
+  public send = async (message: OutboundGatewayMessage) => {
     if (DEBUG) texts.log('<', message)
     const packed = this.packer.pack(message)
     this.ws.send(packed)
@@ -150,7 +150,7 @@ class WSClient {
         this.connect()
         break
       case OPCode.HELLO:
-        this.setupHeartbeat(message.d.heartbeat_interval)
+        this.setupHeartbeat((message.d as { heartbeat_interval: number }).heartbeat_interval)
         this.sendIdentifyOrResume()
         this.shouldResume = false
         break
@@ -168,13 +168,6 @@ class WSClient {
       case OPCode.REQUEST_GUILD_MEMBERS: {
         // Shouldn't ever happen
         texts.log(LOG_PREFIX, `Received send-only OPCode (${message.op})!`, message)
-        break
-      }
-
-      // * Default
-
-      default: {
-        texts.log(LOG_PREFIX, `Unhandled OPCode (${message.op})!`, message)
         break
       }
     }
@@ -201,7 +194,7 @@ class WSClient {
 
     if (DEBUG) texts.log(LOG_PREFIX, this.shouldResume ? 'Resuming...' : 'Sending identify...')
 
-    let payload: GatewayMessage
+    let payload: OutboundGatewayMessage
     if (this.shouldResume) {
       payload = {
         op: OPCode.RESUME,
@@ -251,11 +244,7 @@ class WSClient {
       return
     }
 
-    const payload: GatewayMessage = {
-      op: OPCode.HEARTBEAT,
-      d: this.lastSequenceNumber,
-    }
-    this.send(payload)
+    this.send({ op: OPCode.HEARTBEAT, d: this.lastSequenceNumber })
     this.receivedHeartbeatAck = false
   }
 
@@ -263,11 +252,11 @@ class WSClient {
     switch (message.t) {
       case GatewayMessageType.READY: {
         if (DEBUG) texts.log(LOG_PREFIX, 'Got dispatch <READY>!')
-        this.sessionID = message.d?.session_id
+        this.sessionID = (message.d as { session_id: string }).session_id
         break
       }
       case GatewayMessageType.SESSIONS_REPLACE: {
-        const session = message.d?.at(0)
+        const session = (message.d as Array<{ session_id: string }>).at(0)
         if (session.session_id) this.sessionID = session.session_id
         break
       }
