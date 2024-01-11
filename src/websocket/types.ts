@@ -16,12 +16,12 @@ export type GatewayMessage<Data = unknown> =
      * are received have an `op` of `DISPATCH`, with the `t` field actually
      * denoting the event type of interest.
      */
-    op: OPCode.DISPATCH,
+    op: OPCode.DISPATCH
 
     /**
      * The enclosed event data contained within this Gateway packet.
      */
-    d: Data,
+    d: Data
 
     /**
      * Packet sequence number, which is used for resuming sessions and heartbeats.
@@ -31,7 +31,7 @@ export type GatewayMessage<Data = unknown> =
      * gateway will use the sequence number as a reference point in order to send
      * us all of the events that we missed.
      */
-    s: number,
+    s: number
 
     /**
      * The event name for this gateway message (only relevant if `op` is
@@ -40,12 +40,12 @@ export type GatewayMessage<Data = unknown> =
     t: GatewayMessageType
   }
   | {
-    op: OPCode,
-    d: Data,
+    op: OPCode
+    d: Data
 
     // The sequence number and event name fields are always (supposed to be)
     // `null` when `op` isn't `DISPATCH`.
-    s: null,
+    s: null
     t: null
   }
 
