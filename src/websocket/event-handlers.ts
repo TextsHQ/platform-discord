@@ -1,7 +1,7 @@
 import { texts, ServerEvent, ServerEventType, Message, ActivityType, UserPresence } from '@textshq/platform-sdk'
 
 import { Snowflake } from 'discord-api-types/globals'
-import { APIUser, APIGuild, APIChannel, GatewayPresenceUpdateData, APIEmoji, ChannelType } from 'discord-api-types/v9'
+import { APIUser, APIGuild, APIChannel, GatewayPresenceUpdateData, APIEmoji, ChannelType, APIGroupDMChannel, APIDMChannel } from 'discord-api-types/v9'
 import { IGNORED_CHANNEL_TYPES } from '../constants'
 import { mapThread, mapPresence, mapUser, mapMessage, mapReaction } from '../mappers/mappers'
 import type DiscordNetworkAPI from '../network-api'
@@ -10,28 +10,12 @@ import { DiscordEmoji } from '../types/discord-types'
 import { getEmojiURL } from '../util'
 import { GatewayMessageType } from './constants'
 
+function isGuildChannel(channel: APIChannel): channel is Exclude<APIChannel, APIGroupDMChannel | APIDMChannel> {
+  return channel.type !== ChannelType.DM && channel.type !== ChannelType.GroupDM
+}
+
 export function attachReadyHandlers(api: DiscordNetworkAPI) {
-  api.gatewayEvents.on(GatewayMessageType.READY, message => {
-    // Assert the entire structure of the READY packet in one go. TODO: Move
-    // this somewhere else.
-    const d = message.d as {
-      analytics_token: string
-      users: APIUser[]
-      read_state: {
-        entries: Array<{ id: Snowflake, last_message_id: Snowflake }>
-      }
-      user: { premium_type?: number }
-
-      // TODO: Verify if this type is truly the case:
-      guilds: Array<APIGuild & { channels: APIChannel[], threads: APIChannel[] }>
-
-      user_guild_settings: {
-        entries: Array<{
-          channel_overrides: Array<{ muted: boolean, channel_id: string }>
-        }>
-      }
-    }
-
+  api.gatewayEvents.on(GatewayMessageType.READY, ({ d }) => {
     if (ENABLE_DISCORD_ANALYTICS) api.analyticsToken = d.analytics_token
 
     api.usernameIDMap = new Map(
@@ -88,13 +72,7 @@ export function attachReadyHandlers(api: DiscordNetworkAPI) {
     texts.log('[discord] Pumped READY')
   })
 
-  api.gatewayEvents.on(GatewayMessageType.READY_SUPPLEMENTAL, message => {
-    const d = message.d as {
-      merged_presences: {
-        friends?: Array<GatewayPresenceUpdateData & { user_id: Snowflake }>
-      }
-    }
-
+  api.gatewayEvents.on(GatewayMessageType.READY_SUPPLEMENTAL, ({ d }) => {
     api.usersPresence = Object.fromEntries(
       d.merged_presences.friends?.map(presence => [
         presence.user_id,
@@ -105,9 +83,8 @@ export function attachReadyHandlers(api: DiscordNetworkAPI) {
 }
 
 export function attachGuildHandlers(api: DiscordNetworkAPI) {
-  api.gatewayEvents.on(GatewayMessageType.GUILD_CREATE, ({ d }) => {
+  api.gatewayEvents.on(GatewayMessageType.GUILD_CREATE, ({ d: guild }) => {
     if (api.guildCustomEmojiMap) {
-      const guild = d as APIGuild
       const emojis: DiscordEmoji[] = guild.emojis.map(e => ({
         displayName: e.name ?? e.id!,
         reactionKey: `<:${e.name}:${e.id}>`,
@@ -132,11 +109,11 @@ export function attachGuildHandlers(api: DiscordNetworkAPI) {
 
     if (!ENABLE_GUILDS) return
 
-    const channels = (d.channels as APIChannel[])
+    const channels = guild.channels
       .filter(c => !IGNORED_CHANNEL_TYPES.has(c.type))
       .map(c => mapThread(c, api.readStateMap.get(c.id), api.mutedChannels.has(c.id), api.currentUser))
 
-    api.channelsMap?.set(d.id, channels)
+    api.channelsMap?.set(guild.id, channels)
 
     const channelEvents: ServerEvent[] = channels.map(c => ({
       type: ServerEventType.STATE_SYNC,
@@ -149,14 +126,14 @@ export function attachGuildHandlers(api: DiscordNetworkAPI) {
     api.eventCallback(channelEvents)
   })
 
-  api.gatewayEvents.on(GatewayMessageType.GUILD_DELETE, ({ d }) => {
-    api.guildCustomEmojiMap?.delete(d.id)
+  api.gatewayEvents.on(GatewayMessageType.GUILD_DELETE, ({ d: guild }) => {
+    api.guildCustomEmojiMap?.delete(guild.id)
     api.onGuildCustomEmojiMapUpdate()
     // TODO: State sync
 
     if (!ENABLE_GUILDS) return
 
-    const channelIDs = api.channelsMap?.get(d.id)?.map(c => c.id)
+    const channelIDs = api.channelsMap?.get(guild.id)?.map(c => c.id)
     if (!channelIDs) return
 
     const events: ServerEvent[] = channelIDs.map(id => ({
@@ -168,7 +145,7 @@ export function attachGuildHandlers(api: DiscordNetworkAPI) {
     }))
     api.eventCallback(events)
 
-    api.channelsMap?.delete(d.id)
+    api.channelsMap?.delete(guild.id)
   })
 
   api.gatewayEvents.on(GatewayMessageType.GUILD_EMOJIS_UPDATE, ({ d }) => {
@@ -214,7 +191,7 @@ export function attachMessageHandlers(api: DiscordNetworkAPI) {
         mutationType: 'upsert',
         objectName: 'message',
         objectIDs: { threadID: d.channel_id },
-        entries: [mapMessage(d, api.currentUser?.id) as Message],
+        entries: [mapMessage(d, api.currentUser?.id)],
       }])
     }
   })
@@ -295,7 +272,7 @@ export function attachMessageHandlers(api: DiscordNetworkAPI) {
 
 export function attachChannelHandlers(api: DiscordNetworkAPI) {
   api.gatewayEvents.on(GatewayMessageType.CHANNEL_CREATE, ({ d }) => {
-    if (!ENABLE_GUILDS && d.guild_id) return
+    if (!ENABLE_GUILDS && isGuildChannel(d)) return
 
     if (d.type !== ChannelType.DM && d.type !== ChannelType.GroupDM) {
       return
@@ -318,7 +295,7 @@ export function attachChannelHandlers(api: DiscordNetworkAPI) {
   })
 
   api.gatewayEvents.on(GatewayMessageType.CHANNEL_UPDATE, ({ d }) => {
-    if (!ENABLE_GUILDS && d.guild_id) return
+    if (!ENABLE_GUILDS || !isGuildChannel(d)) return
 
     const channels = api.channelsMap?.get(d.guild_id)
     if (!channels) return
@@ -342,7 +319,7 @@ export function attachChannelHandlers(api: DiscordNetworkAPI) {
   })
 
   api.gatewayEvents.on(GatewayMessageType.CHANNEL_DELETE, ({ d }) => {
-    if (!ENABLE_GUILDS && d.guild_id) return
+    if (!ENABLE_GUILDS && isGuildChannel(d)) return
 
     api.eventCallback([{
       type: ServerEventType.STATE_SYNC,
