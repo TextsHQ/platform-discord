@@ -270,7 +270,7 @@ export function attachMessageHandlers(api: DiscordNetworkAPI) {
   api.gatewayEvents.on(GatewayMessageType.MESSAGE_ACK, ({ d }) => {
     if (!ENABLE_GUILDS && d.guild_id) return
     const threadID = d.channel_id
-    this.readStateMap.set(threadID, d.message_id)
+    api.readStateMap.set(threadID, d.message_id)
     api.eventCallback([{
       type: ServerEventType.STATE_SYNC,
       mutationType: 'update',
