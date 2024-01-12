@@ -1,5 +1,5 @@
 import { Message, MessageActionType, Attachment, AttachmentType, MessageLink, MessageReaction, Thread, ThreadType, User, PartialWithID, UserPresence, texts } from '@textshq/platform-sdk'
-import { APIChannel, EmbedType, MessageActivityType, APIAttachment, MessageType, GatewayPresenceUpdateData, APIUser } from 'discord-api-types/v9'
+import { APIChannel, EmbedType, MessageActivityType, APIAttachment, MessageType, GatewayPresenceUpdateData, APIUser, GatewayMessageReactionAddDispatchData, GatewayPresenceUpdateDispatchData, APIPartialEmoji } from 'discord-api-types/v9'
 import { uniqBy } from 'lodash'
 
 import { IGNORED_MESSAGE_TYPES, StickerFormat, THREAD_TYPES } from '../constants'
@@ -8,7 +8,7 @@ import { mapTextAttributes } from '../text-attributes'
 import { handleArticleEmbed, handleGifvEmbed, handleImageEmbed, handleLinkEmbed, handleRichEmbed, handleVideoEmbed } from './rich-embeds'
 import type { DiscordMessage, DiscordReactionDetails } from '../types/discord-types'
 
-export const mapReaction = (reaction: DiscordReactionDetails, participantID: string): MessageReaction => {
+export const mapReaction = (reaction: { emoji: APIPartialEmoji }, participantID: string): MessageReaction => {
   // reaction.emoji = { id: '352592187265122304', name: 'pat' }
   // reaction.emoji = { id: null, name: '👍' }
   const reactionKey = (reaction.emoji.name || reaction.emoji.id)!
@@ -21,7 +21,7 @@ export const mapReaction = (reaction: DiscordReactionDetails, participantID: str
   }
 }
 
-export const mapPresence = (userID: string, presence: GatewayPresenceUpdateData): UserPresence => {
+export const mapPresence = (userID: string, presence: Omit<GatewayPresenceUpdateData, 'since' | 'afk'>): UserPresence => {
   const activity = presence.activities?.length > 0 ? presence.activities?.[0] as any : undefined
   return {
     userID,

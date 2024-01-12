@@ -22,6 +22,7 @@ import _emojis from './resources/emojis.json'
 import _emojiShortcuts from './resources/shortcuts.json'
 import type { GatewayConnectionOptions, GatewayMessage } from './websocket/types'
 import { attachReadyHandlers, attachChannelHandlers, attachGuildHandlers, attachReactionHandlers, attachMessageHandlers, attachRelationshipHandlers, attachRecipientHandlers } from './websocket/event-handlers'
+import GatewayEventEmitter from './websocket/emitter'
 
 const API_VERSION = 9
 const API_ENDPOINT = `https://discord.com/api/v${API_VERSION}`
@@ -73,7 +74,7 @@ export default class DiscordNetworkAPI {
 
   private deviceFingerprint?: string = undefined
 
-  gatewayEvents = new EventEmitter({ captureRejections: true })
+  gatewayEvents = new GatewayEventEmitter()
 
   token?: string
 
@@ -618,6 +619,15 @@ export default class DiscordNetworkAPI {
     // texts.log(LOG_PREFIX, op, d, t)
     this.gatewayEvents.emit('message', message)
     if (message.t) {
+      // This is the part where we tell TypeScript that the data coming in is,
+      // in fact, the shape that we say it is. Of course, this can change from
+      // underneath us at a moment's notice. We can eliminate this by actually
+      // checking that received data is of the expected shape (e.g. via
+      // something like Zod). For now, though, just assume that we're right.
+      // When Discord changes the shape of data they send to users, we'll
+      // simply have to catch up.
+      //
+      // @ts-expect-error
       this.gatewayEvents.emit(message.t, message)
     }
   }
