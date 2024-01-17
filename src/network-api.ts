@@ -85,8 +85,6 @@ export default class DiscordNetworkAPI {
     this.pendingEventsQueue.push(...events)
   }
 
-  startPolling?: () => void
-
   ready = false
 
   currentUser?: User
@@ -131,24 +129,28 @@ export default class DiscordNetworkAPI {
   disconnect = () => {
     texts.log(LOG_PREFIX, 'Disconnecting')
     this.ready = false
-    if (this.client?.ready) this.client?.disconnect()
+    if (this.client?.connected) this.client?.disconnect()
     this.client = undefined
   }
 
-  connect = async (force = false, resume = false) => {
-    if (this.client?.ready) {
+  connect = async (force = false) => {
+    texts.log(LOG_PREFIX, `DiscordNetworkAPI#connect called (are we ready? ${this.ready}, WS open? ${this.client?.connected})`)
+
+    if (this.client?.connected) {
       if (force) {
-        texts.log(LOG_PREFIX, 'Force connect!')
+        texts.log(LOG_PREFIX, 'connect(true) called and we\'re connected, forcing a disconnect first')
         this.client.disconnect()
       } else {
-        texts.log(LOG_PREFIX, 'connect() called, but already has client.')
+        texts.log(LOG_PREFIX, 'connect() called, but we\'re already connected')
         return
       }
     }
 
-    texts.log(LOG_PREFIX, 'Connecting...')
+    texts.log(LOG_PREFIX, 'connecting...')
 
     if (!this.client) {
+      texts.log(LOG_PREFIX, 'making new WSClient')
+
       const url = `${API_ENDPOINT}/gateway`
       const gatewayRes = await this.httpClient.requestAsString(url, { headers: { 'User-Agent': USER_AGENT } })
       const { statusCode, body } = gatewayRes
@@ -160,7 +162,6 @@ export default class DiscordNetworkAPI {
       this.client = new WSClient(gatewayHost, this.token!, defaultPacker!, WS_OPTIONS)
     }
 
-    // this.client.resumeOnConnect = resume
     await this.client.connect()
     this.setupGatewayListeners()
   }
@@ -583,25 +584,21 @@ export default class DiscordNetworkAPI {
       this.ready = ready
     }
 
-    this.client.onConnectionClosed = (code) => {
+    this.client.onConnectionClosed = code => {
+      // Called when we lose connection to the gateway. WSClient handles
+      // reconnection for us (if appropriate), so there's no need to do it
+      // here.
+
       this.ready = false
 
       // TODO: Show toast
 
       switch (code) {
-        case GatewayCloseCode.ADDRESS_NOT_FOUND:
-          texts.log(LOG_PREFIX, 'Gateway connection closed due to network connection loss.')
-          this.startPolling?.()
-          break
         case GatewayCloseCode.AUTHENTICATION_FAILED:
-          texts.log(LOG_PREFIX, 'Gateway connection closed due to authentication failure.')
-          this.client?.disconnect()
+          // "The account token sent with your identify payload is incorrect."
+          texts.log(LOG_PREFIX, 'GW authentication failed; disposing WSClient and going away')
           this.client = undefined
-          // eslint-disable-next-line @typescript-eslint/no-throw-literal
           throw new ReAuthError('Access token invalid')
-        case GatewayCloseCode.SESSION_TIMED_OUT:
-          texts.log(`${LOG_PREFIX} Gateway session timed out`)
-          break
         default:
           break
       }
@@ -659,8 +656,6 @@ export default class DiscordNetworkAPI {
       if (err.code === 'ECONNREFUSED' && (err.message.endsWith('0.0.0.0:443') || err.message.endsWith('127.0.0.1:443'))) {
         texts.error('Discord is blocked')
         throw new Error('Discord seems to be blocked on your device. This could have been done by an app or a manual entry in /etc/hosts')
-      } else if (err.code === 'ENOTFOUND') {
-        this.startPolling?.()
       } else {
         throw err
       }

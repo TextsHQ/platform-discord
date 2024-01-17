@@ -89,10 +89,15 @@ export enum GatewayMessageType {
 }
 
 export enum GatewayCloseCode {
-  MANUAL_DISCONNECT = 1000,
-  RECONNECT_REQUESTED = 1001,
-  DISCONNECTED = 1005,
-  ADDRESS_NOT_FOUND = 1006,
+  // These close codes are standard (RFC 6455): https://datatracker.ietf.org/doc/html/rfc6455#section-7.4.1
+  CLOSE_NORMAL = 1000,
+  CLOSE_GOING_AWAY = 1001,
+  CLOSED_NO_STATUS = 1005,
+  // This close code is special in that the WebSocket is also closed with it if
+  // we timeout when trying to disconnect.
+  CLOSED_ABNORMALLY = 1006,
+
+  // Discord Gateway close event codes: https://discord.com/developers/docs/topics/opcodes-and-status-codes#gateway-gateway-close-event-codes
   UNKNOWN_ERROR = 4000,
   UNKNOWN_OPCODE = 4001,
   DECODE_ERROR = 4002,
@@ -106,3 +111,32 @@ export enum GatewayCloseCode {
   INVALID_INTENTS = 4013,
   DISALLOWED_INTENTS = 4014,
 }
+
+/**
+  * WebSocket close codes to attempt reconnection and resumption upon
+  * receiving.
+  */
+export const RECONNECT_AND_RESUME_CLOSE_CODES = [
+  GatewayCloseCode.CLOSE_GOING_AWAY,
+  GatewayCloseCode.CLOSED_NO_STATUS,
+  GatewayCloseCode.CLOSED_ABNORMALLY,
+
+  GatewayCloseCode.UNKNOWN_ERROR,
+  GatewayCloseCode.UNKNOWN_OPCODE,
+  GatewayCloseCode.DECODE_ERROR,
+  GatewayCloseCode.RATE_LIMITED,
+]
+
+/**
+  * WebSocket close codes to attempt reconnection upon receiving. The session
+  * should be discarded, and a resume shouldn't be attempted.
+  */
+export const RECONNECT_DONT_RESUME_CLOSE_CODES = [
+  GatewayCloseCode.INVALID_SEQ,
+  GatewayCloseCode.SESSION_TIMED_OUT,
+  GatewayCloseCode.NOT_AUTHENTICATED,
+
+  // For the following close codes, it's unknown whether resuming would be OK
+  // after receiving them. Don't resume, just in case.
+  GatewayCloseCode.ALREADY_AUTHENTICATED,
+]
