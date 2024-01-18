@@ -3,7 +3,6 @@ import { mapUser } from './mappers/mappers'
 import DiscordNetworkAPI from './network-api'
 import { getDataURI } from './util'
 
-const POLLING_INTERVAL = 10_000
 const LOG_PREFIX = '[discord]'
 
 export default class Discord implements PlatformAPI {
@@ -22,7 +21,6 @@ export default class Discord implements PlatformAPI {
     const currentUser = mapUser(res!.json)
     this.api.currentUser = currentUser
     this.api.usernameIDMap.set(currentUser.username!, currentUser.id)
-    this.api.startPolling = this.startPolling
     await this.api.getUserFriends()
   }
 
@@ -39,7 +37,6 @@ export default class Discord implements PlatformAPI {
 
   dispose = () => {
     texts.log(LOG_PREFIX, 'Disposing')
-    if (this.pollingInterval) this.stopPolling(false)
     this.api.disconnect()
   }
 
@@ -142,46 +139,8 @@ export default class Discord implements PlatformAPI {
   // }
 
   reconnectRealtime = async () => {
-    texts.log(`${LOG_PREFIX} reconnectRealtime`)
-    await this.api.connect(true, true)
+    texts.log(`${LOG_PREFIX} received reconnectRealtime (ignoring)`)
     if (this.api.lastFocusedThread) this.api.eventCallback?.([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: this.api.lastFocusedThread }])
-  }
-
-  startPolling = async () => {
-    texts.log(`${LOG_PREFIX} Starting polling, interval: ${POLLING_INTERVAL}`)
-    this.api.setGatewayShouldResume(true)
-
-    const action = async (): Promise<boolean> => {
-      texts.log(`${LOG_PREFIX} Polling...`)
-      try {
-        const user = await this.api.getMe()
-        if (user) {
-          texts.log(`${LOG_PREFIX} Poll successful!`)
-          await this.stopPolling(true)
-          return true
-        }
-      } catch (error) {
-        texts.log(`${LOG_PREFIX} Poll failed!`, error)
-      }
-      return false
-    }
-    const success = await action()
-    if (!success) {
-      clearInterval(this.pollingInterval!)
-      this.pollingInterval = setInterval(action, POLLING_INTERVAL)
-    }
-  }
-
-  stopPolling = async (success: boolean) => {
-    texts.log(`${LOG_PREFIX} Stopping polling`)
-
-    if (this.pollingInterval != null) clearInterval(this.pollingInterval)
-    this.pollingInterval = undefined
-
-    if (success) {
-      await this.api.connect(true, true)
-      if (this.api.lastFocusedThread) this.api.eventCallback?.([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: this.api.lastFocusedThread }])
-    }
   }
 
   private pushToken: string | undefined
