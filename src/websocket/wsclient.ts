@@ -330,9 +330,10 @@ class WSClient {
     if (!this.receivedHeartbeatAck) {
       log('connection zombified! tried to send heartbeat, but the last one wasn\'t acked')
 
-      // "The client should immediately terminate the connection with any close
-      // code besides `1000` or `1001`, then reconnect and attempt to Resume."
-      this.reconnect({ code: GatewayCloseCode.CLOSED_ABNORMALLY, resuming: true })
+      // Unsure if this is the status code that first-party clients use; let's
+      // just use 1008 (appropriate in generic situations) for now. The `ws`
+      // library restricts which codes we can use.
+      this.reconnect({ code: 1008, resuming: true })
       return
     }
 
