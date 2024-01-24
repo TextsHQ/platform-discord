@@ -11,7 +11,7 @@ import { mapMessage, mapPresence, mapReaction, mapThread, mapUser } from './mapp
 import WSClient from './websocket/wsclient'
 import { GatewayCloseCode, GatewayMessageType } from './websocket/constants'
 import { defaultPacker } from './packers'
-import { generateScienceClientUUID, getEmojiURL, sleep } from './util'
+import { emojiToMarkup, generateScienceClientUUID, getEmojiURL, sleep } from './util'
 import { generateSnowflake } from './common-util'
 import { ENABLE_GUILDS, ENABLE_DM_GUILD_MEMBERS, ENABLE_DISCORD_ANALYTICS } from './preferences'
 import { IGNORED_CHANNEL_TYPES, ScienceEventType, USER_AGENT } from './constants'
@@ -574,7 +574,7 @@ export default class DiscordNetworkAPI {
       })
       .replace(emojiRegex, match => { // emojis
         const customEmoji = this.allCustomEmojis?.find(emoji => `:${emoji.name}:` === match)
-        if (customEmoji) return `<:${customEmoji.name}:${customEmoji.id}>`
+        if (customEmoji) return emojiToMarkup(customEmoji)
         return match
       })
       // TODO: this.emojiShortcuts.shortcuts

@@ -1,4 +1,5 @@
 import { AttachmentType } from '@textshq/platform-sdk'
+import type { APIEmoji } from 'discord-api-types/v9'
 import { EPOCH as DISCORD_EPOCH } from './discord-constants'
 
 export { setTimeout as sleep } from 'timers/promises'
@@ -89,3 +90,8 @@ export const getLottieStickerURL = (id: string) => `https://discord.com/stickers
 export const getPNGStickerURL = (id: string) => `https://media.discordapp.net/stickers/${id}.png?size=512`
 
 export const getEmojiURL = (emojiID: string, animated?: boolean) => `https://cdn.discordapp.com/emojis/${emojiID}.${animated ? 'gif' : 'png'}`
+
+export const emojiToMarkup = (emoji: APIEmoji) => {
+  const potentiallyAnimatedFlag = emoji.animated ? 'a' : ''
+  return `<${potentiallyAnimatedFlag}:${emoji.name}:${emoji.id}>`
+}
