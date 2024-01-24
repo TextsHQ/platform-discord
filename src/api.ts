@@ -69,6 +69,8 @@ export default class Discord implements PlatformAPI {
       : this.api.userFriends
   }
 
+  getCustomEmojis = () => this.api.getCustomEmojis()
+
   /* searchMessages = (typed: string, pagination?: PaginationArg, threadID?: string) => {
     if (!threadID) return { items: [], hasMore: false }
     const typedLower = typed.toLowerCase()

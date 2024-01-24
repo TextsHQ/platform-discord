@@ -11,7 +11,7 @@ import { mapMessage, mapPresence, mapReaction, mapThread, mapUser } from './mapp
 import WSClient from './websocket/wsclient'
 import { GatewayCloseCode, GatewayMessageType } from './websocket/constants'
 import { defaultPacker } from './packers'
-import { generateScienceClientUUID, getEmojiURL, sleep } from './util'
+import { emojiToMarkup, generateScienceClientUUID, getEmojiURL, sleep } from './util'
 import { generateSnowflake } from './common-util'
 import { ENABLE_GUILDS, ENABLE_DM_GUILD_MEMBERS, ENABLE_DISCORD_ANALYTICS } from './preferences'
 import { IGNORED_CHANNEL_TYPES, ScienceEventType, USER_AGENT } from './constants'
@@ -60,10 +60,8 @@ export default class DiscordNetworkAPI {
 
   channelsMap? = ENABLE_GUILDS ? new Map<string, Thread[]>() : undefined
 
-  // key is guild id
-  guildCustomEmojiMap?: Map<string, DiscordEmoji[]>
-
-  private allCustomEmojis?: DiscordEmoji[]
+  // This is left `undefined` when the user doesn't have Nitro. Keyed by guild ID.
+  customEmojis?: Map<Snowflake, APIEmoji[]>
 
   usersPresence: PresenceMap = {}
 
@@ -318,7 +316,10 @@ export default class DiscordNetworkAPI {
     }
     const reactionsDetails = await Promise.all(message.reactions?.map(getReactionDetails) ?? [])
     const mapped = mapMessage(message, this.currentUser?.id, reactionsDetails)
-    if (mapped?.text) mapped.text = this.mapMentionsAndEmojis(mapped.text, false)
+    // Don't clobber instances of ":emoji_name:" in the message content at
+    // this point, because we've already parsed emoji markup and replaced them
+    // with images.
+    if (mapped?.text) mapped.text = this.mapMentionsAndEmojis(mapped.text, false, false)
     return mapped
   }
 
@@ -489,11 +490,24 @@ export default class DiscordNetworkAPI {
     this.sendScienceRequest(ScienceEventType.ack_messages, properties)
   }
 
+  get allCustomEmojis(): APIEmoji[] {
+    if (!this.customEmojis) {
+      return []
+    }
+
+    return Array.from(this.customEmojis.values()).flat()
+  }
+
+  findCustomEmojiNamed = (name: string): APIEmoji | null => {
+    // TODO: This is O(n) for what should really be O(1).
+    return this.allCustomEmojis.find(emoji => emoji.name === name)
+  }
+
   addReaction = async (threadID: string, messageID: string, reactionKey: string) => {
     await this.waitUntilReady()
 
-    const emoji = this.allCustomEmojis?.find(e => e.displayName === reactionKey)
-    if (emoji) reactionKey = emoji.reactionKey.slice(2, -1)
+    const emoji = this.findCustomEmojiNamed(reactionKey)
+    if (emoji) reactionKey = `${emoji.name}:${emoji.id}`
 
     await this.fetch({ method: 'PUT', url: `channels/${threadID}/messages/${messageID}/reactions/${encodeURIComponent(reactionKey)}/@me`, checkError: true })
   }
@@ -501,8 +515,8 @@ export default class DiscordNetworkAPI {
   removeReaction = async (threadID: string, messageID: string, reactionKey: string) => {
     await this.waitUntilReady()
 
-    const emoji = this.allCustomEmojis?.find(e => e.displayName === reactionKey)
-    if (emoji) reactionKey = emoji.reactionKey.slice(2, -1)
+    const emoji = this.findCustomEmojiNamed(reactionKey)
+    if (emoji) reactionKey = `${emoji.name}:${emoji.id}`
 
     await this.fetch({ method: 'DELETE', url: `channels/${threadID}/messages/${messageID}/reactions/${encodeURIComponent(reactionKey)}/@me`, checkError: true })
   }
@@ -525,10 +539,9 @@ export default class DiscordNetworkAPI {
 
   getCustomEmojis = async (): Promise<CustomEmojiMap> => {
     await this.waitUntilReady()
-    if (!this.allCustomEmojis) return {}
+    if (!this.customEmojis) return {}
 
-    const emojis = this.allCustomEmojis.map(e => [e.displayName, e.url])
-    return Object.fromEntries(emojis)
+    return Object.fromEntries(this.allCustomEmojis.map(emoji => [emoji.name, getEmojiURL(emoji.id, emoji.animated ?? false)]))
   }
 
   onThreadSelected = async (threadID?: string) => {
@@ -540,11 +553,6 @@ export default class DiscordNetworkAPI {
     if (this.client) this.client.shouldResume = shouldResume
   }
 
-  onGuildCustomEmojiMapUpdate = () => {
-    if (this.guildCustomEmojiMap) this.allCustomEmojis = Array.from(this.guildCustomEmojiMap.values()).flat()
-    // TODO: State sync
-  }
-
   getUserFriends = async () => {
     const res = await this.fetch({ method: 'GET', url: 'users/@me/relationships', checkError: true })
     this.userFriends = (res!.json as { type: number, user: APIUser }[])
@@ -554,7 +562,7 @@ export default class DiscordNetworkAPI {
     this.sendScienceRequest(ScienceEventType.dm_list_viewed)
   }
 
-  private mapMentionsAndEmojis = (text: string, mapMentions = true): string => {
+  private mapMentionsAndEmojis = (text: string, mapMentions = true, mapCustomEmojis = true): string => {
     const mentionRegex = /@([^#@]{3,32}#[0-9]{4})/gi
     const emojiRegex = /:([a-zA-Z0-9-_]*)(~\d*)?:/gi
 
@@ -568,8 +576,9 @@ export default class DiscordNetworkAPI {
         return match
       })
       .replace(emojiRegex, match => { // emojis
-        const emoji = this.allCustomEmojis?.find(e => `:${e.displayName}:` === match)
-        if (emoji) return emoji.reactionKey
+        if (!mapCustomEmojis) return match
+        const customEmoji = this.allCustomEmojis?.find(emoji => `:${emoji.name}:` === match)
+        if (customEmoji) return emojiToMarkup(customEmoji)
         return match
       })
       // TODO: this.emojiShortcuts.shortcuts

@@ -47,18 +47,7 @@ export function attachReadyHandlers(api: DiscordNetworkAPI) {
     if (d.user.premium_type !== 0) {
       // User has Discord Nitro ("premium"; can use custom emojis globally), so
       // store them.
-      const allEmojis = d.guilds.map(guild => {
-        const emojis: DiscordEmoji[] = guild.emojis.map(emoji => ({
-          displayName: emoji.name,
-          reactionKey: `<:${emoji.name}:${emoji.id}>`,
-          url: getEmojiURL(emoji.id, emoji.animated),
-        }))
-
-        return [guild.id, emojis] as const
-      })
-      api.guildCustomEmojiMap = new Map<string, DiscordEmoji[]>(allEmojis)
-
-      api.onGuildCustomEmojiMapUpdate()
+      api.customEmojis = new Map(d.guilds.map(guild => ([guild.id, guild.emojis] as const)))
     }
 
     if (ENABLE_GUILDS) {
@@ -106,24 +95,17 @@ export function attachReadyHandlers(api: DiscordNetworkAPI) {
 
 export function attachGuildHandlers(api: DiscordNetworkAPI) {
   api.gatewayEvents.on(GatewayMessageType.GUILD_CREATE, ({ d }) => {
-    if (api.guildCustomEmojiMap) {
-      const guild = d as APIGuild
-      const emojis: DiscordEmoji[] = guild.emojis.map(e => ({
-        displayName: e.name ?? e.id!,
-        reactionKey: `<:${e.name}:${e.id}>`,
-        url: getEmojiURL(e.id!, e.animated),
-      }))
-      api.guildCustomEmojiMap.set(guild.id, emojis)
-      api.onGuildCustomEmojiMapUpdate()
+    if (api.customEmojis) {
+      api.customEmojis[d.id] = d.emojis
 
       const emojiEvent: ServerEvent = {
         type: ServerEventType.STATE_SYNC,
         objectIDs: {},
         mutationType: 'upsert',
         objectName: 'custom_emoji',
-        entries: guild.emojis.map(e => ({
-          id: e.id!,
-          url: getEmojiURL(e.id!, e.animated),
+        entries: d.emojis.map(emoji => ({
+          id: emoji.id!,
+          url: getEmojiURL(emoji.id!, emoji.animated),
         })),
       }
 
@@ -150,9 +132,18 @@ export function attachGuildHandlers(api: DiscordNetworkAPI) {
   })
 
   api.gatewayEvents.on(GatewayMessageType.GUILD_DELETE, ({ d }) => {
-    api.guildCustomEmojiMap?.delete(d.id)
-    api.onGuildCustomEmojiMapUpdate()
-    // TODO: State sync
+    const customEmojis = api.customEmojis?.get(d.id)
+    if (customEmojis !== null) {
+      api.customEmojis?.delete(d.id)
+
+      api.eventCallback([{
+        type: ServerEventType.STATE_SYNC,
+        objectIDs: {},
+        mutationType: 'delete',
+        objectName: 'custom_emoji',
+        entries: customEmojis.map(emoji => emoji.id),
+      }])
+    }
 
     if (!ENABLE_GUILDS) return
 
@@ -172,15 +163,7 @@ export function attachGuildHandlers(api: DiscordNetworkAPI) {
   })
 
   api.gatewayEvents.on(GatewayMessageType.GUILD_EMOJIS_UPDATE, ({ d }) => {
-    if (!api.guildCustomEmojiMap) return
-
-    const emojis = d.emojis.map((e: APIEmoji) => ({
-      displayName: e.name,
-      reactionKey: `<:${e.name}:${e.id}>`,
-      url: getEmojiURL(e.id!, e.animated),
-    }))
-    api.guildCustomEmojiMap.set(d.guild_id, emojis)
-    api.onGuildCustomEmojiMapUpdate()
+    api.customEmojis?.set(d.id, d.emojis)
   })
 }
 
