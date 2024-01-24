@@ -316,7 +316,10 @@ export default class DiscordNetworkAPI {
     }
     const reactionsDetails = await Promise.all(message.reactions?.map(getReactionDetails) ?? [])
     const mapped = mapMessage(message, this.currentUser?.id, reactionsDetails)
-    if (mapped?.text) mapped.text = this.mapMentionsAndEmojis(mapped.text, false)
+    // Don't clobber instances of ":emoji_name:" in the message content at
+    // this point, because we've already parsed emoji markup and replaced them
+    // with images.
+    if (mapped?.text) mapped.text = this.mapMentionsAndEmojis(mapped.text, false, false)
     return mapped
   }
 
@@ -559,7 +562,7 @@ export default class DiscordNetworkAPI {
     this.sendScienceRequest(ScienceEventType.dm_list_viewed)
   }
 
-  private mapMentionsAndEmojis = (text: string, mapMentions = true): string => {
+  private mapMentionsAndEmojis = (text: string, mapMentions = true, mapCustomEmojis = true): string => {
     const mentionRegex = /@([^#@]{3,32}#[0-9]{4})/gi
     const emojiRegex = /:([a-zA-Z0-9-_]*)(~\d*)?:/gi
 
@@ -573,6 +576,7 @@ export default class DiscordNetworkAPI {
         return match
       })
       .replace(emojiRegex, match => { // emojis
+        if (!mapCustomEmojis) return match
         const customEmoji = this.allCustomEmojis?.find(emoji => `:${emoji.name}:` === match)
         if (customEmoji) return emojiToMarkup(customEmoji)
         return match
