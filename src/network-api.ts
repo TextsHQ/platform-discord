@@ -589,7 +589,7 @@ export default class DiscordNetworkAPI {
     if (!this.client) throw new Error('Client not initialized!')
 
     this.client.onChangedReadyState = ready => {
-      texts.log(`${LOG_PREFIX} Client connection state: ${ready}`)
+      texts.log(`${LOG_PREFIX} client ready state changed to: ${ready}`)
       this.ready = ready
     }
 
@@ -597,8 +597,6 @@ export default class DiscordNetworkAPI {
       // Called when we lose connection to the gateway. WSClient handles
       // reconnection for us (if appropriate), so there's no need to do it
       // here.
-
-      this.ready = false
 
       // TODO: Show toast
 

@@ -79,6 +79,11 @@ class WSClient {
   /// A callback to expose incoming gateway messages downstream.
   public gatewayMessageHandler?: (message: GatewayMessage) => void
 
+  /**
+    * Called with `true` when the gateway sends `READY` (or `RESUMED`, in the
+    * case of resumption). Called with `false` when the WebSocket connection
+    * is closed for any reason.
+    */
   public onChangedReadyState?: (ready: boolean) => void
 
   public onError?: (error: Error) => void
@@ -180,6 +185,7 @@ class WSClient {
     }
 
     this.onConnectionClosed?.(code)
+    this.onChangedReadyState?.(false)
     return { retry }
   }
 
@@ -351,6 +357,7 @@ class WSClient {
         this.sessionID = message.d?.session_id
         this.resumeGatewayURL = message.d?.resume_gateway_url
         if (DEBUG) log(`we're READY! (session id: ${this.sessionID}, resume URL: ${this.resumeGatewayURL})`)
+        this.onChangedReadyState?.(true)
         break
       }
 
@@ -372,6 +379,7 @@ class WSClient {
           },
         }
         this.send(presencePayload)
+        this.onChangedReadyState?.(true)
         break
       }
 

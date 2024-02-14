@@ -73,7 +73,6 @@ export function attachReadyHandlers(api: DiscordNetworkAPI) {
       api.channelsMap = new Map(allChannels)
     }
 
-    api.ready = true
     texts.log('[discord] Pumped READY')
   })
 
