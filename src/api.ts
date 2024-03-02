@@ -141,7 +141,8 @@ export default class Discord implements PlatformAPI {
   // }
 
   reconnectRealtime = async () => {
-    texts.log(`${LOG_PREFIX} received reconnectRealtime (ignoring)`)
+    texts.log(`${LOG_PREFIX} received reconnectRealtime, forcing a reconnect`)
+    this.api.reconnect()
     if (this.api.lastFocusedThread) this.api.eventCallback?.([{ type: ServerEventType.THREAD_MESSAGES_REFRESH, threadID: this.api.lastFocusedThread }])
   }
 

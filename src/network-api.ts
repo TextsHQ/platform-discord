@@ -131,6 +131,10 @@ export default class DiscordNetworkAPI {
     this.client = undefined
   }
 
+  reconnect = () => {
+    this.client?.reconnect({ wantsResume: true })
+  }
+
   connect = async (force = false) => {
     texts.log(LOG_PREFIX, `DiscordNetworkAPI#connect called (are we ready? ${this.ready}, WS open? ${this.client?.connected})`)
 
