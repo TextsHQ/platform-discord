@@ -147,10 +147,10 @@ class WSClient {
     this.ws.disconnect(code)
   }
 
-  public reconnect = (options: { code?: number, resuming: boolean }) => {
+  public reconnect = (options: { wantsResume: boolean }) => {
     this.performingManualReconnect = true
-    this.updateResumptionState(options.resuming)
-    this.disconnect(options.code)
+    this.updateResumptionState(options.wantsResume)
+    this.ws?.forceDisconnect()
   }
 
   public send = async (message: GatewayMessage) => {
@@ -234,12 +234,12 @@ class WSClient {
         break
       case OPCode.RECONNECT:
         log('received RECONNECT, reconnecting...')
-        this.reconnect({ resuming: true })
+        this.reconnect({ wantsResume: true })
         break
       case OPCode.INVALID_SESSION: {
         const salvageable: boolean = message.d
         log(`received INVALID_SESSION (salvageable: ${salvageable}), reconnecting`)
-        this.reconnect({ resuming: salvageable })
+        this.reconnect({ wantsResume: salvageable })
         break
       }
       case OPCode.HELLO:
@@ -335,11 +335,7 @@ class WSClient {
 
     if (!this.receivedHeartbeatAck) {
       log('connection zombified! tried to send heartbeat, but the last one wasn\'t acked')
-
-      // Unsure if this is the status code that first-party clients use; let's
-      // just use 1008 (appropriate in generic situations) for now. The `ws`
-      // library restricts which codes we can use.
-      this.reconnect({ code: 1008, resuming: true })
+      this.reconnect({ wantsResume: true })
       return
     }
 
