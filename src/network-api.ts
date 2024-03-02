@@ -160,7 +160,7 @@ export default class DiscordNetworkAPI {
       this.client = new WSClient(gatewayHost, this.token!, defaultPacker!, WS_OPTIONS)
     }
 
-    await this.client.connect()
+    this.client.connect()
     this.setupGatewayListeners()
   }
 
