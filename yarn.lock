@@ -2069,7 +2069,7 @@ __metadata:
   resolution: "@textshq/platform-discord@workspace:."
   dependencies:
     "@textshq/eslint-config": "https://github.com/TextsHQ/eslint-config#1643cad9437bfe0491504c6f9428dc0c1264d8ff"
-    "@textshq/platform-sdk": "https://github.com/TextsHQ/platform-sdk#8b0e4d5db637d5103ce85000af5fec7738859748"
+    "@textshq/platform-sdk": "https://github.com/TextsHQ/platform-sdk#6e4e72ed3a8b172c494dd0e340079f2454c4c48b"
     "@textshq/platform-test-lib": "https://github.com/TextsHQ/platform-test-lib#3d6a0d9452ccc24c3f07ec27b9f2730438392de2"
     "@types/eslint": ^8.4.10
     "@types/jest": ^27.4.1
@@ -2087,9 +2087,9 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@textshq/platform-sdk@https://github.com/TextsHQ/platform-sdk#8b0e4d5db637d5103ce85000af5fec7738859748":
+"@textshq/platform-sdk@https://github.com/TextsHQ/platform-sdk#6e4e72ed3a8b172c494dd0e340079f2454c4c48b":
   version: 0.4.4
-  resolution: "@textshq/platform-sdk@https://github.com/TextsHQ/platform-sdk.git#commit=8b0e4d5db637d5103ce85000af5fec7738859748"
+  resolution: "@textshq/platform-sdk@https://github.com/TextsHQ/platform-sdk.git#commit=6e4e72ed3a8b172c494dd0e340079f2454c4c48b"
   dependencies:
     emoji-regex: ^10.1.0
     lodash: ^4.17.21
@@ -2100,7 +2100,7 @@ __metadata:
       optional: true
     ws:
       optional: true
-  checksum: ddf873515cca271133fab5386146d558cc1e3110147fbd07c0ebd91a1c97ff05fe662bf335c8e8c925cbbf43efe9f6faf6b75fd7f8166e0fed465f62fe256312
+  checksum: 4495618acb0a11cfe298099bd4f6d55fbe1b21723da3dfe869bd8bcdac4420f7c39c302639435ea5e0a963d6b6f2991443b082c47dd82fbd0b8445d6c2088d7a
   languageName: node
   linkType: hard
 
@@ -7800,7 +7800,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"ws@npm:^8.15.1":
+"ws@npm:^8.15.1, ws@npm:^8.2.1":
   version: 8.16.0
   resolution: "ws@npm:8.16.0"
   peerDependencies:
@@ -7812,21 +7812,6 @@ __metadata:
     utf-8-validate:
       optional: true
   checksum: feb3eecd2bae82fa8a8beef800290ce437d8b8063bdc69712725f21aef77c49cb2ff45c6e5e7fce622248f9c7abaee506bae0a9064067ffd6935460c7357321b
-  languageName: node
-  linkType: hard
-
-"ws@npm:^8.2.1":
-  version: 8.13.0
-  resolution: "ws@npm:8.13.0"
-  peerDependencies:
-    bufferutil: ^4.0.1
-    utf-8-validate: ">=5.0.2"
-  peerDependenciesMeta:
-    bufferutil:
-      optional: true
-    utf-8-validate:
-      optional: true
-  checksum: 53e991bbf928faf5dc6efac9b8eb9ab6497c69feeb94f963d648b7a3530a720b19ec2e0ec037344257e05a4f35bd9ad04d9de6f289615ffb133282031b18c61c
   languageName: node
   linkType: hard
 
