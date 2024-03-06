@@ -4,7 +4,7 @@ import { promises as fs } from 'fs'
 import { uniqBy } from 'lodash'
 import { texts, MessageContent, PaginationArg, Thread, Message, ServerEventType, OnServerEventCallback, ActivityType, User, MessageSendOptions, ReAuthError, PresenceMap, Paginated, FetchOptions, ServerEvent, CustomEmojiMap, UserPresence, PaginatedWithCursors } from '@textshq/platform-sdk'
 import { ExpectedJSONGotHTMLError } from '@textshq/platform-sdk/dist/json'
-import { APIChannel, APIDMChannel, APIDMChannelBase, APIEmoji, APIGroupDMChannel, APIGuild, APIReaction, APIUser, ChannelType, GatewayPresenceUpdateData, Snowflake } from 'discord-api-types/v9'
+import { APIChannel, APIDMChannel, APIEmoji, APIGroupDMChannel, APIGuild, APIReaction, APIUser, ChannelType, GatewayPresenceUpdateData, Snowflake } from 'discord-api-types/v9'
 import EventEmitter from 'events'
 
 import { mapMessage, mapPresence, mapReaction, mapThread, mapUser } from './mappers/mappers'
