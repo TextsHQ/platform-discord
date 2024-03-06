@@ -1,5 +1,5 @@
+import type { APIEmoji, APIUser } from 'discord-api-types/v9'
 import { AttachmentType } from '@textshq/platform-sdk'
-import type { APIEmoji } from 'discord-api-types/v9'
 import { EPOCH as DISCORD_EPOCH } from './discord-constants'
 
 export { setTimeout as sleep } from 'timers/promises'
@@ -77,6 +77,9 @@ export const parseMediaURL = (url: string): { isGif?: boolean, type: AttachmentT
       return { type: AttachmentType.UNKNOWN }
   }
 }
+
+export const resolveUsername = (user: APIUser): string =>
+  (user.discriminator === '0' ? user.username : `${user.username}#${user.discriminator}`)
 
 export const getUserAvatar = (userID: string, avatarID: string) => `https://cdn.discordapp.com/avatars/${userID}/${avatarID}.${avatarID.startsWith('a_') ? 'gif' : 'png'}?size=256`
 
