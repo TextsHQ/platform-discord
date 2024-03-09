@@ -4,14 +4,14 @@ import { promises as fs } from 'fs'
 import { uniqBy } from 'lodash'
 import { texts, MessageContent, PaginationArg, Thread, Message, ServerEventType, OnServerEventCallback, ActivityType, User, MessageSendOptions, ReAuthError, PresenceMap, Paginated, FetchOptions, ServerEvent, CustomEmojiMap, UserPresence, PaginatedWithCursors } from '@textshq/platform-sdk'
 import { ExpectedJSONGotHTMLError } from '@textshq/platform-sdk/dist/json'
-import { APIChannel, APIEmoji, APIGuild, APIReaction, APIUser, ChannelType, GatewayPresenceUpdateData, Snowflake } from 'discord-api-types/v9'
+import { APIChannel, APIDMChannel, APIEmoji, APIGroupDMChannel, APIGuild, APIReaction, APIUser, ChannelType, GatewayPresenceUpdateData, Snowflake } from 'discord-api-types/v9'
 import EventEmitter from 'events'
 
 import { mapMessage, mapPresence, mapReaction, mapThread, mapUser } from './mappers/mappers'
 import WSClient from './websocket/wsclient'
 import { GatewayCloseCode, GatewayMessageType } from './websocket/constants'
 import { defaultPacker } from './packers'
-import { emojiToMarkup, generateScienceClientUUID, getEmojiURL, sleep } from './util'
+import { emojiToMarkup, generateScienceClientUUID, getEmojiURL, resolveUsername, sleep } from './util'
 import { generateSnowflake } from './common-util'
 import { ENABLE_GUILDS, ENABLE_DM_GUILD_MEMBERS, ENABLE_DISCORD_ANALYTICS } from './preferences'
 import { IGNORED_CHANNEL_TYPES, ScienceEventType, USER_AGENT } from './constants'
@@ -178,13 +178,16 @@ export default class DiscordNetworkAPI {
 
     const res = await this.fetch({ method: 'GET', url: 'users/@me/channels', checkError: true })
 
-    const threads: Thread[] = (res!.json as APIChannel[])
-      // @ts-expect-error We're not checking categories
+    const privateChannels = res!.json as (APIDMChannel | APIGroupDMChannel)[]
+
+    privateChannels.flatMap(channel => channel.recipients).forEach(participant => {
+      this.usernameIDMap.set(resolveUsername(participant), participant.id)
+    })
+
+    const threads: Thread[] = privateChannels
       .sort((a, b) => +a.last_message_id! - +b.last_message_id!)
       .reverse()
       .map(t => mapThread(t, this.readStateMap.get(t.id), this.mutedChannels.has(t.id), this.currentUser))
-
-    threads.flatMap(t => t.participants.items).forEach(p => this.usernameIDMap.set(p.username!, p.id))
 
     // TODO: App doesn't display empty channels
     const items = ENABLE_GUILDS ? threads.concat([...this.channelsMap?.values() ?? []].flat()) : threads
@@ -567,11 +570,11 @@ export default class DiscordNetworkAPI {
   }
 
   private mapMentionsAndEmojis = (text: string, mapMentions = true, mapCustomEmojis = true): string => {
-    const mentionRegex = /@([^#@]{3,32}#[0-9]{4})/gi
+    // Resolve old usernames (with discriminator) and new ("pomelo") usernames.
+    const mentionRegex = /@((?:[^@#:]{2,32}#\d{4})|(?:[a-z0-9_.]{2,32}))/gi
     const emojiRegex = /:([a-zA-Z0-9-_]*)(~\d*)?:/gi
 
     // TODO: Check if user has swapping emojis enabled
-    // TODO: Fix mappings for users without discriminators
     return text
       ?.replace(mentionRegex, (match, username) => { // mentions
         if (!mapMentions) return match

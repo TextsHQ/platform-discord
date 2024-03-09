@@ -3,7 +3,7 @@ import { APIChannel, EmbedType, MessageActivityType, APIAttachment, MessageType,
 import { uniqBy } from 'lodash'
 
 import { IGNORED_MESSAGE_TYPES, StickerFormat, THREAD_TYPES } from '../constants'
-import { getEmojiURL, getLottieStickerURL, getPNGStickerURL, getThreadIcon, getTimestampFromSnowflake, getUserAvatar } from '../util'
+import { getEmojiURL, getLottieStickerURL, getPNGStickerURL, getThreadIcon, getTimestampFromSnowflake, getUserAvatar, resolveUsername } from '../util'
 import { mapTextAttributes } from '../text-attributes'
 import { handleArticleEmbed, handleGifvEmbed, handleImageEmbed, handleLinkEmbed, handleRichEmbed, handleVideoEmbed } from './rich-embeds'
 import type { DiscordMessage, DiscordReactionDetails } from '../types/discord-types'
@@ -31,7 +31,7 @@ export const mapPresence = (userID: string, presence: GatewayPresenceUpdateData)
 }
 
 export function mapUser(user: APIUser): User {
-  const username = user.discriminator.length === 4 ? `${user.username}#${user.discriminator}` : user.username
+  const username = resolveUsername(user)
   return {
     id: user.id,
     fullName: user.global_name ?? user.username,
