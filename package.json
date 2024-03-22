@@ -35,5 +35,8 @@
     "jest": "^27.5.1",
     "typescript": "^5.0.2"
   },
-  "packageManager": "yarn@3.5.0"
+  "resolutions": {
+    "node-gyp": "^10.0.1"
+  },
+  "packageManager": "yarn@4.1.1"
 }
