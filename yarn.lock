@@ -2085,7 +2085,7 @@ __metadata:
   resolution: "@textshq/platform-discord@workspace:."
   dependencies:
     "@textshq/eslint-config": "https://github.com/TextsHQ/eslint-config#1643cad9437bfe0491504c6f9428dc0c1264d8ff"
-    "@textshq/platform-sdk": "https://github.com/TextsHQ/platform-sdk#6e4e72ed3a8b172c494dd0e340079f2454c4c48b"
+    "@textshq/platform-sdk": "https://github.com/TextsHQ/platform-sdk#69d1d78006b09323c4e5f6b6e512c7ce20f9c456"
     "@textshq/platform-test-lib": "https://github.com/TextsHQ/platform-test-lib#3d6a0d9452ccc24c3f07ec27b9f2730438392de2"
     "@types/eslint": "npm:^8.4.10"
     "@types/jest": "npm:^27.4.1"
@@ -2103,9 +2103,9 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@textshq/platform-sdk@https://github.com/TextsHQ/platform-sdk#6e4e72ed3a8b172c494dd0e340079f2454c4c48b":
+"@textshq/platform-sdk@https://github.com/TextsHQ/platform-sdk#69d1d78006b09323c4e5f6b6e512c7ce20f9c456":
   version: 0.4.4
-  resolution: "@textshq/platform-sdk@https://github.com/TextsHQ/platform-sdk.git#commit=6e4e72ed3a8b172c494dd0e340079f2454c4c48b"
+  resolution: "@textshq/platform-sdk@https://github.com/TextsHQ/platform-sdk.git#commit=69d1d78006b09323c4e5f6b6e512c7ce20f9c456"
   dependencies:
     emoji-regex: "npm:^10.1.0"
     lodash: "npm:^4.17.21"
@@ -2116,7 +2116,7 @@ __metadata:
       optional: true
     ws:
       optional: true
-  checksum: 10/c136fa299ff4f7b25bbd725e4dc52cce90d2533e4d6aa28fb153cba5f2ff283b38a7b5ff03a67376ff0239d2465a0171c00b901f530c8e159b8ea8735e6e7de9
+  checksum: 10/e87149eb67eb189b968d88341363daf7b28ba619be2a007b3ad4e0e24f5d5972ceb771f7b1f9db5668e4c1c618a1edbfdbd80445ee21015cddeb3562673eee43
   languageName: node
   linkType: hard
 
