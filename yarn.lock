@@ -2086,7 +2086,7 @@ __metadata:
   dependencies:
     "@textshq/eslint-config": "https://github.com/TextsHQ/eslint-config#1643cad9437bfe0491504c6f9428dc0c1264d8ff"
     "@textshq/platform-sdk": "https://github.com/TextsHQ/platform-sdk#69d1d78006b09323c4e5f6b6e512c7ce20f9c456"
-    "@textshq/platform-test-lib": "https://github.com/TextsHQ/platform-test-lib#3d6a0d9452ccc24c3f07ec27b9f2730438392de2"
+    "@textshq/platform-test-lib": "git+ssh://git@github.com:TextsHQ/platform-test-lib#3d6a0d9452ccc24c3f07ec27b9f2730438392de2"
     "@types/eslint": "npm:^8.4.10"
     "@types/jest": "npm:^27.4.1"
     "@types/lodash": "npm:^4.14.181"
@@ -2130,9 +2130,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@textshq/platform-test-lib@https://github.com/TextsHQ/platform-test-lib#3d6a0d9452ccc24c3f07ec27b9f2730438392de2":
+"@textshq/platform-test-lib@git+ssh://git@github.com:TextsHQ/platform-test-lib#3d6a0d9452ccc24c3f07ec27b9f2730438392de2":
   version: 0.1.0
-  resolution: "@textshq/platform-test-lib@https://github.com/TextsHQ/platform-test-lib.git#commit=3d6a0d9452ccc24c3f07ec27b9f2730438392de2"
+  resolution: "@textshq/platform-test-lib@git+ssh://git@github.com:TextsHQ/platform-test-lib#commit=3d6a0d9452ccc24c3f07ec27b9f2730438392de2"
   dependencies:
     "@textshq/platform-sdk": "https://github.com/TextsHQ/platform-sdk#ad5cbc49ffac074860ed49e31bb7d998c20b2ba4"
     got: "npm:^11.8.2"
